@@ -822,6 +822,7 @@ export const VigenciaModule: React.FC = () => {
                             otrosies={state.otrosies}
                             actas={state.actas}
                             risks={state.riesgos}
+                            pagos={state.pagos || []}
                           />
                         )}
                       </div>
