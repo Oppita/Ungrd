@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import { Contract, Pago, InterventoriaReport, FinancialDocument } from "../types";
+import {
+  Contract,
+  Pago,
+  InterventoriaReport,
+  FinancialDocument,
+} from "../types";
 import { useProject } from "../store/ProjectContext";
 import {
   X,
@@ -13,6 +18,7 @@ import {
 import { uploadDocumentToStorage, formatDateForInput } from "../lib/storage";
 import { ImportPagosCSV } from "./ImportPagosCSV";
 import { analyzePagoText } from "../services/financialService";
+import { AIProviderSelector } from "./AIProviderSelector";
 
 interface AddPagoFormProps {
   contracts: Contract[];
@@ -44,7 +50,7 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
     observaciones: initialData?.observaciones || "",
     rcId: initialData?.rcId || "",
     cdp: initialData?.cdp || "",
-    ...initialData
+    ...initialData,
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -202,7 +208,7 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
       } else {
         addPago(newPago);
       }
-      
+
       onClose();
     } catch (error) {
       console.error("Error saving pago:", error);
@@ -221,9 +227,13 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
               <DollarSign size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-bold">{initialData?.id ? 'Editar Pago' : 'Registrar Pago(s)'}</h2>
+              <h2 className="text-xl font-bold">
+                {initialData?.id ? "Editar Pago" : "Registrar Pago(s)"}
+              </h2>
               <p className="text-indigo-100 text-xs">
-                {initialData?.id ? `Editando pago No. ${initialData.numero || ''}` : 'Gestión financiera del contrato y proyectos'}
+                {initialData?.id
+                  ? `Editando pago No. ${initialData.numero || ""}`
+                  : "Gestión financiera del contrato y proyectos"}
               </p>
             </div>
           </div>
@@ -264,13 +274,16 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
           ) : activeTab === "ai" ? (
             <div className="space-y-6">
               <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
-                <h3 className="font-bold text-indigo-800 text-sm flex items-center gap-2 mb-2">
-                  <Loader2
-                    className={isAnalyzing ? "animate-spin" : ""}
-                    size={16}
-                  />{" "}
-                  Extracción Inteligente
-                </h3>
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-bold text-indigo-800 text-sm flex items-center gap-2">
+                    <Loader2
+                      className={isAnalyzing ? "animate-spin" : ""}
+                      size={16}
+                    />{" "}
+                    Extracción Inteligente
+                  </h3>
+                  <AIProviderSelector />
+                </div>
                 <p className="text-xs text-indigo-600">
                   Pega el texto del pago o tabla, incluyendo fecha, valores,
                   numero de cdp, contrato, etc. La inteligencia artificial
@@ -412,7 +425,10 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
                     type="text"
                     value={formData.proteccionCostera || ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, proteccionCostera: e.target.value })
+                      setFormData({
+                        ...formData,
+                        proteccionCostera: e.target.value,
+                      })
                     }
                     placeholder="Ej: SI / NO"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
@@ -556,13 +572,16 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
                     value={formData.rcId || ""}
                     onChange={(e) => {
                       const rcId = e.target.value;
-                      const matchedRC = financialDocs.find((d: any) => d.id === rcId);
-                      setFormData({ 
-                        ...formData, 
+                      const matchedRC = financialDocs.find(
+                        (d: any) => d.id === rcId,
+                      );
+                      setFormData({
+                        ...formData,
                         rcId,
                         rc: matchedRC?.numero || "",
                         cdp: matchedRC?.numeroCdp || formData.cdp,
-                        contractId: matchedRC?.contractId || formData.contractId
+                        contractId:
+                          matchedRC?.contractId || formData.contractId,
                       });
                     }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
@@ -570,10 +589,15 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
                     <option value="">-- Sin asociación (S/V) --</option>
                     {financialDocs
                       .filter((d: any) => d.tipo === "RC")
-                      .sort((a: any, b: any) => a.numero.localeCompare(b.numero))
+                      .sort((a: any, b: any) =>
+                        a.numero.localeCompare(b.numero),
+                      )
                       .map((rc: any) => (
                         <option key={rc.id} value={rc.id}>
-                          RC No. {rc.numero} {rc.valor ? `(${new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP" }).format(rc.valor)})` : ''}
+                          RC No. {rc.numero}{" "}
+                          {rc.valor
+                            ? `(${new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP" }).format(rc.valor)})`
+                            : ""}
                         </option>
                       ))}
                   </select>
