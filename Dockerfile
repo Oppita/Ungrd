@@ -3,16 +3,15 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar dependencias primero
-COPY package*.json ./
+# Aumentar memoria para evitar crashes durante build
+ENV NODE_OPTIONS=--max-old-space-size=4096
 
-# Usar --legacy-peer-deps para resolver conflicto React 19 vs react-simple-maps
+COPY package*.json ./
 RUN npm ci --legacy-peer-deps
 
-# Copiar todo el código fuente
 COPY . .
 
-# Build del frontend
+# Build del frontend con más recursos
 RUN npm run build
 
 # ====================== PRODUCTION STAGE ======================
@@ -20,7 +19,6 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Usuario no-root por seguridad
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 expressuser
 
@@ -37,6 +35,7 @@ USER expressuser
 
 ENV NODE_ENV=production
 ENV PORT=10000
+ENV NODE_OPTIONS=--max-old-space-size=2048
 
 EXPOSE 10000
 
