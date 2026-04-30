@@ -1520,6 +1520,7 @@ export const FinancialExecutionModule: React.FC<
               c.projectId === selectedRCForPago.projectId ||
               c.id === selectedRCForPago.contractId
           )}
+          financialDocs={projectDocs}
           initialData={
             selectedRCForPago.numero !== "Nuevo Pago Independiente"
               ? {
@@ -2091,181 +2092,12 @@ export const FinancialExecutionModule: React.FC<
       )}
 
       {selectedPagoToEdit && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200">
-            <div className="bg-indigo-600 p-6 text-white flex justify-between items-center">
-              <div>
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Edit /> Editar Pago No. {selectedPagoToEdit.numero}
-                </h3>
-                <p className="text-indigo-100 text-sm mt-1">
-                  Asociado a: {selectedPagoToEdit.beneficiario}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedPagoToEdit(null)}
-                className="p-2 hover:bg-white/20 rounded-full transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                    Número de Pago / Comprobante
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedPagoToEdit.numero}
-                    onChange={(e) =>
-                      setSelectedPagoToEdit({
-                        ...selectedPagoToEdit,
-                        numero: e.target.value,
-                      })
-                    }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                    Fecha de Pago
-                  </label>
-                  <input
-                    type="date"
-                    value={selectedPagoToEdit.fecha}
-                    onChange={(e) =>
-                      setSelectedPagoToEdit({
-                        ...selectedPagoToEdit,
-                        fecha: e.target.value,
-                      })
-                    }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                    Valor Pagado
-                  </label>
-                  <div className="relative">
-                    <DollarSign
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                      size={16}
-                    />
-                    <input
-                      type="number"
-                      value={selectedPagoToEdit.valor}
-                      onChange={(e) =>
-                        setSelectedPagoToEdit({
-                          ...selectedPagoToEdit,
-                          valor: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                    Estado
-                  </label>
-                  <select
-                    value={selectedPagoToEdit.estado}
-                    onChange={(e) =>
-                      setSelectedPagoToEdit({
-                        ...selectedPagoToEdit,
-                        estado: e.target.value as any,
-                      })
-                    }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
-                  >
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="Pagado">Pagado</option>
-                    <option value="Rechazado">Rechazado</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                  Asociar a RC (Documento Financiero)
-                </label>
-                <select
-                  value={selectedPagoToEdit.rcId || ""}
-                  onChange={(e) => {
-                    const rcId = e.target.value;
-                    const matchedRC = state.financialDocuments.find(
-                      (d: any) => d.id === rcId,
-                    );
-                    setSelectedPagoToEdit({
-                      ...selectedPagoToEdit,
-                      rcId,
-                      rc: matchedRC?.numero || "",
-                      cdp: matchedRC?.numeroCdp || "",
-                    });
-                  }}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">-- Sin asociación (S/V) --</option>
-                  {state.financialDocuments
-                    .filter((d: any) => d.tipo === "RC")
-                    .sort((a: any, b: any) => a.numero.localeCompare(b.numero))
-                    .map((rc: any) => (
-                      <option key={rc.id} value={rc.id}>
-                        RC No. {rc.numero} -{" "}
-                        {rc.nombre || rc.descripcion?.substring(0, 50)} (
-                        {formatCurrency(rc.valor)})
-                      </option>
-                    ))}
-                </select>
-                <p className="text-[10px] text-slate-400 italic">
-                  Asociar el pago a un RC permite rastrear la ejecución
-                  presupuestaria del contrato.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                  Observaciones
-                </label>
-                <textarea
-                  value={selectedPagoToEdit.observaciones}
-                  onChange={(e) =>
-                    setSelectedPagoToEdit({
-                      ...selectedPagoToEdit,
-                      observaciones: e.target.value,
-                    })
-                  }
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 h-24"
-                  placeholder="Detalles adicionales del pago..."
-                />
-              </div>
-            </div>
-
-            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button
-                onClick={() => setSelectedPagoToEdit(null)}
-                className="px-6 py-2 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition-all"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  updatePago(selectedPagoToEdit);
-                  setSelectedPagoToEdit(null);
-                  showAlert("Pago actualizado exitosamente");
-                }}
-                className="px-8 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
-              >
-                Guardar Cambios
-              </button>
-            </div>
-          </div>
-        </div>
+        <AddPagoForm
+          contracts={state.contratos}
+          financialDocs={projectDocs}
+          initialData={selectedPagoToEdit}
+          onClose={() => setSelectedPagoToEdit(null)}
+        />
       )}
     </div>
   );
