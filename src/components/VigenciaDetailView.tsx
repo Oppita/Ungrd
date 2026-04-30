@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Vigencia, Project, ProjectDocument, Contract, Otrosie, Acta, Riesgo } from '../types';
-import { FileText, Folder, AlertTriangle, Briefcase, Zap, BarChart3, ChevronRight, Layers } from 'lucide-react';
+import { Vigencia, Project, ProjectDocument, Contract, Otrosie, Acta, Riesgo, Pago } from '../types';
+import { FileText, Folder, AlertTriangle, Briefcase, Zap, BarChart3, ChevronRight, Layers, DollarSign, Calendar } from 'lucide-react';
+import { formatCurrency } from '../utils/formatters';
 
 interface VigenciaDetailViewProps {
   vigencia: Vigencia;
@@ -10,10 +11,11 @@ interface VigenciaDetailViewProps {
   otrosies: Otrosie[];
   actas: Acta[];
   risks: Riesgo[];
+  pagos?: Pago[];
 }
 
 export const VigenciaDetailView: React.FC<VigenciaDetailViewProps> = ({ 
-  vigencia, projects, documents, contracts, otrosies, actas, risks 
+  vigencia, projects, documents, contracts, otrosies, actas, risks, pagos = [] 
 }) => {
   const [activeTab, setActiveTab] = useState('resumen');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -34,6 +36,7 @@ export const VigenciaDetailView: React.FC<VigenciaDetailViewProps> = ({
     { id: 'resumen', label: 'Resumen Ejecutivo', icon: BarChart3 },
     { id: 'proyectos', label: 'Proyectos', icon: Briefcase },
     { id: 'contratos', label: 'Contratos', icon: Layers },
+    { id: 'pagos', label: 'Pagos / Financiero', icon: DollarSign },
     { id: 'documentos', label: 'Repositorio', icon: Folder },
   ];
 
@@ -118,6 +121,66 @@ export const VigenciaDetailView: React.FC<VigenciaDetailViewProps> = ({
           <ul className="space-y-2">
             {vigenciaContracts.map(c => <li key={c.id} onClick={() => setSelectedContract(c)} className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer flex justify-between items-center"><span>{c.numero} - {c.contratista}</span><ChevronRight size={16} /></li>)}
           </ul>
+        )}
+        {activeTab === 'pagos' && (
+          <div className="space-y-4">
+            <h4 className="font-bold text-slate-800 text-lg border-b border-slate-100 pb-2 mb-4">Relación de Pagos en la Vigencia</h4>
+            {pagos && pagos.filter(p => vigenciaContracts.some(c => c.id === p.contractId)).length > 0 ? (
+              <div className="grid gap-3">
+                {pagos
+                  .filter(p => vigenciaContracts.some(c => c.id === p.contractId))
+                  .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+                  .map((pago, pIdx) => {
+                    const relatedC = vigenciaContracts.find(c => c.id === pago.contractId);
+                    return (
+                      <div key={pago.id || pIdx} className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-bold text-slate-800 text-sm">Pago No. {pago.numero}</p>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                              pago.estado === 'Pagado' ? 'bg-emerald-100 text-emerald-700' :
+                              pago.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' :
+                              'bg-amber-100 text-amber-700'
+                            }`}>
+                              {pago.estado}
+                            </span>
+                            {relatedC && (
+                              <span className="px-2 py-0.5 bg-slate-200 text-slate-700 text-[10px] rounded uppercase tracking-wider font-bold truncate max-w-[200px]">
+                                Contrato: {relatedC.numero}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                            <Calendar size={12} /> {pago.fecha}
+                            {pago.rc && <><span className="mx-1">•</span>RC: {pago.rc}</>}
+                            {pago.cdp && <><span className="mx-1">•</span>CDP: {pago.cdp}</>}
+                          </p>
+                          {pago.observaciones && (
+                            <p className="text-[11px] text-slate-600 mt-2 bg-white px-3 py-1.5 rounded-md border border-slate-200">
+                              "{pago.observaciones}"
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {pago.beneficiario && <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-medium border border-indigo-100">Beneficiario: {pago.beneficiario}</span>}
+                            {pago.identificacion && <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded">ID: {pago.identificacion}</span>}
+                            {pago.banco && <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded">Banco: {pago.banco}</span>}
+                            {pago.cuenta && <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded">Cta: {pago.cuenta}</span>}
+                          </div>
+                        </div>
+                        <div className="md:text-right shrink-0">
+                          <p className="text-sm font-black text-slate-400 capitalize mb-1">Valor Girado</p>
+                          <p className="text-xl font-black text-emerald-600">{formatCurrency(pago.valor)}</p>
+                        </div>
+                      </div>
+                  )})}
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-50 border border-slate-100 border-dashed rounded-2xl">
+                <DollarSign className="mx-auto text-slate-300 mb-2" size={32} />
+                <p className="text-sm text-slate-500">No se encontraron pagos registrados para esta vigencia en el sistema.</p>
+              </div>
+            )}
+          </div>
         )}
         {activeTab === 'documentos' && (
           <div className="space-y-4">
