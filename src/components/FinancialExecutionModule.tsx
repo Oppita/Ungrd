@@ -693,22 +693,14 @@ export const FinancialExecutionModule: React.FC<
       const docsToSave: FinancialDocument[] = [];
       const pagosToSave: any[] = [];
 
-      // Detect header format
-      let isNewFormat = false;
-      if (lines.length > 0) {
-        const firstLine = lines[0].toLowerCase();
-        if (
-          firstLine.includes("no cdp") &&
-          firstLine.includes("valor cdp") &&
-          firstLine.includes("no rc")
-        ) {
-          isNewFormat = true;
-        }
-      }
-
       lines.forEach((line, index) => {
-        // Skip header
-        if (index === 0) return;
+        // Skip header if it looks like one
+        if (
+          index === 0 &&
+          (line.toLowerCase().includes("n°") ||
+            line.toLowerCase().includes("vincular"))
+        )
+          return;
         if (!line.trim()) return;
 
         // Flexible split: attempts tab first, then semicolon, then comma
@@ -721,105 +713,60 @@ export const FinancialExecutionModule: React.FC<
           const cleanAmount = (s: string) => {
             if (!s) return 0;
             // Remove symbols but keep numbers and decimal separators
-            let val = s.toString().replace(/[$\s,]/g, (match) => {
-              if (match === ",") return "."; // Basic normalization
-              return "";
-            });
-
-            // More robust normalization for common Latin formats
-            // If there's more than one dot, it might be thousands separator
-            if ((val.match(/\./g) || []).length > 1) {
-              val = val.replace(/\./g, "");
+            let val = s.replace(/[$\s]/g, "");
+            // Handle European/Latin American format: 1.000,00 -> 1000.00
+            if (val.includes(",") && val.includes(".")) {
+              if (val.lastIndexOf(",") > val.lastIndexOf(".")) {
+                val = val.replace(/\./g, "").replace(",", ".");
+              } else {
+                val = val.replace(/,/g, "");
+              }
+            } else if (val.includes(",")) {
+              val = val.replace(",", ".");
             }
-
             return parseFloat(val) || 0;
           };
 
           const parseSpanishDate = (d: string) => {
             if (!d) return new Date().toISOString().split("T")[0];
             const clean = d.trim();
-
-            // Handle Excel serial date (e.g. 44649)
-            if (/^\d{5}$/.test(clean)) {
-              const serial = parseInt(clean);
-              const date = new Date((serial - 25569) * 86400 * 1000);
-              return date.toISOString().split("T")[0];
-            }
-
             if (clean.includes("/")) {
               const [day, month, year] = clean.split("/");
-              let fullYear = year;
               if (year && year.length === 2) {
-                fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+                return `20${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
               }
-              return `${fullYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-            }
-
-            if (clean.includes("-")) {
-              const parts = clean.split("-");
-              if (parts[0].length === 4) return clean; // ISO YYYY-MM-DD
-              // Try DD-MM-YYYY
-              const [day, month, year] = parts;
               return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
             }
-
             return clean;
           };
 
-          let cdpNum,
-            cdpDate,
-            cdpVal,
-            rcNum,
-            rcDate,
-            rcVal,
-            rpVal,
-            description,
-            beneficiary,
-            identificacion,
-            areaEjecutora,
-            fuente,
-            rubro,
-            contractRef,
-            convenioRef;
+          // Mapping based on Header:
+          // 0: N°, 1: ConvenioRef, 2: ContractRef, 3: Beneficiary, 4: Rubro, 5: Fuente,
+          // 6: NoCDP, 7: FechaCDP, 8: ValCDP, 9: NoRC, 10: FechaRC, 11: ValRC, 12: Pagos Realizados
+          // Additional Pago Fields: 13: PagoFactura, 14: PagoFecha, 15: EntidadBancaria, 16: ComprobanteEgreso
+          const convenioRef = parts[1]?.trim();
+          const contractRef = parts[2]?.trim();
+          const beneficiary = parts[3]?.trim();
+          const rubro = parts[4]?.trim();
+          const fuente = parts[5]?.trim();
+          const description = parts[17]?.trim() || `${fuente}: ${rubro}`;
 
-          if (isNewFormat) {
-            // New Format Mapping:
-            // 0: No CDP, 1: Valor CDP, 2: Solicitante, 3: Area Ejecutora, 4: Descripcion, 5: Fecha CDP
-            // 6: Alias, 7: Fuente, 8: Linea, 9: Rubro, 10: Nacional/Regional, 11: Identificacion
-            // 12: Nombre, 13: No RC, 14: Fecha RC, 15: Estado, 16: Tipo, 17: Valor RC, 18: Contrato
-            // 23: Valor pagado
-            cdpNum = parts[0]?.trim();
-            cdpVal = cleanAmount(parts[1]);
-            areaEjecutora = parts[3]?.trim();
-            description = parts[4]?.trim();
-            cdpDate = parseSpanishDate(parts[5]);
-            fuente = parts[7]?.trim();
-            rubro = parts[9]?.trim();
-            identificacion = parts[11]?.trim();
-            beneficiary = parts[12]?.trim();
-            rcNum = parts[13]?.trim();
-            rcDate = parseSpanishDate(parts[14]);
-            rcVal = cleanAmount(parts[17]);
-            contractRef = parts[18]?.trim();
-            rpVal = cleanAmount(parts[23]);
-          } else {
-            // Standard Legacy Format Mapping:
-            // 0: N°, 1: ConvenioRef, 2: ContractRef, 3: Beneficiary, 4: Rubro, 5: Fuente,
-            // 6: NoCDP, 7: FechaCDP, 8: ValCDP, 9: NoRC, 10: FechaRC, 11: ValRC, 12: Pagos Realizados
-            convenioRef = parts[1]?.trim();
-            contractRef = parts[2]?.trim();
-            beneficiary = parts[3]?.trim();
-            rubro = parts[4]?.trim();
-            fuente = parts[5]?.trim();
-            cdpNum = parts[6]?.trim();
-            cdpDate = parseSpanishDate(parts[7]);
-            cdpVal = cleanAmount(parts[8]);
-            rcNum = parts[9]?.trim();
-            rcDate = parseSpanishDate(parts[10]);
-            rcVal = cleanAmount(parts[11]);
-            rpVal = cleanAmount(parts[12]);
-            description = parts[17]?.trim() || `${fuente}: ${rubro}`;
-          }
+          const cdpNum = parts[6]?.trim();
+          const cdpDate = parseSpanishDate(parts[7]);
+          const cdpVal = cleanAmount(parts[8]);
+
+          const rcNum = parts[9]?.trim();
+          const rcDate = parseSpanishDate(parts[10]);
+          const rcVal = cleanAmount(parts[11]);
+
+          const rpVal = cleanAmount(parts[12]);
+          const pagoFactura = parts[13]?.trim() || `FAC-CSV-${index}`;
+          const pagoFecha = parts[14]?.trim()
+            ? parseSpanishDate(parts[14])
+            : rcDate || cdpDate;
+          const entidadBancaria = parts[15]?.trim() || "Banco Matriz";
+          const comprobanteEgreso =
+            parts[16]?.trim() || `CE-${Date.now()}-${index}`;
 
           if (cdpNum) {
             // Attempt to resolve IDs
@@ -848,14 +795,12 @@ export const FinancialExecutionModule: React.FC<
               convenioId,
               contractId,
               nombre: beneficiary,
-              identificacion: identificacion,
-              areaEjecutora: areaEjecutora,
               rubro,
               fuente,
-              descripcion: description || "Importado sin descripción",
+              descripcion: description,
               validacion_ia: {
                 coherente: true,
-                observaciones: "Importado vía Carga Masiva (Refactorizado)",
+                observaciones: "Importado vía Carga Masiva",
                 inconsistencias: [],
               },
             };
@@ -873,7 +818,7 @@ export const FinancialExecutionModule: React.FC<
             docsToSave.push(cdpDoc);
 
             // 2. Create RC if exists
-            if (rcNum) {
+            if (rcNum && rcVal > 0) {
               const rcId = `FIN-RC-CSV-${Date.now()}-${index}`;
               const rcDoc: FinancialDocument = {
                 ...baseDoc,
@@ -881,9 +826,9 @@ export const FinancialExecutionModule: React.FC<
                 tipo: "RC",
                 numero: rcNum,
                 numeroCdp: cdpNum,
-                valor: rcVal > 0 ? rcVal : cdpVal, // Default to CDP value if RC value missing
+                valor: rcVal,
                 fecha: rcDate || cdpDate,
-                valorPagado: 0,
+                valorPagado: 0, // Will be calculated dynamically based on Pagos
               };
               docsToSave.push(rcDoc);
 
@@ -891,16 +836,19 @@ export const FinancialExecutionModule: React.FC<
               if (rpVal > 0) {
                 pagosToSave.push({
                   id: `PAGO-CSV-${Date.now()}-${index}`,
-                  contractId: contractId || `UNLINKED-CONT-${Date.now()}`,
+                  contractId: contractId || `TEMP-CONT-${Date.now()}`,
                   rcId: rcId,
-                  numero: `${cdpNum}-${rcNum}-P${index}`,
-                  beneficiario: beneficiary || "Beneficiario CSV",
-                  identificacion: identificacion,
-                  fecha: rcDate || cdpDate,
-                  fechaPagoReal: rcDate || cdpDate,
+                  numero: cdpNum + "-" + rcNum + "-P1",
+                  numeroFactura: pagoFactura,
+                  beneficiario: beneficiary || "Beneficiario Importado",
+                  entidadBancaria: entidadBancaria,
+                  comprobanteEgreso: comprobanteEgreso,
+                  fecha: pagoFecha,
+                  fechaPagoReal: pagoFecha,
                   valor: rpVal,
                   estado: "Pagado",
-                  observaciones: "Carga automática desde consolidado CDP/RC.",
+                  observaciones:
+                    "Pago importado masivamente vía CSV. Atado a RC y CDP.",
                 });
               }
             }
