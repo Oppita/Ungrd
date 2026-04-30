@@ -3,15 +3,17 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Aumentar memoria para evitar crashes durante build
 ENV NODE_OPTIONS=--max-old-space-size=4096
 
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+
+# Instalamos prop-types explícitamente + legacy peer deps
+RUN npm install prop-types --save-dev && \
+    npm ci --legacy-peer-deps
 
 COPY . .
 
-# Build del frontend con más recursos
+# Build con configuración más tolerante
 RUN npm run build
 
 # ====================== PRODUCTION STAGE ======================
