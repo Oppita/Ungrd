@@ -22,6 +22,7 @@ const CDPListItem = ({
   onEdit, 
   onDelete,
   onAddPago,
+  onAddRC,
   state 
 }: any) => {
   const [expanded, setExpanded] = useState(false);
@@ -127,6 +128,12 @@ const CDPListItem = ({
               <Activity size={18} className="text-indigo-600" /> Trazabilidad de Compromisos (RC)
             </h5>
             <div className="flex gap-2">
+               <button 
+                  onClick={(e) => { e.stopPropagation(); onAddRC(doc); }}
+                  className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[10px] font-black shadow-sm flex items-center gap-1 hover:bg-emerald-100"
+                >
+                  <Plus size={12} /> Añadir RC
+                </button>
                <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-black text-slate-500 shadow-sm">
                  {linkedRCs.length} RCs Vinculados
                </span>
@@ -145,7 +152,14 @@ const CDPListItem = ({
                  <FileText size={24} className="text-slate-300" />
               </div>
               <p className="text-sm font-bold text-slate-400">No hay Registros de Compromiso vinculados a este CDP</p>
-              <p className="text-[10px] text-slate-400 uppercase mt-1">Vincule un RC usando el número de CDP {doc.numero}</p>
+              <div className="flex justify-center gap-3 mt-4">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onAddRC(doc); }}
+                  className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm border border-emerald-100 hover:bg-emerald-100"
+                >
+                  <Plus size={14} /> Vincular RC a este CDP
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -763,6 +777,15 @@ export const FinancialExecutionModule: React.FC<FinancialExecutionModuleProps> =
                 <Filter size={14} /> {showAllPagos ? 'Mostrando Todos' : 'Filtrar por Proyecto'}
               </button>
               <button
+                onClick={() => {
+                  setSelectedRCForPago({ id: '', numero: 'Nuevo Pago Independiente' } as any);
+                  setShowAddPagoModal(true);
+                }}
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-black border border-blue-100 hover:bg-blue-100 transition-colors shadow-sm"
+              >
+                <Plus size={14} /> Pago Manual
+              </button>
+              <button
                 onClick={() => setShowImportPagosModal(true)}
                 className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-colors shadow-sm"
               >
@@ -845,6 +868,19 @@ export const FinancialExecutionModule: React.FC<FinancialExecutionModuleProps> =
                 onAddPago={(rc: any) => {
                   setSelectedRCForPago(rc);
                   setShowAddPagoModal(true);
+                }}
+                onAddRC={(cdp: any) => {
+                  setPreviewDoc({
+                    id: `FIN-RC-${Date.now()}`,
+                    tipo: 'RC',
+                    numero: '',
+                    valor: 0,
+                    fecha: new Date().toISOString().split('T')[0],
+                    descripcion: '',
+                    numeroCdp: cdp.numero,
+                    projectId: cdp.projectId || ''
+                  } as any);
+                  setShowModal(true);
                 }}
                 state={state}
               />;
@@ -1096,8 +1132,8 @@ export const FinancialExecutionModule: React.FC<FinancialExecutionModuleProps> =
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200">
             <div className="bg-emerald-600 p-6 text-white flex justify-between items-center">
               <div>
-                <h3 className="text-xl font-bold flex items-center gap-2"><DollarSign /> Registrar Pago a RC No. {selectedRCForPago.numero}</h3>
-                <p className="text-emerald-100 text-sm mt-1">Presupuesto del RC: {formatCurrency(selectedRCForPago.valor)}</p>
+                <h3 className="text-xl font-bold flex items-center gap-2"><DollarSign /> {selectedRCForPago.numero === 'Nuevo Pago Independiente' ? 'Registrar Pago Manual' : `Registrar Pago a RC No. ${selectedRCForPago.numero}`}</h3>
+                <p className="text-emerald-100 text-sm mt-1">{selectedRCForPago.valor ? `Presupuesto del RC: ${formatCurrency(selectedRCForPago.valor)}` : 'Asocie este pago a un RC o CDP a continuación'}</p>
               </div>
               <button onClick={() => setShowAddPagoModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                 <X size={20} />
@@ -1111,10 +1147,12 @@ export const FinancialExecutionModule: React.FC<FinancialExecutionModuleProps> =
               const valorStr = fd.get('valor') as string;
               const valor = parseFloat(valorStr.replace(/[^0-9.-]+/g,""));
               
+              const rcIdValue = fd.get('rcId') as string;
               addPago({
                 id: crypto.randomUUID(),
                 contractId: selectedRCForPago.contractId || '',
-                rcId: selectedRCForPago.id,
+                rcId: rcIdValue || '',
+                cdp: fd.get('cdpId') as string || '',
                 fecha: fd.get('fecha') as string,
                 valor,
                 observaciones: fd.get('concepto') as string || '',
@@ -1128,10 +1166,42 @@ export const FinancialExecutionModule: React.FC<FinancialExecutionModuleProps> =
                 comprobanteEgreso: fd.get('comprobanteEgreso') as string,
                 fechaPagoReal: fd.get('fechaPagoReal') as string,
               });
-              showAlert('Pago registrado de forma exitosa. El saldo del RC se ha actualizado.');
+              showAlert('Pago registrado de forma exitosa.');
               setShowAddPagoModal(false);
             }}>
               <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">RC Asociado (Opcional)</label>
+                    <select
+                      name="rcId"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      defaultValue={selectedRCForPago.id !== '' ? selectedRCForPago.id : ''}
+                    >
+                      <option value="">-- Sin Asociación Puntos RC --</option>
+                      {projectDocs.filter(d => d.tipo === 'RC').map(rc => (
+                        <option key={rc.id} value={rc.id}>
+                          RC No. {rc.numero} - {formatCurrency(rc.valor)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">CDP Asociado (Opcional)</label>
+                    <select
+                      name="cdpId"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    >
+                      <option value="">-- Sin Asociación --</option>
+                      {projectDocs.filter(d => d.tipo === 'CDP').map(cdp => (
+                        <option key={cdp.id} value={cdp.id}>
+                          CDP No. {cdp.numero} - {formatCurrency(cdp.valor)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">Valor Pagado (Requerido)</label>
@@ -1538,14 +1608,32 @@ export const FinancialExecutionModule: React.FC<FinancialExecutionModuleProps> =
                   Confirmar y Guardar
                 </button>
               ) : (
-                <button 
-                  onClick={handleAnalyzeText}
-                  disabled={isAnalyzing || !pastedText.trim()}
-                  className="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex items-center gap-2 disabled:bg-slate-400"
-                >
-                  {isAnalyzing ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-                  Analizar Documento
-                </button>
+                <>
+                  <button 
+                    onClick={() => {
+                      setPreviewDoc({
+                        id: `FIN-MAN-${Date.now()}`,
+                        tipo: activeTab === 'RC' ? 'RC' : 'CDP',
+                        numero: '',
+                        valor: 0,
+                        fecha: new Date().toISOString().split('T')[0],
+                        descripcion: '',
+                        projectId: selectedProjectId || projectId || ''
+                      } as any);
+                    }}
+                    className="px-6 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold hover:bg-emerald-100 transition-colors border border-emerald-200"
+                  >
+                    Crear Manualmente
+                  </button>
+                  <button 
+                    onClick={handleAnalyzeText}
+                    disabled={isAnalyzing || !pastedText.trim()}
+                    className="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex items-center gap-2 disabled:bg-slate-400"
+                  >
+                    {isAnalyzing ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
+                    Analizar Documento
+                  </button>
+                </>
               )}
             </div>
           </div>
