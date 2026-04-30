@@ -857,6 +857,7 @@ export interface Pago {
 
   // Nuevos campos masivos (CSV)
   cdp?: string;
+  proteccionCostera?: string;
   areaEjecutora?: string;
   identificacion?: string;
   banco?: string;
