@@ -1,12 +1,112 @@
 import { Type } from "@google/genai";
 import { FinancialDocument } from "../types";
-import { generateContent, getAIModel, getAIProvider } from "./aiProviderService";
+import {
+  generateContent,
+  getAIModel,
+  getAIProvider,
+} from "./aiProviderService";
 
-export const analyzeFinancialDocumentText = async (text: string, contractId: string, projectId: string, convenioId?: string, otrosieId?: string): Promise<FinancialDocument> => {
+export const analyzePagoText = async (text: string): Promise<any> => {
   const model = getAIModel();
   const provider = getAIProvider();
 
-    const prompt = `
+  const prompt = `
+  Actúa como un analista financiero. Tu tarea es extraer la información de un registro de pago desde un texto o estructura CSV/TSV y mapearla a los campos de nuestro sistema.
+
+  CAMPOS A EXTRAER SEGÚN LA MATRIZ:
+  - numero: Número del pago o comprobante (Ej: 38551) (String)
+  - cdp: Número del CDP (Ej: 19-1014) (String)
+  - proteccionCostera: Si está marcado como "SI" o similar (Boolean)
+  - areaEjecutora: Área (Ej: GAA o vacía) (String)
+  - observaciones: Descripción del pago (String)
+  - fecha: Fecha del pago, en formato YYYY-MM-DD (String)
+  - identificacion: NIT/CC del destinatario (String)
+  - beneficiario: Nombre de la entidad/persona (String)
+  - valor: Valor bruto/transferido (Número puro, sin $ ni puntos) (Number)
+  - banco: Nombre del banco (String)
+  - tipoCuenta: Ej: CORRIENTE, AHORROS (String)
+  - cuenta: Número de la cuenta bancaria (String)
+  - solicitud: ID de solicitud (String)
+  - numeroContratoOriginal: Contrato referenciado (Ej: 9677-PPAL001-832-2019) (String)
+  - rc: Registro Presupuestal / RC asociado (String)
+  - valorDistribuido: Valor (Número puro) (Number)
+  - resolucion: (String)
+  - fuente: Ej: PRESUPUESTO NACIONAL INVERSION (String)
+  - fechaRadicado: Formato YYYY-MM-DD (String)
+  - departamento: (String)
+  - ciudad: (String)
+  - codigoRubro: Ej: 1AB-5 (String)
+  - rubro: Descripción del rubro (String)
+  - cuentaPago: (String)
+  - firma: Nombre del aprobador (String)
+  - cargo: Cargo del aprobador (String)
+
+  TEXTO A ANALIZAR:
+  ${text}
+
+  Convierte las fechas al formato YYYY-MM-DD. Limpia los símbolos de pesos.
+  Devuelve SOLO un JSON con esta estructura exacta. (Si un campo no existe, devuélvelo como "")
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        numero: { type: Type.STRING },
+        cdp: { type: Type.STRING },
+        proteccionCostera: { type: Type.BOOLEAN },
+        areaEjecutora: { type: Type.STRING },
+        observaciones: { type: Type.STRING },
+        fecha: { type: Type.STRING },
+        identificacion: { type: Type.STRING },
+        beneficiario: { type: Type.STRING },
+        valor: { type: Type.NUMBER },
+        banco: { type: Type.STRING },
+        tipoCuenta: { type: Type.STRING },
+        cuenta: { type: Type.STRING },
+        solicitud: { type: Type.STRING },
+        numeroContratoOriginal: { type: Type.STRING },
+        rc: { type: Type.STRING },
+        valorDistribuido: { type: Type.NUMBER },
+        resolucion: { type: Type.STRING },
+        fuente: { type: Type.STRING },
+        fechaRadicado: { type: Type.STRING },
+        departamento: { type: Type.STRING },
+        ciudad: { type: Type.STRING },
+        codigoRubro: { type: Type.STRING },
+        rubro: { type: Type.STRING },
+        cuentaPago: { type: Type.STRING },
+        firma: { type: Type.STRING },
+        cargo: { type: Type.STRING },
+      },
+    },
+  });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+
+  const parsed = JSON.parse(
+    responseText
+      .replace(/\`\`\`json\s*/g, "")
+      .replace(/\`\`\`\s*/g, "")
+      .trim(),
+  );
+  return parsed;
+};
+
+export const analyzeFinancialDocumentText = async (
+  text: string,
+  contractId: string,
+  projectId: string,
+  convenioId?: string,
+  otrosieId?: string,
+): Promise<FinancialDocument> => {
+  const model = getAIModel();
+  const provider = getAIProvider();
+
+  const prompt = `
     Actúa como un experto en auditoría financiera y gestión presupuestal pública.
     Tu tarea es extraer información estructurada de un texto que representa un documento financiero (CDP o RC).
     
@@ -117,17 +217,22 @@ export const analyzeFinancialDocumentText = async (text: string, contractId: str
         valorPorPagar: { type: Type.NUMBER },
         nombreFirma: { type: Type.STRING },
         cargoFirma: { type: Type.STRING },
-        usuario: { type: Type.STRING }
+        usuario: { type: Type.STRING },
       },
-      required: ["tipo", "numero", "valor", "fecha", "descripcion"]
-    }
+      required: ["tipo", "numero", "valor", "fecha", "descripcion"],
+    },
   });
 
   if (!responseText) {
     throw new Error("El modelo no devolvió ningún contenido.");
   }
 
-  const parsed = JSON.parse(responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim());
+  const parsed = JSON.parse(
+    responseText
+      .replace(/```json\s*/g, "")
+      .replace(/```\s*/g, "")
+      .trim(),
+  );
   return {
     id: `FIN-${Date.now()}`,
     contractId: contractId || undefined,
@@ -138,7 +243,7 @@ export const analyzeFinancialDocumentText = async (text: string, contractId: str
     validacion_ia: {
       coherente: true,
       observaciones: `Analizado automáticamente con ${provider} (${model})`,
-      inconsistencias: []
-    }
+      inconsistencias: [],
+    },
   };
 };
