@@ -12,7 +12,18 @@ export default defineConfig(({mode}) => {
   const rawSupabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || '';
   
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'ignore-missing-deps',
+        resolveId(id) {
+          if (['prop-types', 'react-is'].includes(id)) {
+            return { id, external: true };
+          }
+        },
+      },
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(geminiApiKey),
       'process.env.API_KEY': JSON.stringify(apiKey),
@@ -22,11 +33,11 @@ export default defineConfig(({mode}) => {
       'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(rawSupabaseKey),
     },
     optimizeDeps: {
-      include: ['prop-types', 'react-simple-maps'],
+      include: ['prop-types', 'react-is', 'react-simple-maps', 'recharts'],
     },
     build: {
       rollupOptions: {
-        external: ['prop-types'],
+        external: ['prop-types', 'react-is'],
       },
     },
     resolve: {
