@@ -12,18 +12,7 @@ export default defineConfig(({mode}) => {
   const rawSupabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || '';
   
   return {
-    plugins: [
-      react(),
-      tailwindcss(),
-      {
-        name: 'ignore-missing-deps',
-        resolveId(id) {
-          if (['prop-types', 'react-is'].includes(id)) {
-            return { id, external: true };
-          }
-        },
-      },
-    ],
+    plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(geminiApiKey),
       'process.env.API_KEY': JSON.stringify(apiKey),
@@ -35,19 +24,12 @@ export default defineConfig(({mode}) => {
     optimizeDeps: {
       include: ['prop-types', 'react-is', 'react-simple-maps', 'recharts'],
     },
-    build: {
-      rollupOptions: {
-        external: ['prop-types', 'react-is'],
-      },
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify – file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
         '/api': {
