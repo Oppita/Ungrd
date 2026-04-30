@@ -30,6 +30,7 @@ import { formatCurrency } from "../utils/formatters";
 import { analyzeFinancialDocumentText } from "../services/financialService";
 import { showAlert } from "../utils/alert";
 
+import { AIProviderSelector } from "./AIProviderSelector";
 import { AddPagoForm } from "./AddPagoForm";
 import { ImportPagosCSV } from "./ImportPagosCSV";
 
@@ -536,18 +537,14 @@ export const FinancialExecutionModule: React.FC<
   });
 
   const availableProjects = state.proyectos;
-  const projectContracts = state.contratos.filter(
-    (c) =>
-      (!selectedProjectId || c.projectId === selectedProjectId) &&
-      c.numero.toLowerCase().includes(contractSearch.toLowerCase()),
+  const projectContracts = state.contratos.filter((c) =>
+    c.numero.toLowerCase().includes(contractSearch.toLowerCase()),
   );
   const projectConvenios = state.convenios.filter((c) => {
     const matchesSearch =
       c.numero.toLowerCase().includes(convenioSearch.toLowerCase()) ||
       c.nombre.toLowerCase().includes(convenioSearch.toLowerCase());
-    if (!selectedProjectId) return matchesSearch;
-    const p = state.proyectos.find((proj) => proj.id === selectedProjectId);
-    return c.id === p?.convenioId && matchesSearch;
+    return matchesSearch;
   });
   const projectOtrosies = state.otrosies.filter(
     (o) =>
@@ -1518,7 +1515,7 @@ export const FinancialExecutionModule: React.FC<
             (c) =>
               c.projectId === projectId ||
               c.projectId === selectedRCForPago.projectId ||
-              c.id === selectedRCForPago.contractId
+              c.id === selectedRCForPago.contractId,
           )}
           financialDocs={projectDocs}
           initialData={
@@ -1526,7 +1523,12 @@ export const FinancialExecutionModule: React.FC<
               ? {
                   rcId: selectedRCForPago.id,
                   contractId: selectedRCForPago.contractId,
-                  cdp: projectDocs.find((d) => d.tipo === "CDP" && d.numero === selectedRCForPago.numeroCdp)?.numero || "",
+                  cdp:
+                    projectDocs.find(
+                      (d) =>
+                        d.tipo === "CDP" &&
+                        d.numero === selectedRCForPago.numeroCdp,
+                    )?.numero || "",
                 }
               : undefined
           }
@@ -1982,10 +1984,13 @@ export const FinancialExecutionModule: React.FC<
                   </div>
 
                   <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                    <h4 className="font-bold text-indigo-900 mb-2 flex items-center gap-2">
-                      <Activity size={18} />
-                      Extracción Automática con IA
-                    </h4>
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-bold text-indigo-900 flex items-center gap-2">
+                        <Activity size={18} />
+                        Extracción Automática con IA
+                      </h4>
+                      <AIProviderSelector />
+                    </div>
                     <p className="text-sm text-indigo-700 mb-4">
                       Pega el texto del CDP o RC extraído de la matriz o
                       documento oficial. La IA extraerá todos los campos
