@@ -1,12 +1,12 @@
 // src/lib/supabase.ts
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+export const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+export const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
-export const isSupabaseConfigured = 
-  supabaseUrl.length > 15 && 
-  supabaseAnonKey.length > 20 && 
+export const isSupabaseConfigured =
+  supabaseUrl.length > 15 &&
+  supabaseAnonKey.length > 20 &&
   !supabaseUrl.includes('falta-configurar');
 
 console.log("Supabase Configuración:");
@@ -26,7 +26,7 @@ export const getSupabase = (): SupabaseClient => {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
-        lock: undefined,           // Evita timeouts en Render
+        lock: undefined, // Evita timeouts en Render
       },
       global: {
         headers: {
@@ -35,6 +35,7 @@ export const getSupabase = (): SupabaseClient => {
       },
     });
   }
+
   return supabaseInstance;
 };
 
