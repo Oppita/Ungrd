@@ -31,11 +31,12 @@ export const ImportPagosCSV: React.FC<ImportPagosCSVProps> = ({ contracts, onCom
 
     Papa.parse(file, {
       header: true,
-      skipEmptyLines: 'greedy',
+      skipEmptyLines: true,
+      delimiter: "", // Auto-detect delimiter
       transformHeader: (header) => header.trim().replace(/^"|"$/g, '').replace(/[\n\r]/g, ''),
       complete: (results) => {
         const data = results.data as any[];
-        console.log(`CSV Parsing complete. found ${data.length} rows.`);
+        console.log(`CSV Parsing complete. identified ${data.length} potential rows.`);
         
         if (results.errors && results.errors.length > 0) {
            console.warn(`PapaParse reported ${results.errors.length} syntax warnings/errors:`, results.errors.slice(0, 5));
@@ -43,74 +44,101 @@ export const ImportPagosCSV: React.FC<ImportPagosCSVProps> = ({ contracts, onCom
 
         let successCount = 0;
         const errorMessages: string[] = [];
-        const pagosToUpload: any[] = [];
+        const pagosToUpload: Pago[] = [];
         
         // Optimize lookup
         const contractMap = new Map();
         contracts.forEach(c => contractMap.set(c.numero, c.id));
-        const firstContractId = contracts.length > 0 ? contracts[0].id : '';
 
         data.forEach((row, index) => {
           try {
             // Clean keys
             const cleanRow: any = {};
+            let hasAnyData = false;
             for (const key in row) {
               const cleanKey = key.trim().replace(/^"|"$/g, '').replace(/[\n\r]/g, '');
-              const cleanValue = row[key] && typeof row[key] === 'string' ? row[key].trim().replace(/^"|"$/g, '') : '';
+              const cleanValue = row[key] !== null && row[key] !== undefined ? String(row[key]).trim().replace(/^"|"$/g, '') : '';
               cleanRow[cleanKey] = cleanValue;
+              if (cleanValue !== '') hasAnyData = true;
             }
 
-            // Exclude completely empty rows
-            const isRowEmpty = Object.values(cleanRow).every(val => !val || (typeof val === 'string' && val.trim() === ''));
-            if (isRowEmpty) {
+            // Exclude completely empty rows but be less aggressive
+            if (!hasAnyData) {
               return;
             }
 
             // Extract fields based on requested structure using loose matching where possible
             const getField = (keys: string[]) => {
               for (const key of keys) {
-                if (cleanRow[key] !== undefined) return cleanRow[key];
+                if (cleanRow[key] !== undefined && cleanRow[key] !== '') return cleanRow[key];
                 // Also try case-insensitive matching
                 const matchingKey = Object.keys(cleanRow).find(k => k.toLowerCase() === key.toLowerCase() || k.toLowerCase().trim() === key.toLowerCase().trim());
-                if (matchingKey) return cleanRow[matchingKey];
+                if (matchingKey && cleanRow[matchingKey] !== '') return cleanRow[matchingKey];
               }
               return '';
             };
 
-            const idCsv = getField(['ID']);
+            const idCsv = getField(['ID', 'Identificador', 'id_pago']);
             let numero = getField(['No.Pago', 'Número', 'Numero', 'No. Pago', 'Numero Pago', 'Num Pago', 'ID']);
             if (!numero) {
-              numero = idCsv || `CSV-${index + 1}`;
+              numero = idCsv || `GEN-${Date.now()}-${index}`;
             }
 
             const cdp = getField(['CDP', 'No. CDP', 'Numero CDP', 'Certificado']);
             const areaEjecutora = getField(['Area Ejecutora', 'Área Ejecutora', 'Area', 'Dependencia']);
-            const observaciones = getField(['Observación', 'Observacion', 'Concepto', 'Detalle']);
+            const observaciones = getField(['Observación', 'Observacion', 'Concepto', 'Detalle', 'Objeto', 'Descripcion']);
             const identificacion = getField(['Identificación', 'Identificacion', 'NIT', 'Cédula', 'Cedula', 'Documento']);
             const beneficiario = getField(['Beneficiario', 'Nombre Beneficiario', 'Nombre', 'Contratista']);
-            const rawValor = getField(['Valor Transferido', 'Valor', 'Valor Bruto', 'Valor Pagado', 'Valor Real', 'Monto']);
-            const proteccionCostera = getField(['PROTECCION COSTERA']);
+            const rawValor = getField(['Valor Transferido', 'Valor', 'Valor Bruto', 'Valor Pagado', 'Valor Real', 'Monto', 'Valor Neto']);
+            const proteccionCostera = getField(['PROTECCION COSTERA', 'Proteccion Costera']);
 
-            
-            // Clean value (e.g. 757,163.70 -> 757163.70)
             const validateDateStr = (dateStr: string) => {
               if (!dateStr) return '';
-              const cleaned = dateStr.replace(/\//g, '-');
+              const cleaned = dateStr.replace(/\//g, '-').trim();
+              
+              // Handle DD-MM-YYYY
               if (cleaned.split('-').length === 3) {
-                 const [d, m, y] = cleaned.split('-');
-                 if (y.length === 4) return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                 const parts = cleaned.split('-');
+                 if (parts[2].length === 4) { // YYYY is at the end
+                    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                 }
+                 if (parts[0].length === 4) { // YYYY is at the start
+                    return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                 }
               }
               return cleaned;
             };
 
-            const fecha = cleanRow['Fecha'] ? validateDateStr(cleanRow['Fecha']) : new Date().toISOString().split('T')[0];
-            const fechaRadicado = cleanRow['Fecha Radicado'] ? validateDateStr(cleanRow['Fecha Radicado']) : '';
+            const fecha = getField(['Fecha', 'Fecha Pago']) ? validateDateStr(getField(['Fecha', 'Fecha Pago'])) : new Date().toISOString().split('T')[0];
+            const fechaRadicado = getField(['Fecha Radicado', 'Radicado']) ? validateDateStr(getField(['Fecha Radicado', 'Radicado'])) : '';
             
-            // Numeric parsing where DOT is decimal.
             const parseColombianNumber = (str: string) => {
               if (!str) return 0;
-              // Remove commas, currency symbols, and spaces. Dot is kept as decimal.
-              let cleaned = str.toString().replace(/[$\s,]/g, '');
+              // Handle common Colombian formats: 1.000.000,00 or 1,000,000.00
+              let cleaned = str.toString().replace(/[$\s]/g, '');
+              
+              // If it has both . and , (e.g. 1.000,00)
+              if (cleaned.includes('.') && cleaned.includes(',')) {
+                if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
+                  // Decimal is comma
+                  cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+                } else {
+                  // Decimal is dot
+                  cleaned = cleaned.replace(/,/g, '');
+                }
+              } else if (cleaned.includes(',')) {
+                // Only comma - check if it's likely a decimal or thousands separator
+                // In many datasets, a single comma in a long number is a decimal
+                const parts = cleaned.split(',');
+                if (parts[1].length === 3) {
+                   // Likely thousands
+                   cleaned = cleaned.replace(/,/g, '');
+                } else {
+                   // Likely decimal
+                   cleaned = cleaned.replace(',', '.');
+                }
+              }
+              
               const val = parseFloat(cleaned) || 0;
               return val;
             };
@@ -123,7 +151,7 @@ export const ImportPagosCSV: React.FC<ImportPagosCSVProps> = ({ contracts, onCom
             const cuenta = getField(['Cuenta', 'No Cuenta', 'Numero Cuenta', 'No. Cuenta']);
             const solicitud = getField(['Solicitud', 'No Solicitud', 'No. Solicitud']);
             const numeroContratoOriginal = getField(['Contrato', 'No. Contrato', 'Numero Contrato', 'Numero de Contrato']);
-            const rc = getField(['RC', 'Registro Compromiso']).trim();
+            const rc = getField(['RC', 'Registro Compromiso', 'Registro']).trim();
             const resolucion = getField(['Resolucion', 'Resolución']);
             const fuente = getField(['Fuente', 'Fuente Financiacion', 'Fuente de Financiacion']);
             const departamento = getField(['Departamento']);
@@ -134,37 +162,36 @@ export const ImportPagosCSV: React.FC<ImportPagosCSVProps> = ({ contracts, onCom
             const firma = getField(['Firma', 'Aprobado Por']);
             const cargo = getField(['Cargo']);
 
-            // Attempt to find contract by exact match first. If none, we leave it empty.
-            let contractId = contractMap.get(numeroContratoOriginal) || ''; 
-            if (!contractMap.has(numeroContratoOriginal) && numeroContratoOriginal) {
-               const matched = contracts.find(c => c.numero && c.numero.includes(numeroContratoOriginal));
-               if (matched) {
-                 contractId = matched.id;
-                 contractMap.set(numeroContratoOriginal, matched.id); 
+            let contractId = ''; 
+            if (numeroContratoOriginal) {
+               contractId = contractMap.get(numeroContratoOriginal) || '';
+               if (!contractId) {
+                  const matched = contracts.find(c => c.numero && (c.numero === numeroContratoOriginal || c.numero.includes(numeroContratoOriginal)));
+                  if (matched) {
+                    contractId = matched.id;
+                  }
                }
             }
 
-            // Find matching RC with more flexibility
             let rcId = undefined;
             if (rc) {
               const matchedRC = state.financialDocuments.find((doc: any) => 
                 doc.tipo === 'RC' && 
                 ((doc.numero && doc.numero.toLowerCase().trim() === rc.toLowerCase().trim()) || 
-                 (doc.numero && doc.numero.toLowerCase().includes(rc.toLowerCase())) ||
-                 (doc.numeroCdp && cdp && doc.numeroCdp.toLowerCase().trim() === cdp.toLowerCase().trim()))
+                 (doc.numero && doc.numero.toLowerCase().includes(rc.toLowerCase())))
               );
               if (matchedRC) rcId = matchedRC.id;
             }
 
             const newPago: Pago = {
-               id: `PAG-CSV-${Date.now()}-${index}`,
+               id: `PAG-CSV-${index}-${Date.now()}`,
                contractId,
                rcId,
                numero,
                fecha,
                valor,
                estado: 'Pagado',
-               observaciones,
+               observaciones: observaciones || 'Importación Masiva',
                
                cdp,
                proteccionCostera,
@@ -194,12 +221,11 @@ export const ImportPagosCSV: React.FC<ImportPagosCSVProps> = ({ contracts, onCom
             successCount++;
 
           } catch (err: any) {
-             errorMessages.push(`Fila ${index + 2}: Error al procesar - ${err.message}`);
+             errorMessages.push(`Fila ${index + 2}: Error Fatal - ${err.message}`);
           }
         });
 
-        console.log(`Subiendo ${pagosToUpload.length} pagos...`);
-
+        console.log(`Procesados ${successCount} pagos. Guardando en el estado global...`);
 
         if (pagosToUpload.length > 0) {
           addPagos(pagosToUpload);
@@ -209,7 +235,7 @@ export const ImportPagosCSV: React.FC<ImportPagosCSVProps> = ({ contracts, onCom
         setResults({
           success: successCount,
           errors: errorMessages,
-          message: `El sistema ha procesado ${successCount} pagos de un total de ${data.length} filas leídas en el CSV.`
+          message: `Éxito: Se han cargado ${successCount} pagos al sistema correctamente de las ${data.length} filas del archivo.`
         });
       },
       error: (error) => {
