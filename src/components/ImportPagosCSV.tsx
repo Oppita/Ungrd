@@ -167,6 +167,7 @@ export const ImportPagosCSV: React.FC<ImportPagosCSVProps> = ({ contracts, onCom
                observaciones,
                
                cdp,
+               proteccionCostera,
                areaEjecutora,
                identificacion,
                beneficiario,
@@ -227,11 +228,9 @@ export const ImportPagosCSV: React.FC<ImportPagosCSVProps> = ({ contracts, onCom
         <h4 className="font-bold flex items-center gap-2 mb-2">
           <AlertCircle size={16} /> Estructura requerida (CSV)
         </h4>
-        <p className="mb-2">El archivo debe contener las siguientes columnas (la primera fila debe ser el encabezado):</p>
+        <p className="mb-2">El archivo debe contener las siguientes columnas (la primera fila debe ser el encabezado, preferiblemente separadas por tabulaciones (TSV) o comas):</p>
         <code className="bg-white px-3 py-2 rounded border border-indigo-200 block text-xs overflow-x-auto whitespace-nowrap">
-          "No.Pago","CDP","Area Ejecutora","Observación","Fecha","Identificación","Beneficiario","Valor",
-          "Banco","Tipo Cuenta","Cuenta","Solicitud","Contrato","RC","Valor Distribuido","Resolucion",
-          "Fuente","Fecha Radicado","Departamento","Ciudad","Codigo rubro","Rubro","Cuenta Pago","Firma","Cargo"
+          ID, No.Pago, CDP, PROTECCION COSTERA, Area Ejecutora, Observación, Fecha, Identificación, Beneficiario, Valor Transferido, Banco, Tipo Cuenta, Cuenta, Solicitud, Contrato, RC, Valor Distribuido, Resolucion, Fuente, Fecha Radicado, Departamento, Ciudad, Codigo rubro, Rubro, Cuenta Pago, Firma, Cargo
         </code>
       </div>
 
