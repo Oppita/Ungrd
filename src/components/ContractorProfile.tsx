@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProject } from '../store/ProjectContext';
 import { Contractor, Contract, Project, ContractorEvaluation, ProjectDocument } from '../types';
+import { formatCurrency } from '../utils/formatters';
 import { 
   User, 
   Building2, 
@@ -29,7 +30,9 @@ import {
   Globe,
   Loader2,
   Zap,
-  MoreVertical
+  MoreVertical,
+  DollarSign,
+  Calendar
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -1217,6 +1220,64 @@ export const ContractorProfile: React.FC<ContractorProfileProps> = ({ onSelectPr
                                 {state.otrosies.filter(o => o.contractId === c.id).length} registrados
                               </p>
                             </div>
+                          </div>
+
+                          {/* Pagos Realizados Section */}
+                          <div className="mt-6 pt-6 border-t border-slate-100">
+                            <h5 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
+                              <DollarSign size={14} className="text-emerald-500" />
+                              Relación de Pagos
+                            </h5>
+                            
+                            {state.pagos && state.pagos.filter(p => p.contractId === c.id).length > 0 ? (
+                              <div className="space-y-3">
+                                {state.pagos.filter(p => p.contractId === c.id)
+                                  .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+                                  .map((pago, pIdx) => (
+                                  <div key={pago.id || pIdx} className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div>
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <p className="font-bold text-slate-800 text-sm">Pago No. {pago.numero}</p>
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                                          pago.estado === 'Pagado' ? 'bg-emerald-100 text-emerald-700' :
+                                          pago.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' :
+                                          'bg-amber-100 text-amber-700'
+                                        }`}>
+                                          {pago.estado}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                                        <Calendar size={12} /> {pago.fecha}
+                                        {pago.rc && <><span className="mx-1">•</span>RC: {pago.rc}</>}
+                                        {pago.cdp && <><span className="mx-1">•</span>CDP: {pago.cdp}</>}
+                                      </p>
+                                      {pago.observaciones && (
+                                        <p className="text-[11px] text-slate-600 mt-2 bg-white px-3 py-1.5 rounded-md border border-slate-200">
+                                          "{pago.observaciones}"
+                                        </p>
+                                      )}
+                                      <div className="flex flex-wrap gap-2 mt-2">
+                                        {pago.banco && <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded">Banco: {pago.banco}</span>}
+                                        {pago.cuenta && <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded">Cuenta: {pago.cuenta}</span>}
+                                        {pago.identificacion && <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded">ID: {pago.identificacion}</span>}
+                                      </div>
+                                    </div>
+                                    <div className="md:text-right shrink-0">
+                                      <p className="text-sm font-black text-slate-400 capitalize mb-1">Valor Girado</p>
+                                      <p className="text-xl font-black text-emerald-600">{formatCurrency(pago.valor)}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                                <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl flex justify-between items-center mt-2 border border-emerald-100">
+                                  <span className="text-xs font-bold uppercase tracking-wider">Total Pagado:</span>
+                                  <span className="text-lg font-black">
+                                    {formatCurrency(state.pagos.filter(p => p.contractId === c.id && p.estado === 'Pagado').reduce((sum, p) => sum + p.valor, 0))}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-slate-400 italic">No se registran pagos para este contrato.</p>
+                            )}
                           </div>
                         </div>
                       );
