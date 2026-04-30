@@ -3,14 +3,16 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar dependencias primero (mejor caching)
+# Copiar dependencias primero
 COPY package*.json ./
-RUN npm ci --frozen-lockfile
 
-# Copiar todo el código
+# Usar --legacy-peer-deps para resolver conflicto React 19 vs react-simple-maps
+RUN npm ci --legacy-peer-deps
+
+# Copiar todo el código fuente
 COPY . .
 
-# Build del frontend (Vite)
+# Build del frontend
 RUN npm run build
 
 # ====================== PRODUCTION STAGE ======================
@@ -18,20 +20,17 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Crear usuario no-root por seguridad
+# Usuario no-root por seguridad
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 expressuser
 
-# Copiar package.json y node_modules
 COPY package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY server.ts ./
 
-# Instalar tsx para ejecutar TypeScript
 RUN npm install tsx
 
-# Crear carpeta uploads
 RUN mkdir -p uploads && chown -R expressuser:nodejs /app
 
 USER expressuser
