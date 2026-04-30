@@ -206,12 +206,68 @@ export const ContratosDetallados: React.FC<ContratosDetalladosProps> = ({ contra
             </div>
 
             {/* Trazabilidad Financiera del Convenio */}
-            <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm">
-              <div className="flex items-center justify-between">
+            <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm mt-8">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h5 className="font-bold text-slate-800 uppercase tracking-wider text-xs mb-1">Trazabilidad Financiera</h5>
-                  <p className="text-sm text-slate-500">Gestione los CDP, RC y RP desde el Módulo Financiero.</p>
+                  <h5 className="font-bold text-slate-800 uppercase tracking-wider text-xs mb-1">Trazabilidad Financiera: Pagos Realizados</h5>
+                  <p className="text-sm text-slate-500">Pagos asociados a los contratos de este proyecto y convenio.</p>
                 </div>
+              </div>
+              <div className="space-y-4">
+                {state.pagos && state.pagos.filter(p => contracts.some(c => c.id === p.contractId)).length > 0 ? (
+                  <div className="grid gap-3">
+                    {state.pagos
+                      .filter(p => contracts.some(c => c.id === p.contractId))
+                      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+                      .map((pago, pIdx) => {
+                        const relatedC = contracts.find(c => c.id === pago.contractId);
+                        return (
+                          <div key={pago.id || pIdx} className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-bold text-slate-800 text-sm">Pago No. {pago.numero}</p>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                                  pago.estado === 'Pagado' ? 'bg-emerald-100 text-emerald-700' :
+                                  pago.estado === 'Rechazado' ? 'bg-rose-100 text-rose-700' :
+                                  'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {pago.estado}
+                                </span>
+                                {relatedC && (
+                                  <span className="px-2 py-0.5 bg-slate-200 text-slate-700 text-[10px] rounded uppercase tracking-wider font-bold">
+                                    Contrato: {relatedC.numero}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                                <Calendar size={12} /> {pago.fecha}
+                                {pago.rc && <><span className="mx-1">•</span>RC: {pago.rc}</>}
+                                {pago.cdp && <><span className="mx-1">•</span>CDP: {pago.cdp}</>}
+                              </p>
+                              {pago.observaciones && (
+                                <p className="text-[11px] text-slate-600 mt-2 bg-white px-3 py-1.5 rounded-md border border-slate-200">
+                                  "{pago.observaciones}"
+                                </p>
+                              )}
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {pago.beneficiario && <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-medium border border-indigo-100">Beneficiario: {pago.beneficiario}</span>}
+                                {pago.banco && <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded">Banco: {pago.banco}</span>}
+                                {pago.identificacion && <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded">ID: {pago.identificacion}</span>}
+                              </div>
+                            </div>
+                            <div className="md:text-right shrink-0">
+                              <p className="text-sm font-black text-slate-400 capitalize mb-1">Valor Girado</p>
+                              <p className="text-xl font-black text-emerald-600">{formatCurrency(pago.valor)}</p>
+                            </div>
+                          </div>
+                      )})}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center bg-slate-50 border border-slate-100 border-dashed rounded-2xl">
+                    <DollarSign className="mx-auto text-slate-300 mb-2" size={32} />
+                    <p className="text-sm text-slate-500">No se encontraron pagos registrados para este convenio/proyecto en el sistema.</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -473,15 +529,13 @@ export const ContratosDetallados: React.FC<ContratosDetalladosProps> = ({ contra
                                  </div>
                                </div>
                                
-                               <div className="mt-2 pt-2 border-t border-slate-50 grid grid-cols-2 gap-4">
-                                  <div className="flex flex-col">
-                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Entidad Bancaria</span>
-                                    <span className="text-[10px] font-bold text-slate-600 truncate">{p.entidadBancaria || p.banco || 'No especificada'}</span>
-                                  </div>
-                                  <div className="flex flex-col text-right">
-                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter text-right">Comprobante de Egreso</span>
-                                    <span className="text-[10px] font-bold text-slate-600 truncate">{p.comprobanteEgreso || 'N/A'}</span>
-                                  </div>
+                               <div className="mt-2 pt-2 border-t border-slate-50 flex flex-wrap gap-2 text-[10px] text-slate-600">
+                                  {p.beneficiario && <span className="bg-slate-100 px-2 py-1 rounded font-medium">Beneficiario: {p.beneficiario}</span>}
+                                  {p.identificacion && <span className="bg-slate-100 px-2 py-1 rounded font-medium">NIT/CC: {p.identificacion}</span>}
+                                  {(p.banco || p.entidadBancaria) && <span className="bg-slate-100 px-2 py-1 rounded font-medium">Banco: {p.banco || p.entidadBancaria}</span>}
+                                  {p.cuenta && <span className="bg-slate-100 px-2 py-1 rounded font-medium">Cuenta: {p.cuenta}</span>}
+                                  {p.comprobanteEgreso && <span className="bg-slate-100 px-2 py-1 rounded font-medium">Comprobante: {p.comprobanteEgreso}</span>}
+                                  {p.observaciones && <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-medium ml-auto max-w-[200px] truncate">"{p.observaciones}"</span>}
                                </div>
                              </div>
                            ))}
