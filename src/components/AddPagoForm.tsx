@@ -1,26 +1,48 @@
-import React, { useState } from 'react';
-import { Contract, Pago, InterventoriaReport } from '../types';
-import { useProject } from '../store/ProjectContext';
-import { X, DollarSign, Calendar, Upload, Loader2, ListPlus, FileUp } from 'lucide-react';
-import { uploadDocumentToStorage, formatDateForInput } from '../lib/storage';
-import { ImportPagosCSV } from './ImportPagosCSV';
+import React, { useState } from "react";
+import { Contract, Pago, InterventoriaReport } from "../types";
+import { useProject } from "../store/ProjectContext";
+import {
+  X,
+  DollarSign,
+  Calendar,
+  Upload,
+  Loader2,
+  ListPlus,
+  FileUp,
+} from "lucide-react";
+import { uploadDocumentToStorage, formatDateForInput } from "../lib/storage";
+import { ImportPagosCSV } from "./ImportPagosCSV";
+import { analyzePagoText } from "../services/financialService";
 
 interface AddPagoFormProps {
   contracts: Contract[];
   reports?: InterventoriaReport[];
+  initialData?: Partial<Pago>;
   onClose: () => void;
 }
 
-export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [], onClose }) => {
+export const AddPagoForm: React.FC<AddPagoFormProps> = ({
+  contracts,
+  reports = [],
+  initialData,
+  onClose,
+}) => {
   const { addPago, addDocument } = useProject();
-  const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
+  const [activeTab, setActiveTab] = useState<"single" | "bulk" | "ai">(
+    "single",
+  );
+  const [pastedText, setPastedText] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [formData, setFormData] = useState<Partial<Pago>>({
-    contractId: contracts[0]?.id || '',
-    fecha: new Date().toISOString().split('T')[0],
-    estado: 'Pendiente',
-    valor: 0,
-    numero: '',
-    observaciones: '',
+    contractId: initialData?.contractId || contracts[0]?.id || "",
+    fecha: initialData?.fecha || new Date().toISOString().split("T")[0],
+    estado: initialData?.estado || "Pendiente",
+    valor: initialData?.valor || 0,
+    numero: initialData?.numero || "",
+    observaciones: initialData?.observaciones || "",
+    rcId: initialData?.rcId || "",
+    cdp: initialData?.cdp || "",
+    ...initialData
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,6 +50,72 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleAnalyzeText = async () => {
+    if (!pastedText.trim()) return;
+    setIsAnalyzing(true);
+    try {
+      const extracted = await analyzePagoText(pastedText);
+      // Find matching contract ID if possible
+      let matchedContractId = formData.contractId;
+      if (extracted.numeroContratoOriginal) {
+        const match = contracts.find(
+          (c) =>
+            c.numero.includes(extracted.numeroContratoOriginal) ||
+            extracted.numeroContratoOriginal.includes(c.numero),
+        );
+        if (match) {
+          matchedContractId = match.id;
+        }
+      }
+
+      setFormData((prev: any) => ({
+        ...prev,
+        contractId: matchedContractId,
+        numero: extracted.numero || prev.numero,
+        comprobanteEgreso: extracted.numero || prev.comprobanteEgreso,
+        numeroFactura: extracted.numero || prev.numeroFactura,
+        cdp: extracted.cdp || prev.cdp,
+        proteccionCostera:
+          extracted.proteccionCostera ?? prev.proteccionCostera,
+        areaEjecutora: extracted.areaEjecutora || prev.areaEjecutora,
+        observaciones: extracted.observaciones || prev.observaciones,
+        fecha: extracted.fecha || prev.fecha,
+        identificacion: extracted.identificacion || prev.identificacion,
+        beneficiario: extracted.beneficiario || prev.beneficiario,
+        valor:
+          typeof extracted.valor === "number" ? extracted.valor : prev.valor,
+        banco: extracted.banco || prev.banco,
+        entidadBancaria: extracted.banco || prev.entidadBancaria,
+        tipoCuenta: extracted.tipoCuenta || prev.tipoCuenta,
+        cuenta: extracted.cuenta || prev.cuenta,
+        solicitud: extracted.solicitud || prev.solicitud,
+        numeroContratoOriginal:
+          extracted.numeroContratoOriginal || prev.numeroContratoOriginal,
+        rc: extracted.rc || prev.rc,
+        valorDistribuido:
+          typeof extracted.valorDistribuido === "number"
+            ? extracted.valorDistribuido
+            : prev.valorDistribuido,
+        resolucion: extracted.resolucion || prev.resolucion,
+        fuente: extracted.fuente || prev.fuente,
+        fechaRadicado: extracted.fechaRadicado || prev.fechaRadicado,
+        departamento: extracted.departamento || prev.departamento,
+        ciudad: extracted.ciudad || prev.ciudad,
+        codigoRubro: extracted.codigoRubro || prev.codigoRubro,
+        rubro: extracted.rubro || prev.rubro,
+        cuentaPago: extracted.cuentaPago || prev.cuentaPago,
+        firma: extracted.firma || prev.firma,
+        cargo: extracted.cargo || prev.cargo,
+      }));
+      setActiveTab("single"); // Switch back to 'single' to see the form
+    } catch (error) {
+      console.error(error);
+      alert("Error al analizar texto. Verifique la conexión a IA.");
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -43,28 +131,30 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
       if (selectedFile) {
         const folderPath = `Pagos/${formData.contractId}`;
         soporteUrl = await uploadDocumentToStorage(selectedFile, folderPath);
-        
+
         // Add to document repository
         addDocument({
           id: `DOC-PAGO-${Date.now()}`,
           contractId: formData.contractId,
           titulo: `Soporte Pago ${formData.numero}`,
-          tipo: 'Soporte Pago',
-          fechaCreacion: new Date().toISOString().split('T')[0],
-          ultimaActualizacion: new Date().toISOString().split('T')[0],
-          estado: 'Aprobado',
-          tags: ['Pago', formData.numero],
+          tipo: "Soporte Pago",
+          fechaCreacion: new Date().toISOString().split("T")[0],
+          ultimaActualizacion: new Date().toISOString().split("T")[0],
+          estado: "Aprobado",
+          tags: ["Pago", formData.numero],
           folderPath,
-          versiones: [{
-            id: `VER-${Date.now()}`,
-            version: 1,
-            fecha: new Date().toISOString().split('T')[0],
-            url: soporteUrl,
-            nombreArchivo: selectedFile.name,
-            subidoPor: 'Administrador',
-            accion: 'Subida',
-            estado: 'Aprobado'
-          }]
+          versiones: [
+            {
+              id: `VER-${Date.now()}`,
+              version: 1,
+              fecha: new Date().toISOString().split("T")[0],
+              url: soporteUrl,
+              nombreArchivo: selectedFile.name,
+              subidoPor: "Administrador",
+              accion: "Subida",
+              estado: "Aprobado",
+            },
+          ],
         });
       }
 
@@ -76,7 +166,7 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
         fecha: formData.fecha!,
         valor: Number(formData.valor),
         estado: formData.estado as any,
-        observaciones: formData.observaciones || '',
+        observaciones: formData.observaciones || "",
         soporteUrl,
         cdp: formData.cdp,
         areaEjecutora: formData.areaEjecutora,
@@ -88,7 +178,9 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
         solicitud: formData.solicitud,
         numeroContratoOriginal: formData.numeroContratoOriginal,
         rc: formData.rc,
-        valorDistribuido: formData.valorDistribuido ? Number(formData.valorDistribuido) : undefined,
+        valorDistribuido: formData.valorDistribuido
+          ? Number(formData.valorDistribuido)
+          : undefined,
         resolucion: formData.resolucion,
         fuente: formData.fuente,
         fechaRadicado: formData.fechaRadicado,
@@ -121,55 +213,120 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
             </div>
             <div>
               <h2 className="text-xl font-bold">Registrar Pago(s)</h2>
-              <p className="text-indigo-100 text-xs">Gestión financiera del contrato y proyectos</p>
+              <p className="text-indigo-100 text-xs">
+                Gestión financiera del contrato y proyectos
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+          >
             <X size={24} />
           </button>
         </div>
 
         <div className="bg-slate-50 p-4 border-b border-slate-200 flex space-x-4">
-          <button 
-            onClick={() => setActiveTab('single')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'single' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:bg-slate-200'}`}
+          <button
+            onClick={() => setActiveTab("single")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "single" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:bg-slate-200"}`}
           >
             <ListPlus size={16} /> Pago Individual
           </button>
-          <button 
-            onClick={() => setActiveTab('bulk')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'bulk' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:bg-slate-200'}`}
+          <button
+            onClick={() => setActiveTab("bulk")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "bulk" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:bg-slate-200"}`}
           >
             <FileUp size={16} /> Carga Masiva (CSV)
+          </button>
+          <button
+            onClick={() => setActiveTab("ai")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "ai" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:bg-slate-200"}`}
+          >
+            <Upload size={16} /> Extracción IA
           </button>
         </div>
 
         <div className="p-8 max-h-[70vh] overflow-y-auto">
-          {activeTab === 'bulk' ? (
+          {activeTab === "bulk" ? (
             <ImportPagosCSV contracts={contracts} onComplete={onClose} />
+          ) : activeTab === "ai" ? (
+            <div className="space-y-6">
+              <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
+                <h3 className="font-bold text-indigo-800 text-sm flex items-center gap-2 mb-2">
+                  <Loader2
+                    className={isAnalyzing ? "animate-spin" : ""}
+                    size={16}
+                  />{" "}
+                  Extracción Inteligente
+                </h3>
+                <p className="text-xs text-indigo-600">
+                  Pega el texto del pago o tabla, incluyendo fecha, valores,
+                  numero de cdp, contrato, etc. La inteligencia artificial
+                  extraerá y llenará el formulario automáticamente.
+                </p>
+              </div>
+              <textarea
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder="Pega el texto de tu documento o tabla aquí..."
+                className="w-full h-48 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none font-mono"
+              ></textarea>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-2 bg-white text-slate-600 rounded-xl text-sm font-bold border border-slate-200 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleAnalyzeText}
+                  disabled={isAnalyzing || !pastedText.trim()}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isAnalyzing ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Upload size={16} />
+                  )}
+                  Analizar Texto
+                </button>
+              </div>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contrato en Sistema</label>
-                  <select 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Contrato en Sistema
+                  </label>
+                  <select
                     value={formData.contractId}
-                    onChange={e => setFormData({ ...formData, contractId: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, contractId: e.target.value })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                     required
                   >
-                    {contracts.map(c => (
-                      <option key={c.id} value={c.id}>{c.numero} - {c.contratista}</option>
+                    {contracts.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.numero} - {c.contratista}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">No.Pago</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    No.Pago
+                  </label>
+                  <input
                     type="text"
                     value={formData.numero}
-                    onChange={e => setFormData({ ...formData, numero: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, numero: e.target.value })
+                    }
                     placeholder="Ej: 83107"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                     required
@@ -177,13 +334,23 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Valor del Pago</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Valor del Pago
+                  </label>
                   <div className="relative">
-                    <DollarSign size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
+                    <DollarSign
+                      size={18}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
                       type="number"
                       value={formData.valor}
-                      onChange={e => setFormData({ ...formData, valor: Number(e.target.value) })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          valor: Number(e.target.value),
+                        })
+                      }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold text-slate-700"
                       required
                     />
@@ -191,13 +358,20 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Fecha
+                  </label>
                   <div className="relative">
-                    <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
+                    <Calendar
+                      size={18}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
                       type="date"
-                      value={formatDateForInput(formData.fecha || '')}
-                      onChange={e => setFormData({ ...formData, fecha: e.target.value })}
+                      value={formatDateForInput(formData.fecha || "")}
+                      onChange={(e) =>
+                        setFormData({ ...formData, fecha: e.target.value })
+                      }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                       required
                     />
@@ -205,229 +379,326 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">CDP</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    CDP
+                  </label>
+                  <input
                     type="text"
-                    value={formData.cdp || ''}
-                    onChange={e => setFormData({ ...formData, cdp: e.target.value })}
+                    value={formData.cdp || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cdp: e.target.value })
+                    }
                     placeholder="Ej: 22-1614"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Área Ejecutora</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Área Ejecutora
+                  </label>
+                  <input
                     type="text"
-                    value={formData.areaEjecutora || ''}
-                    onChange={e => setFormData({ ...formData, areaEjecutora: e.target.value })}
+                    value={formData.areaEjecutora || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        areaEjecutora: e.target.value,
+                      })
+                    }
                     placeholder="Ej: GAA"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Identificación</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Identificación
+                  </label>
+                  <input
                     type="text"
-                    value={formData.identificacion || ''}
-                    onChange={e => setFormData({ ...formData, identificacion: e.target.value })}
+                    value={formData.identificacion || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        identificacion: e.target.value,
+                      })
+                    }
                     placeholder="Documento Beneficiario"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2 col-span-1 md:col-span-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Beneficiario</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Beneficiario
+                  </label>
+                  <input
                     type="text"
-                    value={formData.beneficiario || ''}
-                    onChange={e => setFormData({ ...formData, beneficiario: e.target.value })}
+                    value={formData.beneficiario || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, beneficiario: e.target.value })
+                    }
                     placeholder="Nombre Completo o Razón Social"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Banco</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Banco
+                  </label>
+                  <input
                     type="text"
-                    value={formData.banco || ''}
-                    onChange={e => setFormData({ ...formData, banco: e.target.value })}
+                    value={formData.banco || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, banco: e.target.value })
+                    }
                     placeholder="Ej: BANCO DAVIVIENDA"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo Cuenta</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Tipo Cuenta
+                  </label>
+                  <input
                     type="text"
-                    value={formData.tipoCuenta || ''}
-                    onChange={e => setFormData({ ...formData, tipoCuenta: e.target.value })}
+                    value={formData.tipoCuenta || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, tipoCuenta: e.target.value })
+                    }
                     placeholder="Ej: AHORROS"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cuenta Número</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Cuenta Número
+                  </label>
+                  <input
                     type="text"
-                    value={formData.cuenta || ''}
-                    onChange={e => setFormData({ ...formData, cuenta: e.target.value })}
+                    value={formData.cuenta || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cuenta: e.target.value })
+                    }
                     placeholder="No. de Cuenta"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Solicitud</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Solicitud
+                  </label>
+                  <input
                     type="text"
-                    value={formData.solicitud || ''}
-                    onChange={e => setFormData({ ...formData, solicitud: e.target.value })}
+                    value={formData.solicitud || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, solicitud: e.target.value })
+                    }
                     placeholder="Ej: 9438"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contrato Orig/Texto</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Contrato Orig/Texto
+                  </label>
+                  <input
                     type="text"
-                    value={formData.numeroContratoOriginal || ''}
-                    onChange={e => setFormData({ ...formData, numeroContratoOriginal: e.target.value })}
+                    value={formData.numeroContratoOriginal || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        numeroContratoOriginal: e.target.value,
+                      })
+                    }
                     placeholder="Ej: 9677-PPAL001..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">RC</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    RC
+                  </label>
+                  <input
                     type="text"
-                    value={formData.rc || ''}
-                    onChange={e => setFormData({ ...formData, rc: e.target.value })}
+                    value={formData.rc || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, rc: e.target.value })
+                    }
                     placeholder="Ej: 20180"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Resolución</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Resolución
+                  </label>
+                  <input
                     type="text"
-                    value={formData.resolucion || ''}
-                    onChange={e => setFormData({ ...formData, resolucion: e.target.value })}
+                    value={formData.resolucion || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, resolucion: e.target.value })
+                    }
                     placeholder="Ej: 012022"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2 col-span-1 md:col-span-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fuente</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Fuente
+                  </label>
+                  <input
                     type="text"
-                    value={formData.fuente || ''}
-                    onChange={e => setFormData({ ...formData, fuente: e.target.value })}
+                    value={formData.fuente || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, fuente: e.target.value })
+                    }
                     placeholder="Ej: PRESUPUESTO NACIONAL FUNCIONAMIENTO"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha Radicado</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Fecha Radicado
+                  </label>
+                  <input
                     type="date"
-                    value={formatDateForInput(formData.fechaRadicado || '')}
-                    onChange={e => setFormData({ ...formData, fechaRadicado: e.target.value })}
+                    value={formatDateForInput(formData.fechaRadicado || "")}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        fechaRadicado: e.target.value,
+                      })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Departamento</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Departamento
+                  </label>
+                  <input
                     type="text"
-                    value={formData.departamento || ''}
-                    onChange={e => setFormData({ ...formData, departamento: e.target.value })}
+                    value={formData.departamento || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, departamento: e.target.value })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ciudad</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Ciudad
+                  </label>
+                  <input
                     type="text"
-                    value={formData.ciudad || ''}
-                    onChange={e => setFormData({ ...formData, ciudad: e.target.value })}
+                    value={formData.ciudad || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, ciudad: e.target.value })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Código Rubro</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Código Rubro
+                  </label>
+                  <input
                     type="text"
-                    value={formData.codigoRubro || ''}
-                    onChange={e => setFormData({ ...formData, codigoRubro: e.target.value })}
+                    value={formData.codigoRubro || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, codigoRubro: e.target.value })
+                    }
                     placeholder="Ej: 1AG-1-1"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2 col-span-1 md:col-span-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rubro</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Rubro
+                  </label>
+                  <input
                     type="text"
-                    value={formData.rubro || ''}
-                    onChange={e => setFormData({ ...formData, rubro: e.target.value })}
+                    value={formData.rubro || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, rubro: e.target.value })
+                    }
                     placeholder="Ej: PRESTACION DE SERVICIOS..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cuenta Pago (Sys)</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Cuenta Pago (Sys)
+                  </label>
+                  <input
                     type="text"
-                    value={formData.cuentaPago || ''}
-                    onChange={e => setFormData({ ...formData, cuentaPago: e.target.value })}
+                    value={formData.cuentaPago || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cuentaPago: e.target.value })
+                    }
                     placeholder="Ej: FA-2846"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Firma</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Firma
+                  </label>
+                  <input
                     type="text"
-                    value={formData.firma || ''}
-                    onChange={e => setFormData({ ...formData, firma: e.target.value })}
+                    value={formData.firma || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, firma: e.target.value })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-2 col-span-1 md:col-span-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cargo</label>
-                  <input 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Cargo
+                  </label>
+                  <input
                     type="text"
-                    value={formData.cargo || ''}
-                    onChange={e => setFormData({ ...formData, cargo: e.target.value })}
+                    value={formData.cargo || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cargo: e.target.value })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
-
-
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</label>
-                  <select 
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Estado
+                  </label>
+                  <select
                     value={formData.estado}
-                    onChange={e => setFormData({ ...formData, estado: e.target.value as any })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        estado: e.target.value as any,
+                      })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   >
                     <option value="Pendiente">Pendiente</option>
@@ -437,7 +708,9 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Soporte del Pago</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Soporte del Pago
+                  </label>
                   <div className="relative">
                     <input
                       type="file"
@@ -452,7 +725,7 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
                     >
                       <Upload size={18} className="text-slate-400" />
                       <span className="text-slate-600 font-medium truncate max-w-[200px]">
-                        {selectedFile ? selectedFile.name : 'Subir documento'}
+                        {selectedFile ? selectedFile.name : "Subir documento"}
                       </span>
                     </label>
                   </div>
@@ -460,10 +733,14 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Observaciones</label>
-                <textarea 
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Observaciones
+                </label>
+                <textarea
                   value={formData.observaciones}
-                  onChange={e => setFormData({ ...formData, observaciones: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, observaciones: e.target.value })
+                  }
                   rows={2}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"
                   placeholder="Observación del pago..."
@@ -490,7 +767,7 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
                       Guardando...
                     </>
                   ) : (
-                    'Guardar Pago'
+                    "Guardar Pago"
                   )}
                 </button>
               </div>
@@ -501,4 +778,3 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({ contracts, reports = [
     </div>
   );
 };
-
