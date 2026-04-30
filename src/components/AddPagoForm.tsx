@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Contract, Pago, InterventoriaReport } from "../types";
+import { Contract, Pago, InterventoriaReport, FinancialDocument } from "../types";
 import { useProject } from "../store/ProjectContext";
 import {
   X,
@@ -17,6 +17,7 @@ import { analyzePagoText } from "../services/financialService";
 interface AddPagoFormProps {
   contracts: Contract[];
   reports?: InterventoriaReport[];
+  financialDocs?: FinancialDocument[];
   initialData?: Partial<Pago>;
   onClose: () => void;
 }
@@ -24,10 +25,11 @@ interface AddPagoFormProps {
 export const AddPagoForm: React.FC<AddPagoFormProps> = ({
   contracts,
   reports = [],
+  financialDocs = [],
   initialData,
   onClose,
 }) => {
-  const { addPago, addDocument } = useProject();
+  const { addPago, updatePago, addDocument } = useProject();
   const [activeTab, setActiveTab] = useState<"single" | "bulk" | "ai">(
     "single",
   );
@@ -159,8 +161,9 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
       }
 
       const newPago: Pago = {
-        id: `PAG-${Date.now()}`,
+        id: initialData?.id || `PAG-${Date.now()}`,
         contractId: formData.contractId!,
+        rcId: formData.rcId || formData.rc,
         reportId: formData.reportId,
         numero: formData.numero!,
         fecha: formData.fecha!,
@@ -169,6 +172,7 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
         observaciones: formData.observaciones || "",
         soporteUrl,
         cdp: formData.cdp,
+        proteccionCostera: formData.proteccionCostera,
         areaEjecutora: formData.areaEjecutora,
         identificacion: formData.identificacion,
         beneficiario: formData.beneficiario,
@@ -193,7 +197,12 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
         cargo: formData.cargo,
       };
 
-      addPago(newPago);
+      if (initialData?.id && updatePago) {
+        updatePago(newPago);
+      } else {
+        addPago(newPago);
+      }
+      
       onClose();
     } catch (error) {
       console.error("Error saving pago:", error);
@@ -212,9 +221,9 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
               <DollarSign size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Registrar Pago(s)</h2>
+              <h2 className="text-xl font-bold">{initialData?.id ? 'Editar Pago' : 'Registrar Pago(s)'}</h2>
               <p className="text-indigo-100 text-xs">
-                Gestión financiera del contrato y proyectos
+                {initialData?.id ? `Editando pago No. ${initialData.numero || ''}` : 'Gestión financiera del contrato y proyectos'}
               </p>
             </div>
           </div>
@@ -226,26 +235,28 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
           </button>
         </div>
 
-        <div className="bg-slate-50 p-4 border-b border-slate-200 flex space-x-4">
-          <button
-            onClick={() => setActiveTab("single")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "single" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:bg-slate-200"}`}
-          >
-            <ListPlus size={16} /> Pago Individual
-          </button>
-          <button
-            onClick={() => setActiveTab("bulk")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "bulk" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:bg-slate-200"}`}
-          >
-            <FileUp size={16} /> Carga Masiva (CSV)
-          </button>
-          <button
-            onClick={() => setActiveTab("ai")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "ai" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:bg-slate-200"}`}
-          >
-            <Upload size={16} /> Extracción IA
-          </button>
-        </div>
+        {!initialData?.id && (
+          <div className="bg-slate-50 p-4 border-b border-slate-200 flex space-x-4">
+            <button
+              onClick={() => setActiveTab("single")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "single" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:bg-slate-200"}`}
+            >
+              <ListPlus size={16} /> Pago Individual
+            </button>
+            <button
+              onClick={() => setActiveTab("bulk")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "bulk" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:bg-slate-200"}`}
+            >
+              <FileUp size={16} /> Carga Masiva (CSV)
+            </button>
+            <button
+              onClick={() => setActiveTab("ai")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "ai" ? "bg-white shadow-sm text-indigo-700" : "text-slate-500 hover:bg-slate-200"}`}
+            >
+              <Upload size={16} /> Extracción IA
+            </button>
+          </div>
+        )}
 
         <div className="p-8 max-h-[70vh] overflow-y-auto">
           {activeTab === "bulk" ? (
@@ -395,6 +406,21 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
 
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Protección Costera
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.proteccionCostera || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, proteccionCostera: e.target.value })
+                    }
+                    placeholder="Ej: SI / NO"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                     Área Ejecutora
                   </label>
                   <input
@@ -524,17 +550,33 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
 
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    RC
+                    Asociar a RC (Documento)
                   </label>
-                  <input
-                    type="text"
-                    value={formData.rc || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, rc: e.target.value })
-                    }
-                    placeholder="Ej: 20180"
+                  <select
+                    value={formData.rcId || ""}
+                    onChange={(e) => {
+                      const rcId = e.target.value;
+                      const matchedRC = financialDocs.find((d: any) => d.id === rcId);
+                      setFormData({ 
+                        ...formData, 
+                        rcId,
+                        rc: matchedRC?.numero || "",
+                        cdp: matchedRC?.numeroCdp || formData.cdp,
+                        contractId: matchedRC?.contractId || formData.contractId
+                      });
+                    }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                  />
+                  >
+                    <option value="">-- Sin asociación (S/V) --</option>
+                    {financialDocs
+                      .filter((d: any) => d.tipo === "RC")
+                      .sort((a: any, b: any) => a.numero.localeCompare(b.numero))
+                      .map((rc: any) => (
+                        <option key={rc.id} value={rc.id}>
+                          RC No. {rc.numero} {rc.valor ? `(${new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP" }).format(rc.valor)})` : ''}
+                        </option>
+                      ))}
+                  </select>
                 </div>
 
                 <div className="space-y-2">
