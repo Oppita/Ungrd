@@ -508,7 +508,7 @@ export const FinancialExecutionModule: React.FC<
     return docs;
   }, [state.financialDocuments, projectId]);
 
-  const [showAllPagos, setShowAllPagos] = useState(false);
+  const [showAllPagos, setShowAllPagos] = useState(true);
 
   const projectPagos = useMemo(() => {
     let pagos = state.pagos || [];
@@ -516,10 +516,17 @@ export const FinancialExecutionModule: React.FC<
       const contractIds = state.contratos
         .filter((c) => c.projectId === projectId)
         .map((c) => c.id);
-      pagos = pagos.filter((p) => contractIds.includes(p.contractId));
+      
+      const projectDocs = state.financialDocuments.filter(d => d.projectId === projectId);
+      const rcIds = projectDocs.filter(d => d.tipo === 'RC').map(d => d.id);
+      
+      pagos = pagos.filter((p) => 
+        (p.contractId && contractIds.includes(p.contractId)) || 
+        (p.rcId && rcIds.includes(p.rcId))
+      );
     }
     return pagos;
-  }, [state.pagos, state.contratos, projectId, showAllPagos]);
+  }, [state.pagos, state.contratos, state.financialDocuments, projectId, showAllPagos]);
 
   const filteredDocs = projectDocs.filter(
     (d) =>
