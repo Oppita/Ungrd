@@ -287,7 +287,7 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
     } catch (error: any) {
       console.error('Error parsing PDF with Rigor IA:', error);
       const msg = error?.message || 'Error desconocido';
-      showAlert(`Error al extraer datos del PDF: ${msg}`, 'error');
+      showAlert(`Error al extraer datos del PDF: ${msg}`);
       setParseProgress(`Error: ${msg}`);
     } finally {
       setIsParsing(false);
@@ -300,23 +300,50 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
     setParseProgress('Analizando texto con IA de alto rigor...');
     try {
       let prompt = '';
+      let responseSchema: any = undefined;
 
       if (formType === 'otrosie') {
-        prompt = `Analiza este texto de Otrosí y extrae la información con rigor técnico, jurídico y financiero en formato JSON:
-        {
-          "numero": "string",
-          "fechaFirma": "string (YYYY-MM-DD)",
-          "objeto": "string",
-          "justificacionTecnica": "string",
-          "justificacionJuridica": "string",
-          "valorAdicional": number,
-          "plazoAdicionalMeses": number,
-          "clausulasModificadas": [{ "numero": "string", "descripcionAnterior": "string", "descripcionNueva": "string" }],
-          "impactoPresupuestal": [{ "rubro": "string", "valorAnterior": number, "valorNuevo": number, "variacion": number }],
-          "nuevasObligaciones": ["string"],
-          "riesgosIdentificados": ["string"],
-          "analisisOptimización": "string"
-        }`;
+        prompt = `Eres un auditor experto. Analiza este texto de Otrosí y extrae la información con extremo rigor técnico, jurídico y financiero. 
+        CRÍTICO: Extrae el valorAdicional como número puro (0 si no hay). Extrae el plazoAdicionalMeses como número (ej: 1.5, 0 si no hay).`;
+        responseSchema = {
+          type: "object",
+          properties: {
+            numero: { type: "string" },
+            fechaFirma: { type: "string" },
+            objeto: { type: "string" },
+            justificacionTecnica: { type: "string" },
+            justificacionJuridica: { type: "string" },
+            valorAdicional: { type: "number", description: "Valor monetario adicionado exacto. 0 si no hay adición." },
+            plazoAdicionalMeses: { type: "number", description: "Meses adicionados. 0 si no hay adición de plazo." },
+            clausulasModificadas: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  numero: { type: "string" },
+                  descripcionAnterior: { type: "string" },
+                  descripcionNueva: { type: "string" }
+                }
+              }
+            },
+            impactoPresupuestal: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  rubro: { type: "string" },
+                  valorAnterior: { type: "number" },
+                  valorNuevo: { type: "number" },
+                  variacion: { type: "number" }
+                }
+              }
+            },
+            nuevasObligaciones: { type: "array", items: { type: "string" } },
+            riesgosIdentificados: { type: "array", items: { type: "string" } },
+            analisisOptimización: { type: "string" }
+          },
+          required: ["numero", "fechaFirma", "valorAdicional", "plazoAdicionalMeses", "objeto"]
+        };
       } else if (formType === 'afectacion') {
         prompt = `Analiza este texto de afectación presupuestal o pago y extrae los datos financieros en formato JSON:
         {
@@ -384,8 +411,13 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
         }`;
       }
 
-      const extractedData = await extractDataFromText(manualText, prompt);
-      if (formType === 'otrosie') setOtrosie(prev => ({ ...prev, ...extractedData }));
+      const extractedData = await extractDataFromText(manualText, prompt, responseSchema);
+      if (formType === 'otrosie') setOtrosie(prev => ({ 
+        ...prev, 
+        ...extractedData,
+        valorAdicional: Number(extractedData.valorAdicional) || 0,
+        plazoAdicionalMeses: Number(extractedData.plazoAdicionalMeses) || 0
+      }));
       else if (formType === 'afectacion') setAfectacion(prev => ({ ...prev, ...extractedData }));
       else if (formType === 'actaInicio') setActaInicio(prev => ({ ...prev, ...extractedData }));
       else if (formType === 'actaComite') setActaComite(prev => ({ ...prev, ...extractedData }));
