@@ -4,12 +4,17 @@ import multer from 'multer';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pdf = require('pdf-parse');
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import path from 'path';
 import fs from 'fs';
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
+
+// Crear directorio de uploads si no existe
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads', { recursive: true });
+}
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -62,12 +67,9 @@ app.post('/api/openrouter', async (req, res) => {
       }
     };
 
-    // Limit max_tokens to avoid 402 errors and ensure reasonable output
     completionParams.max_tokens = config?.maxOutputTokens || 4000;
 
     if (config?.responseMimeType === 'application/json') {
-      // We don't use response_format: { type: 'json_object' } here because many free OpenRouter models don't support it.
-      // Instead, we rely on the system prompt to enforce JSON output.
       if (!messages.some((m: any) => m.role === 'system')) {
         messages.unshift({
           role: 'system',
@@ -80,7 +82,7 @@ app.post('/api/openrouter', async (req, res) => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://ungrd-app.com', // Required by OpenRouter for free models
+        'HTTP-Referer': 'https://ungrd.onrender.com',
         'X-Title': 'UNGRD App',
         'Content-Type': 'application/json'
       },
@@ -93,14 +95,12 @@ app.post('/api/openrouter', async (req, res) => {
       let errorMsg = errorText;
       try {
         const parsed = JSON.parse(errorText);
-        if (parsed.error && parsed.error.message) {
+        if (parsed.error?.message) {
           errorMsg = parsed.error.message;
         } else if (parsed.error) {
           errorMsg = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
         }
-      } catch (e) {
-        // Ignore JSON parse error
-      }
+      } catch (e) {}
       return res.status(response.status).json({ error: errorMsg });
     }
 
@@ -109,14 +109,13 @@ app.post('/api/openrouter', async (req, res) => {
 
     if (content == null) {
       console.error('OpenRouter returned null content:', completion);
-      return res.status(500).json({ error: 'El modelo no devolvió ningún contenido. Puede deberse a filtros de seguridad o un error interno del modelo.' });
+      return res.status(500).json({ error: 'El modelo no devolvió ningún contenido.' });
     }
 
     res.json({ content });
   } catch (error: any) {
     console.error('OpenRouter API error:', error);
-    const errorMessage = error?.message || 'Failed to call OpenRouter API';
-    res.status(500).json({ error: errorMessage });
+    res.status(500).json({ error: error?.message || 'Failed to call OpenRouter API' });
   }
 });
 
@@ -127,11 +126,10 @@ function getAiClient() {
     const geminiKey = process.env.GEMINI_API_KEY || '';
     const genericKey = process.env.API_KEY || '';
     
-    const isPlaceholder = (k: string | undefined) => 
+    const isPlaceholder = (k: string) => 
       !k || k === 'MY_GEMINI_API_KEY' || k === '' || k.includes('YOUR_API_KEY');
 
     let apiKey = '';
-    
     if (!isPlaceholder(geminiKey)) {
       apiKey = geminiKey;
     } else if (!isPlaceholder(genericKey)) {
@@ -139,12 +137,12 @@ function getAiClient() {
     }
 
     if (!apiKey) {
-      console.warn('GEMINI_API_KEY is not set or is a placeholder. Gemini features will be disabled.');
+      console.warn('⚠️ GEMINI_API_KEY no configurada. Gemini desactivado.');
       return null;
     }
 
     const cleanKey = apiKey.trim().replace(/^["']|["']$/g, '');
-    console.log(`Initializing Gemini client with key starting with: ${cleanKey.substring(0, 4)}... (length: ${cleanKey.length})`);
+    console.log(`Inicializando cliente Gemini con key: ${cleanKey.substring(0, 4)}... (len: ${cleanKey.length})`);
     ai = new GoogleGenAI({ apiKey: cleanKey });
   }
   return ai;
@@ -164,22 +162,27 @@ app.get('/api/providers', (req, res) => {
 app.get('/api/debug-env', (req, res) => {
   res.json({
     geminiKeyConfigured: !!process.env.GEMINI_API_KEY,
-    geminiKeyLength: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.length : 0,
+    geminiKeyLength: process.env.GEMINI_API_KEY?.length || 0,
     groqKeyConfigured: !!process.env.GROQ_API_KEY,
     openRouterKeyConfigured: !!process.env.OPENROUTER_API_KEY,
+    nodeEnv: process.env.NODE_ENV,
+    port: process.env.PORT || 10000,
   });
 });
 
-// API Proxy for Gemini
+// ✅ FIX: targetModel declarado FUERA del try para que sea accesible en catch
 app.post('/api/gemini', async (req, res) => {
   const { prompt, model, config, extraParts } = req.body;
   
   const aiClient = getAiClient();
   if (!aiClient) {
-    const errorMsg = 'API_KEY_INVALID: No se detectó una clave de API válida para Gemini. Por favor, asegúrate de configurar GEMINI_API_KEY en el panel de Secrets de AI Studio.';
-    console.error(errorMsg);
-    return res.status(500).json({ error: errorMsg });
+    return res.status(500).json({ 
+      error: 'API_KEY_INVALID: No se configuró GEMINI_API_KEY en las variables de entorno de Render.' 
+    });
   }
+
+  // ✅ DECLARADO FUERA DEL TRY — accesible en catch
+  const targetModel = model || 'gemini-1.5-flash';
 
   try {
     const contents: any[] = [{ parts: [{ text: prompt }] }];
@@ -187,33 +190,40 @@ app.post('/api/gemini', async (req, res) => {
       contents[0].parts.push(...extraParts);
     }
 
-    try {
-      const targetModel = model || 'gemini-1.5-flash';
-      console.log(`Calling Gemini model: ${targetModel}`);
-      const response = await aiClient.models.generateContent({
-        model: targetModel,
-        contents: contents,
-        config: config,
-      });
+    console.log(`Llamando modelo Gemini: ${targetModel}`);
+    const response = await aiClient.models.generateContent({
+      model: targetModel,
+      contents: contents,
+      config: config,
+    });
 
-      console.log('Gemini response received. Text length:', response.text?.length || 0);
-      if (!response.text) {
-        console.warn('Gemini returned empty text. Response object:', JSON.stringify(response, null, 2));
-      }
+    console.log('Respuesta Gemini recibida. Longitud:', response.text?.length || 0);
+    res.json({ content: response.text || "" });
 
-      res.json({ content: response.text || "" });
-    } catch (err: any) {
-      const errorMessage = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
-      if ((targetModel === 'gemini-1.5-flash' || !model) && (errorMessage.includes('503') || errorMessage.includes('UNAVAILABLE') || errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED'))) {
-        console.warn("Primary model overloaded, falling back... ");
-        // Try same model again or handle accordingly
+  } catch (err: any) {
+    const errorMessage = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+    console.error(`Error en modelo ${targetModel}:`, errorMessage);
+    
+    // Retry con modelo alternativo si el principal falla por sobrecarga
+    if (
+      (targetModel === 'gemini-1.5-flash' || !model) && 
+      (errorMessage.includes('503') || errorMessage.includes('UNAVAILABLE') || 
+       errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED'))
+    ) {
+      console.warn(`Modelo ${targetModel} sobrecargado. Intentando con gemini-1.5-pro...`);
+      try {
+        const fallbackResponse = await aiClient.models.generateContent({
+          model: 'gemini-1.5-pro',
+          contents: [{ parts: [{ text: prompt }] }],
+          config: config,
+        });
+        return res.json({ content: fallbackResponse.text || "" });
+      } catch (fallbackErr: any) {
+        console.error('Fallback también falló:', fallbackErr.message);
       }
-      throw err;
     }
-  } catch (error: any) {
-    console.error('Gemini API error:', error);
-    const errorMessage = error?.message || 'Failed to call Gemini API';
-    res.status(error?.status || 500).json({ error: errorMessage });
+    
+    res.status(err?.status || 500).json({ error: errorMessage });
   }
 });
 
@@ -223,7 +233,7 @@ app.post('/api/process-pot', upload.single('pot'), async (req: any, res: any) =>
   try {
     const dataBuffer = fs.readFileSync(req.file.path);
     const data = await pdf(dataBuffer);
-    const text = data.text.substring(0, 30000); // Limit text to avoid token limits
+    const text = data.text.substring(0, 30000);
 
     fs.unlinkSync(req.file.path);
 
@@ -249,18 +259,18 @@ app.post('/api/process-pot', upload.single('pot'), async (req: any, res: any) =>
         response = await aiClient.models.generateContent({
           model: 'gemini-1.5-flash',
           contents: [{ parts: [{ text: prompt }] }],
-          config: {
-            responseMimeType: 'application/json',
-          }
+          config: { responseMimeType: 'application/json' }
         });
-        break; // Success, exit loop
+        break;
       } catch (err: any) {
-        const errorMessage = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
-        const isRetryable = errorMessage && (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('503') || errorMessage.includes('UNAVAILABLE'));
+        const errorMessage = err?.message || JSON.stringify(err);
+        const isRetryable = errorMessage.includes('429') || 
+          errorMessage.includes('RESOURCE_EXHAUSTED') || 
+          errorMessage.includes('503') || 
+          errorMessage.includes('UNAVAILABLE');
         
-        if (isRetryable) {
-          console.warn(`Gemini API overloaded in process-pot, retrying... (${retries} left)`);
-          
+        if (isRetryable && retries > 1) {
+          console.warn(`Gemini sobrecargado en process-pot, reintentando... (${retries - 1} restantes)`);
           await new Promise(resolve => setTimeout(resolve, delay));
           delay *= 2;
           retries--;
@@ -270,15 +280,13 @@ app.post('/api/process-pot', upload.single('pot'), async (req: any, res: any) =>
       }
     }
 
-    if (!response) {
-      throw new Error("Failed to generate content after retries");
-    }
+    if (!response) throw new Error("Fallo tras reintentos");
 
     const result = JSON.parse(response.text || '{}');
     res.json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).send('Error processing PDF.');
+    res.status(500).send('Error procesando PDF.');
   }
 });
 
@@ -288,17 +296,15 @@ app.post('/api/extract-pdf-text', upload.single('file'), async (req: any, res: a
   try {
     const dataBuffer = fs.readFileSync(req.file.path);
     const data = await pdf(dataBuffer);
-    const text = data.text;
-
     fs.unlinkSync(req.file.path);
-    res.json({ text });
+    res.json({ text: data.text });
   } catch (error) {
     console.error(error);
-    res.status(500).send('Error extracting text from PDF.');
+    res.status(500).send('Error extrayendo texto del PDF.');
   }
 });
 
-// Vite middleware setup
+// Vite / Static setup
 import { createServer as createViteServer } from 'vite';
 
 async function startServer() {
@@ -311,14 +317,21 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  const port = 3000;
+  // ✅ Render usa PORT env var (10000 por defecto)
+  const port = parseInt(process.env.PORT || '10000', 10);
   app.listen(port, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${port}`);
+    console.log(`🚀 Server running on port ${port}`);
+    console.log(`📁 Uploads directory: ${path.join(process.cwd(), 'uploads')}`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 Supabase URL: ${process.env.VITE_SUPABASE_URL ? '✅ Configurado' : '❌ No configurado'}`);
+    console.log(`🤖 Gemini: ${process.env.GEMINI_API_KEY ? '✅ Configurado' : '❌ No configurado'}`);
+    console.log(`🤖 Groq: ${process.env.GROQ_API_KEY ? '✅ Configurado' : '❌ No configurado'}`);
+    console.log(`🤖 OpenRouter: ${process.env.OPENROUTER_API_KEY ? '✅ Configurado' : '❌ No configurado'}`);
   });
 }
 
