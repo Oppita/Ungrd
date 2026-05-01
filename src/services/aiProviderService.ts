@@ -56,6 +56,7 @@ export const generateContent = async (
     const currentIndex = FALLBACK_ORDER.indexOf(provider);
     if (currentIndex !== -1 && currentIndex < FALLBACK_ORDER.length - 1) {
       const nextProvider = FALLBACK_ORDER[currentIndex + 1] as AIProvider;
+      console.log(`Falling back from ${provider} to ${nextProvider}`);
       return generateContent(prompt, model, config, extraParts, nextProvider);
     }
     
@@ -182,7 +183,9 @@ export const getAIModel = (): string => {
   try {
     const model = localStorage.getItem("ai_model");
     const validModels = [
-      "gemini-3-flash-preview", 
+      "gemini-1.5-flash", 
+      "gemini-1.5-pro",
+      "gemini-2.0-flash-exp",
       "google/gemini-2.0-pro-exp-02-05", 
       "anthropic/claude-3.5-sonnet", 
       "openai/gpt-4o",
@@ -193,9 +196,9 @@ export const getAIModel = (): string => {
     if (model && validModels.includes(model)) {
       return model;
     }
-    return "gemini-3-flash-preview";
+    return "gemini-1.5-flash";
   } catch (e) {
-    return "gemini-3-flash-preview";
+    return "gemini-1.5-flash";
   }
 };
 
