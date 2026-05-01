@@ -1,16 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { FileText, Upload, Loader2, CheckCircle2, AlertCircle, FileSearch } from 'lucide-react';
-import { Type } from "@google/genai";
-import * as pdfjsLib from 'pdfjs-dist';
-import { generateContent } from '../services/aiProviderService';
+import { aiProviderService } from '../services/aiProviderService';
 import { parseJSONResponse } from '../services/geminiService';
 import { AIProviderSelector } from './AIProviderSelector';
-
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString();
+import { analyzeDocumentWithRigor, EXTRACTION_PROMPTS } from '../services/documentAnalysisService';
 
 interface DocumentReaderProps {
   onDataExtracted: (data: any, type: 'CDP' | 'RC' | 'General') => void;
@@ -23,30 +16,14 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ onDataExtracted, onText
   const [success, setSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const extractTextFromPDF = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => item.str).join(' ');
-      fullText += pageText + '\n';
-    }
-    if (onTextExtracted) {
-      onTextExtracted(fullText);
-    }
-    return fullText;
-  };
-
-  const processWithAI = async (text: string) => {
+  const processWithAI = async (file: File) => {
     setLoading(true);
     setError(null);
     setSuccess(false);
 
     try {
       const prompt = `
-        Analiza el siguiente texto extraído de un documento oficial (CDP, RC, Acta, Contrato, etc.) y extrae la información estructurada.
+        Analiza este documento oficial (CDP, RC, Acta, Contrato, etc.) con RIGOR IA.
         Identifica el tipo de documento y extrae los campos relevantes.
         
         Si es CDP (Certificado de Disponibilidad Presupuestal), extrae: numero, fecha, valor, objeto, rubro, fuente.
@@ -58,45 +35,18 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ onDataExtracted, onText
           "tipo": "CDP" | "RC" | "General",
           "data": { ... campos extraídos ... }
         }
-        
-        Texto del documento:
-        ${text.substring(0, 15000)}
       `;
 
-      const responseSchema = {
-        type: Type.OBJECT,
-        properties: {
-          tipo: { type: Type.STRING, enum: ['CDP', 'RC', 'General'] },
-          data: {
-            type: Type.OBJECT,
-            properties: {
-              numero: { type: Type.STRING },
-              fecha: { type: Type.STRING },
-              valor: { type: Type.NUMBER },
-              objeto: { type: Type.STRING },
-              rubro: { type: Type.STRING },
-              fuente: { type: Type.STRING },
-              contratoAsociado: { type: Type.STRING },
-              cdpAsociado: { type: Type.STRING },
-              nombre: { type: Type.STRING },
-              contratista: { type: Type.STRING },
-              nit: { type: Type.STRING }
-            }
-          }
-        },
-        required: ['tipo', 'data']
-      };
-
-      const resultText = await generateContent(prompt, (window as any).selectedAIModel || "gemini-3-flash-preview", {
-        responseMimeType: "application/json",
-        responseSchema: responseSchema
-      });
-      const result = parseJSONResponse(resultText);
+      const extractionResult = await analyzeDocumentWithRigor(file, prompt);
+      const result = extractionResult.data;
+      
+      if (onTextExtracted) onTextExtracted(extractionResult.rawText);
+      
       onDataExtracted(result.data, result.tipo);
       setSuccess(true);
     } catch (err: any) {
       console.error('AI Extraction Error:', err);
-      setError('No se pudo extraer la información del documento. Intente de nuevo o verifique el archivo.');
+      setError('No se pudo extraer la información del documento con Rigor IA. Intente de nuevo o verifique el archivo.');
     } finally {
       setLoading(false);
     }
@@ -108,15 +58,19 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ onDataExtracted, onText
 
     setLoading(true);
     try {
-      let text = '';
       if (file.type === 'application/pdf') {
-        text = await extractTextFromPDF(file);
+        await processWithAI(file);
       } else {
-        text = await file.text();
+        const text = await file.text();
+        // Fallback for simple text files if needed
+        const prompt = `Analiza este texto y extrae JSON: { "tipo": "General", "data": { "texto": "..." } } \n\n ${text}`;
+        const resultText = await aiProviderService.generateContent(prompt);
+        const result = parseJSONResponse(resultText);
+        onDataExtracted(result.data, result.tipo || 'General');
+        setSuccess(true);
       }
-      await processWithAI(text);
     } catch (err) {
-      setError('Error al leer el archivo.');
+      setError('Error al procesar el archivo.');
       setLoading(false);
     }
   };
