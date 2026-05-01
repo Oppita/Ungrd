@@ -857,6 +857,7 @@ export interface Pago {
   estado: 'Pendiente' | 'Pagado' | 'Rechazado';
   observaciones: string;
   soporteUrl?: string;
+  soporteNombre?: string;
 
   // Nuevos campos masivos (CSV)
   cdp?: string;
@@ -1309,6 +1310,7 @@ export interface FinancialDocument {
   usuario?: string;
 
   documento_url?: string;
+  documentoNombre?: string;
   validacion_ia?: {
     coherente: boolean;
     observaciones: string;
