@@ -1036,9 +1036,4 @@ export const GestionOPS: React.FC<{ projectId: string }> = ({ projectId }) => {
             setSelectedProfessional(prof);
             setShowEditModal(false);
           }}
-          onCancel={() => setShowEditModal(false)}
-        />
-      )}
-    </div>
-  );
-};
+          
