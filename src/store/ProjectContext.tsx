@@ -339,6 +339,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [hasSyncedWithCloud, setHasSyncedWithCloud] = useState(false);
   const [isCloudCheckComplete, setIsCloudCheckComplete] = useState(false);
   const isSyncingRef = useRef(false);
+  const hasSyncedRef = useRef(false);
 
   const repairAllUrls = useCallback(async () => {
     setSyncing(true);
@@ -1131,11 +1132,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     const checkAndAutoLoad = async () => {
+      if (hasSyncedRef.current) return;
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           console.log('Usuario detectado al iniciar, cargando datos de la nube...');
           await loadFromSupabase(false);
+          hasSyncedRef.current = true;
         } else {
           setIsCloudCheckComplete(true);
         }
@@ -1146,22 +1149,33 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     checkAndAutoLoad();
 
+    // Suscribirse a cambios de auth para cargar datos al iniciar sesión en caliente
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'SIGNED_IN' && session?.user) {
-    console.log('Evento de sesión: SIGNED_IN - Cargando datos...');
-    isSyncingRef.current = false; // Reset forzado antes de cargar
-    await loadFromSupabase(false);
-  } else if (event === 'SIGNED_OUT') {
-    isSyncingRef.current = false;
-    setSyncing(false);
-    setHasSyncedWithCloud(false);
-    setIsCloudCheckComplete(false);
-  }
-});
-return () => {
-  subscription?.unsubscribe();
-};
-}, []); // ← Sin dependencias para evitar re-suscripciones
+      console.log('Supabase Auth Event:', event, session?.user ? 'User present' : 'No user');
+      
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+        if (!hasSyncedRef.current && !isSyncingRef.current) {
+          console.log(`Evento ${event}: Iniciando sincronización de datos con la nube...`);
+          await loadFromSupabase(false);
+          hasSyncedRef.current = true;
+        }
+      } else if (event === 'INITIAL_SESSION' || event === 'SIGNED_OUT') {
+        // En estos eventos sin usuario, marcamos el check como completado para liberar la UI
+        isSyncingRef.current = false;
+        hasSyncedRef.current = false;
+        setIsCloudCheckComplete(true);
+        
+        if (event === 'SIGNED_OUT') {
+          setSyncing(false);
+          setHasSyncedWithCloud(false);
+        }
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   const saveToSupabase = async (isManual: boolean = false) => {
     if (!isSupabaseConfigured) {
@@ -1213,10 +1227,11 @@ return () => {
       const { error: upsertError } = await supabase
         .from('app_state')
         .upsert({ 
-  user_id: user.id, 
-  state: { encrypted: encryptedState },
-  updated_at: new Date().toISOString()
-}, { onConflict: 'user_id' });   // ← ESTA LÍNEA
+          user_id: user.id, 
+          state: { encrypted: encryptedState }, // Store as an object with encrypted field
+          updated_at: new Date().toISOString()
+        });
+
       if (upsertError) {
         console.error('Supabase Upsert Error:', upsertError);
         throw new Error(`Error de Supabase: ${upsertError.message || JSON.stringify(upsertError)}`);
@@ -1253,7 +1268,15 @@ return () => {
     setSyncing(true);
     if (isManual) setError(null);
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('🔐 Llamando auth.getUser()...');
+      const authResult = await Promise.race([
+        supabase.auth.getUser(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('TIMEOUT en auth.getUser() - 8 segundos')), 8000)
+        )
+      ]) as any;
+      console.log('🔐 auth.getUser() completado:', !!authResult?.data?.user, authResult?.error?.message);
+      const { data: { user }, error: authError } = authResult;
       if (authError) {
         if (authError.message.includes('Refresh Token Not Found') || authError.message.includes('Invalid Refresh Token')) {
           console.warn('Sesión de Supabase expirada o inválida durante la carga.');
@@ -1398,12 +1421,11 @@ return () => {
       if (isManual) {
         showAlert(`Ocurrió un error (Posible CORS). Revisa tu consola. ${errorMsg}`);
       }
-  
-} finally {
-  setSyncing(false);
-  setIsCloudCheckComplete(true);
-  isSyncingRef.current = false;  // ← SIEMPRE se resetea
-}
+    } finally {
+      setSyncing(false);
+      setIsCloudCheckComplete(true);
+      isSyncingRef.current = false;
+    }
   };
 
   const addInterventoriaReport = (report: InterventoriaReport) => {
