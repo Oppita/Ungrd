@@ -108,18 +108,9 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
   }
 
   if (uploadError || !successfulBucket) {
-    console.error('Error uploading to Supabase Storage after trying all bucket names. Falling back to Base64 to prevent data loss:', uploadError);
-    // Fallback to base64 Data URL to prevent breaking the flow and losing user data
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        resolve(reader.result as string);
-      };
-      reader.onerror = () => {
-        reject(new Error('Failed to upload via Supabase and failed to create Data URL.'));
-      };
-      reader.readAsDataURL(file);
-    });
+    console.error('Error uploading to Supabase Storage after trying all bucket names:', uploadError);
+    // Remove the base64 fallback because it ruins Local Storage and causes Supabase timeouts
+    throw uploadError || new Error('No se pudo encontrar o crear un bucket de almacenamiento (Storage) en Supabase. Verifica que tengas el bucket "documents-srr" configurado.');
   }
 
   // Get the public URL from the successful bucket
