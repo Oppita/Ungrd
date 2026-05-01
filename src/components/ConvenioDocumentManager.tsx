@@ -116,35 +116,56 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
       setParsingStep('Analizando con IA de alto rigor...');
       console.log('Sending to AI, parts:', parts.length);
       
-      const prompt = `Eres un auditor experto en contratación estatal y gestión de proyectos de infraestructura de alto nivel. 
-      Tu tarea es realizar una auditoría exhaustiva de documentos de Otrosí de un Convenio Marco y extraer una estructura JSON con el máximo rigor.
+      const schema = {
+        type: "object",
+        properties: {
+          numero: { type: "string", description: "Número del Otrosí" },
+          fechaFirma: { type: "string", description: "Fecha de firma en formato YYYY-MM-DD" },
+          objeto: { type: "string", description: "Objeto exacto del Otrosí" },
+          justificacionTecnica: { type: "string", description: "La justificación técnica (breve)" },
+          justificacionJuridica: { type: "string", description: "La justificación jurídica o legal (breve)" },
+          valorAdicional: { type: "number", description: "El monto en dinero exacto por el cual se adiciona el convenio/contrato, si aplica. IMPORTANTE: Extraer la cifra en formato numérico sin comas ni símbolos (ej: 150000000). Si no hay valor, establecer 0." },
+          plazoAdicionalMeses: { type: "number", description: "La cantidad EXACTA de meses (pueden ser fracciones, ej: 1.5) por la cual se adiciona el plazo. Si se cuenta en días, divídelo por 30." },
+          tipoModificacion: { type: "string", description: "Tipo: Adición, Prórroga, Adición y Prórroga, Modificación, Suspensión, etc." },
+          supervisorResponsable: { type: "string", description: "Nombre del supervisor" },
+          clausulasModificadas: { 
+            type: "array", 
+            items: { type: "string" },
+            description: "Lista de cláusulas que han sido modificadas"
+          },
+          impactoPresupuestal: { 
+            type: "array", 
+            items: { type: "string" },
+            description: "Análisis del impacto en los rubros"
+          },
+          nuevasObligaciones: {
+            type: "array",
+            items: { type: "string" }
+          },
+          riesgosIdentificados: {
+            type: "array",
+            items: { type: "string" }
+          },
+          analisisOptimización: { type: "string" }
+        },
+        required: ["numero", "fechaFirma", "valorAdicional", "plazoAdicionalMeses", "objeto", "tipoModificacion"]
+      };
+
+      const prompt = `Eres un auditor interviniente del Estado experto en contratación estatal y control presupuestal de altísimo nivel. 
+      Tu tarea es auditar un documento PDF que corresponde a un "Otrosí" (o adenda) de un convenio o contrato y extraer los datos críticos.
+
+      ATENCIÓN CONCIFRAS: El "valorAdicional" y el "plazoAdicionalMeses" SON CRÍTICOS. Busca específicamente términos como "ADICIONAR EL VALOR", "VALOR DE LA ADICIÓN", "PRORROGAR EL PLAZO", "PLAZO DE EJECUCIÓN". 
       
-      Debes devolver un objeto JSON con la siguiente estructura exacta:
-      {
-        "numeroOtrosie": "string",
-        "fechaFirma": "string",
-        "valorAdicional": number,
-        "plazoAdicionalMeses": number,
-        "clausulasModificadas": ["string"],
-        "impactoPresupuestal": ["string"],
-        "nuevasObligaciones": ["string"],
-        "riesgosIdentificados": ["string"],
-        "analisisOptimización": "string",
-        "tipoModificacion": "string",
-        "supervisorResponsable": "string",
-        "nitEntidad": "string",
-        "nitContratista": "string"
-      }
-      
-      REGLAS CRÍTICAS:
-      1. EXTRACCIÓN DE CLÁUSULAS: Debes identificar y extraer TODAS las cláusulas modificadas sin excepción. No omitas ninguna por ser extensa.
-      2. CIFRAS: Extrae los valores numéricos exactos. Verifica puntos y comas de miles y decimales.
-      3. FECHAS: Extrae todas las fechas en formato YYYY-MM-DD.
-      4. IDENTIFICACIÓN: Extrae NITS, Cédulas y nombres completos de responsables mencionados.
-      5. RIGOR TÉCNICO: Si el documento menciona un impacto presupuestal detallado por rubros, lístalos todos.`;
+      REGLAS DE RIGOR:
+      1. Extrae los montos en valor número (ej: 1500000). Elimina el signo $ o puntos en el número final.
+      2. Si el texto indica "un mes y quince días", traduce a 1.5 meses.
+      3. No resumas el Objeto; transcribelo en su forma central.
+      4. Si no hay valor adicionado, el "valorAdicional" es 0.
+      5. Si no hay plazo adicionado, el "plazoAdicionalMeses" es 0.`;
 
       const config = {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        responseSchema: schema
       };
 
       const result = await aiProviderService.generateContent(prompt, aiProviderService.getAIModel(), config, parts);
@@ -154,6 +175,9 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
         setNewOtrosie(prev => ({ 
           ...prev, 
           ...extractedData,
+          numero: extractedData.numero || prev.numero,
+          valorAdicional: Number(extractedData.valorAdicional) || 0,
+          plazoAdicionalMeses: Number(extractedData.plazoAdicionalMeses) || 0,
           clausulasModificadas: Array.isArray(extractedData.clausulasModificadas) ? extractedData.clausulasModificadas : (extractedData.clausulasModificadas ? [extractedData.clausulasModificadas] : prev.clausulasModificadas),
           impactoPresupuestal: Array.isArray(extractedData.impactoPresupuestal) ? extractedData.impactoPresupuestal : (extractedData.impactoPresupuestal ? [extractedData.impactoPresupuestal] : prev.impactoPresupuestal),
           nuevasObligaciones: Array.isArray(extractedData.nuevasObligaciones) ? extractedData.nuevasObligaciones : (extractedData.nuevasObligaciones ? [extractedData.nuevasObligaciones] : prev.nuevasObligaciones),
