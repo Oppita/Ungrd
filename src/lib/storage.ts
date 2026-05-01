@@ -50,6 +50,7 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
   const bucketNamesToTry = [
     storageOverride,
     configuredBucket,
+    'Documents SRR',
     'documents-srr',
     'documents',
     'storage',
@@ -79,19 +80,6 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
           cacheControl: '3600',
           upsert: false
         });
-
-      // If bucket not found, attempt to create it (may work depending on RLS policies)
-      if (error && String(error.message || '').includes('Bucket not found')) {
-        console.warn(`Bucket '${bucketName}' not found. Attempting to create it dynamically...`);
-        const { error: createError } = await supabase.storage.createBucket(bucketName, { public: true });
-        if (!createError) {
-          // Retry upload
-          const retry = await supabase.storage.from(bucketName).upload(filePath, file, { cacheControl: '3600', upsert: false });
-          error = retry.error;
-        } else {
-          console.warn(`Failed to create bucket '${bucketName}':`, createError.message);
-        }
-      }
 
       if (!error) {
         successfulBucket = bucketName;
@@ -174,6 +162,7 @@ export const getRepairedUrl = async (url: string): Promise<string | null> => {
     const alternativeBuckets = [
       storageOverride,
       configuredBucket,
+      'Documents SRR',
       'documents-srr',
       'documents',
       'storage',
