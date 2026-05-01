@@ -7,17 +7,11 @@ import { AddProfessionalForm } from './AddProfessionalForm';
 import { ImportProfessionalsForm } from './ImportProfessionalsForm';
 import { ActivitiesManager } from './ActivitiesManager';
 import { ProfessionalReportsManager } from './ProfessionalReportsManager';
-import * as pdfjsLib from 'pdfjs-dist';
 import { AIProviderSelector } from './AIProviderSelector';
 import { aiProviderService } from '../services/aiProviderService';
 import { parseJSONResponse } from '../services/geminiService';
 import { uploadDocumentToStorage } from '../lib/storage';
-
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString();
+import { analyzeDocumentWithRigor } from '../services/documentAnalysisService';
 
 export const GestionOPS: React.FC<{ projectId: string }> = ({ projectId }) => {
   const { state, addProfessional, updateProfessional, deleteProfessional, addDocument } = useProject();
@@ -158,17 +152,7 @@ export const GestionOPS: React.FC<{ projectId: string }> = ({ projectId }) => {
     setIsAnalyzing(true);
     
     try {
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-      let text = '';
-      const pagesToProcess = Math.min(pdf.numPages, 10); // CVs are usually short
-      for (let i = 1; i <= pagesToProcess; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        text += content.items.map((item: any) => item.str).join(' ');
-      }
-
-      const prompt = `Analiza esta hoja de vida y extrae la siguiente información en formato JSON.
+      const prompt = `Analiza esta hoja de vida con RIGOR IA y extrae la información en formato JSON.
       
       Debes devolver un objeto JSON con esta estructura exacta:
       {
@@ -189,31 +173,20 @@ export const GestionOPS: React.FC<{ projectId: string }> = ({ projectId }) => {
         "ciudad": "string"
       }
       
-      Información a extraer:
-      - nombre: Nombre completo del profesional
-      - profesion: Profesión principal
-      - experienciaAnios: Años totales de experiencia profesional (número)
-      - especialidades: Lista de especialidades (array de strings)
-      - sectoresTrabajados: Sectores en los que ha trabajado (array de strings)
-      - proyectosRelevantes: Proyectos importantes (array de strings)
-      - departamentosExperiencia: Departamentos de Colombia donde ha trabajado (array de strings)
-      - formacionAcademica: Formación académica (array de strings)
-      - certificaciones: Certificaciones (array de strings)
-      - idiomas: Idiomas (array de strings)
-      - habilidadesTecnicas: Habilidades técnicas (array de strings)
-      - linkedinUrl: URL de LinkedIn
-      - fechaNacimiento: Fecha de nacimiento
-      - direccion: Dirección de residencia
-      - ciudad: Ciudad de residencia
+      Información a extraer con rigor técnico:
+      - nombre: Nombre completo
+      - profesion: Profesión u oficio principal
+      - experienciaAnios: Años totales comprobables
+      - especialidades: Temas específicos de dominio
+      - sectoresTrabajados: Sectores (público, privado, infraestructura, etc.)
+      - proyectosRelevantes: Proyectos en los que ha participado
+      - departamentosExperiencia: Departamentos de Colombia donde ha operado
+      - formacionAcademica: Títulos obtenidos
+      - certificaciones: Certificados adicionales`;
+
+      const extractionResult = await analyzeDocumentWithRigor(selectedFile, prompt);
+      const extractedData = extractionResult.data;
       
-      Texto de la hoja de vida: ${text}`;
-
-      const config = {
-        responseMimeType: 'application/json'
-      };
-
-      const result = await aiProviderService.generateContent(prompt, aiProviderService.getAIModel(), config);
-      const extractedData = parseJSONResponse(result);
       const salarioMensual = 7500000;
 
       const folderPath = `Profesionales/${extractedData.nombre || 'Sin Nombre'}/HojaDeVida`;
