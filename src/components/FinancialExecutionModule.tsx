@@ -32,6 +32,7 @@ import { showAlert } from "../utils/alert";
 import { analyzeDocumentWithRigor } from "../services/documentAnalysisService";
 import { analyzeFinancialDocumentText } from "../services/financialService";
 import { calculateProjectTotals } from "../utils/projectCalculations";
+import { uploadDocumentToStorage } from "../lib/storage";
 
 import { AIProviderSelector } from "./AIProviderSelector";
 import { AddPagoForm } from "./AddPagoForm";
@@ -47,6 +48,9 @@ const CDPListItem = ({
   onDelete,
   onAddPago,
   onAddRC,
+  onUploadDoc,
+  onPreviewDoc,
+  uploadingDocId,
   state,
 }: any) => {
   const [expanded, setExpanded] = useState(false);
@@ -109,6 +113,32 @@ const CDPListItem = ({
                   <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase bg-slate-50 px-2 py-1 rounded-lg">
                     <Hash size={12} className="text-indigo-500" /> {doc.rubro}
                   </div>
+                )}
+                {doc.documento_url ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPreviewDoc(doc.documento_url);
+                    }}
+                    className="flex items-center gap-1.5 text-[10px] font-black text-indigo-600 uppercase bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors border border-indigo-100"
+                    title={`Ver Documento: ${doc.documentoNombre || 'Evidencia'}`}
+                  >
+                    <FileText size={12} /> Ver DOC
+                  </button>
+                ) : (
+                  <label 
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 hover:text-emerald-600 uppercase bg-slate-50 hover:bg-emerald-50 px-2 py-1 rounded-lg transition-colors border border-slate-100 hover:border-emerald-200 cursor-pointer"
+                    title="Cargar Documento CDP Físico"
+                  >
+                    {uploadingDocId === doc.id ? (
+                      <Loader2 size={12} className="animate-spin text-emerald-600" />
+                    ) : (
+                      <Upload size={12} />
+                    )}
+                    <span>Subir PDF</span>
+                    <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => onUploadDoc(e, doc)} disabled={uploadingDocId === doc.id} />
+                  </label>
                 )}
               </div>
             </div>
@@ -428,17 +458,20 @@ const CDPListItem = ({
           )}
 
           <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-200/60">
-            <div className="flex items-center gap-4">
-              <div
-                className="p-3 bg-rose-50 rounded-xl text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-              >
-                <Trash2 size={18} />
-              </div>
-              <div className="hidden md:block">
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm("¿Está seguro de que desea eliminar este documento financiero? Esta acción no se puede deshacer y afectará la trazabilidad.")) {
+                                onDelete();
+                              }
+                            }}
+                            className="p-3 bg-rose-50 rounded-xl text-rose-600 hover:bg-rose-600 hover:text-white transition-all transform hover:scale-110 shadow-sm"
+                            title="Eliminar Registro"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                          <div className="hidden md:block">
                 <p className="text-[10px] font-black text-slate-400 uppercase italic">
                   Zona de Seguridad
                 </p>
@@ -486,6 +519,7 @@ export const FinancialExecutionModule: React.FC<
   const [showModal, setShowModal] = useState(false);
   const [showImportPagosModal, setShowImportPagosModal] = useState(false);
   const [showAddPagoModal, setShowAddPagoModal] = useState(false);
+  const [showLinkRCModal, setShowLinkRCModal] = useState<any>(null); // CDP Doc
   const [selectedRCForPago, setSelectedRCForPago] = useState<any>(null);
   const [selectedPagoToEdit, setSelectedPagoToEdit] = useState<any>(null);
   const [selectedRCToViewPagos, setSelectedRCToViewPagos] = useState<any>(null);
@@ -614,6 +648,48 @@ export const FinancialExecutionModule: React.FC<
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
+  const [documentPreviewUrl, setDocumentPreviewUrl] = useState<string | null>(null);
+
+  const handlePreviewDoc = async (url: string) => {
+    // Attempt auto-repair on click
+    try {
+      const { getRepairedUrl, getIframeSafeUrl } = await import('../lib/storage');
+      const repairedUrl = await getRepairedUrl(url);
+      const safeUrl = getIframeSafeUrl(repairedUrl || url);
+      setDocumentPreviewUrl(safeUrl);
+    } catch (e) {
+      setDocumentPreviewUrl(url);
+    }
+  };
+
+  const handleUploadRealPdf = async (e: React.ChangeEvent<HTMLInputElement>, doc: any, type: 'RC' | 'CDP' | 'Pago') => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    setUploadingDocId(doc.id);
+    try {
+      const publicUrl = await uploadDocumentToStorage(file, 'financial-docs');
+      
+      if (type === 'Pago') {
+        const updatedPago = { ...doc, soporteUrl: publicUrl, soporteNombre: file.name };
+        updatePago(updatedPago);
+        showAlert("Documento cargado exitosamente al Pago.");
+      } else {
+        updateFinancialDocument({ ...doc, documento_url: publicUrl, documentoNombre: file.name });
+        showAlert(`Documento cargado exitosamente al ${type}.`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      showAlert(err.message || 'Error al subir el documento a Supabase');
+    } finally {
+      setUploadingDocId(null);
+    }
+    
+    // Reset file input
+    e.target.value = '';
   };
 
   const handleSave = () => {
@@ -1336,18 +1412,11 @@ export const FinancialExecutionModule: React.FC<
                     setShowAddPagoModal(true);
                   }}
                   onAddRC={(cdp: any) => {
-                    setPreviewDoc({
-                      id: `FIN-RC-${Date.now()}`,
-                      tipo: "RC",
-                      numero: "",
-                      valor: 0,
-                      fecha: new Date().toISOString().split("T")[0],
-                      descripcion: "",
-                      numeroCdp: cdp.numero,
-                      projectId: cdp.projectId || "",
-                    } as any);
-                    setShowModal(true);
+                    setShowLinkRCModal(cdp);
                   }}
+                  onUploadDoc={(e: any, doc: any) => handleUploadRealPdf(e, doc, 'CDP')}
+                  onPreviewDoc={(url: string) => handlePreviewDoc(url)}
+                  uploadingDocId={uploadingDocId}
                   state={state}
                 />
               );
@@ -1466,15 +1535,52 @@ export const FinancialExecutionModule: React.FC<
                     </div>
 
                     <div className="mt-4 flex gap-2">
+                      {doc.documento_url ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePreviewDoc(doc.documento_url);
+                          }}
+                          className="flex items-center justify-center gap-2 px-3 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 transition-colors"
+                          title="Ver Documento"
+                        >
+                          <FileText size={16} />
+                        </button>
+                      ) : (
+                        <label 
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center justify-center gap-2 px-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-colors cursor-pointer"
+                          title="Subir Documento PDF"
+                        >
+                          {uploadingDocId === doc.id ? (
+                            <Loader2 size={16} className="animate-spin text-emerald-600" />
+                          ) : (
+                            <Upload size={16} />
+                          )}
+                          <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleUploadRealPdf(e, doc, 'RC')} disabled={uploadingDocId === doc.id} />
+                        </label>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setFilterRcId(doc.id);
                           setActiveTab("Pagos");
                         }}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors shadow-sm"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-200 transition-colors shadow-sm"
                       >
                         <Search size={14} /> Ver Pagos Integrados
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm("¿Está seguro de que desea eliminar este Registro Presupuestal (RC)? Esta acción es irreversible.")) {
+                            deleteFinancialDocument(doc.id);
+                          }
+                        }}
+                        className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+                        title="Eliminar RC"
+                      >
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
@@ -1551,12 +1657,33 @@ export const FinancialExecutionModule: React.FC<
                         {pago.estado}
                       </div>
                       <div className="flex items-center">
+                        {pago.soporteUrl ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePreviewDoc(pago.soporteUrl!);
+                            }}
+                            className="p-1.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all ml-2"
+                            title={`Ver Documento: ${pago.soporteNombre || 'Evidencia'}`}
+                          >
+                            <FileText size={14} />
+                          </button>
+                        ) : (
+                          <label className="p-1.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all ml-2 cursor-pointer flex items-center justify-center relative" title="Cargar Documento Físico (PDF)">
+                            {uploadingDocId === pago.id ? (
+                              <Loader2 size={14} className="animate-spin text-emerald-600" />
+                            ) : (
+                              <Upload size={14} />
+                            )}
+                            <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleUploadRealPdf(e, pago, 'Pago')} disabled={uploadingDocId === pago.id} />
+                          </label>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedPagoToEdit(pago);
                           }}
-                          className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all ml-2"
+                          className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all ml-1"
                           title="Editar Pago"
                         >
                           <Edit size={14} />
@@ -1564,11 +1691,7 @@ export const FinancialExecutionModule: React.FC<
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (
-                              window.confirm(
-                                "¿Está seguro de que desea eliminar este pago?",
-                              )
-                            ) {
+                            if (window.confirm("¿Está seguro de que desea eliminar este pago?")) {
                               deletePago(pago.id);
                             }
                           }}
@@ -1691,6 +1814,79 @@ export const FinancialExecutionModule: React.FC<
           </div>
         )}
       </div>
+
+      {showLinkRCModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white max-w-2xl w-full rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="text-xl font-black text-slate-800">Vincular RC a CDP No. {showLinkRCModal.numero}</h3>
+                <p className="text-xs text-slate-500 mt-1">Seleccione un RC existente para vincularlo a este CDP.</p>
+              </div>
+              <button
+                onClick={() => setShowLinkRCModal(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 flex-1 overflow-y-auto">
+              <div className="relative mb-6">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar RC por número..."
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 font-medium"
+                  onChange={(e) => {
+                    // we can do inline filtering
+                    const val = e.target.value.toLowerCase();
+                    const items = document.querySelectorAll('.rc-link-item');
+                    items.forEach((item: any) => {
+                      if (item.dataset.search.includes(val)) {
+                        item.style.display = 'flex';
+                      } else {
+                        item.style.display = 'none';
+                      }
+                    });
+                  }}
+                />
+              </div>
+              <div className="space-y-3">
+                {state.financialDocuments
+                  .filter((d: any) => d.tipo === "RC" && !d.numeroCdp)
+                  .map((rc: any) => (
+                    <div
+                      key={rc.id}
+                      className="rc-link-item flex justify-between items-center p-4 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
+                      data-search={rc.numero.toLowerCase()}
+                      onClick={() => {
+                        updateFinancialDocument({
+                          ...rc,
+                          numeroCdp: showLinkRCModal.numero
+                        });
+                        showAlert(`RC No. ${rc.numero} vinculado correctamente.`);
+                        setShowLinkRCModal(null);
+                      }}
+                    >
+                      <div>
+                        <p className="font-black text-slate-800">RC No. {rc.numero}</p>
+                        <p className="text-xs text-slate-500">Valor: {formatCurrency(rc.valor)}</p>
+                      </div>
+                      <div className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                        Vincular
+                      </div>
+                    </div>
+                  ))}
+                  {state.financialDocuments.filter((d: any) => d.tipo === "RC" && !d.numeroCdp).length === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-slate-500">No hay RCs disponibles sin vincular.</p>
+                    </div>
+                  )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddPagoModal && selectedRCForPago && (
         <AddPagoForm
@@ -2309,6 +2505,39 @@ export const FinancialExecutionModule: React.FC<
           initialData={selectedPagoToEdit}
           onClose={() => setSelectedPagoToEdit(null)}
         />
+      )}
+
+      {documentPreviewUrl && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex justify-center items-center z-[100] p-4">
+          <div className="bg-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Vista Previa de Documento Físico</h3>
+              <div className="flex items-center gap-4">
+                <a 
+                  href={documentPreviewUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 text-xs font-bold hover:underline"
+                >
+                  Abrir en pestaña nueva
+                </a>
+                <button
+                  onClick={() => setDocumentPreviewUrl(null)}
+                  className="text-slate-400 hover:text-rose-600 transition-colors p-1"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-slate-100 w-full h-full relative">
+              <iframe 
+                src={documentPreviewUrl} 
+                className="w-full h-full absolute inset-0 border-none"
+                title="Visor de PDF"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
