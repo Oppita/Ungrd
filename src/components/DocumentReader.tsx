@@ -142,4 +142,4 @@ const DocumentReader: React.FC<DocumentReaderProps> = ({ onDataExtracted, onText
   );
 };
 
-export default DocumentReader
+export default DocumentReader;
