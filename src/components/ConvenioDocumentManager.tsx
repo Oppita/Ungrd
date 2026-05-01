@@ -237,8 +237,9 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
         riesgosIdentificados: [],
       });
       setUploadedFile(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding otrosie:', error);
+      alert(error.message || 'Error al guardar el otrosí o subir el documento adjunto.');
     } finally {
       setIsSubmitting(false);
     }
@@ -277,8 +278,9 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
       setShowAddDoc(false);
       setNewDoc({ titulo: '', tipo: 'Convenio', descripcion: '' });
       setUploadedFile(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding document:', error);
+      alert(error.message || 'Error al subir el documento adjunto.');
     } finally {
       setIsSubmitting(false);
     }
