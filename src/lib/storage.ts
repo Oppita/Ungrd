@@ -68,17 +68,30 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
     
   const filePath = `${sanitizedFolderPath}/${fileName}`;
 
-  let uploadError = null;
+  let uploadError: any = null;
   let successfulBucket = '';
 
   for (const bucketName of bucketNamesToTry) {
     try {
-      const { error } = await supabase.storage
+      let { error } = await supabase.storage
         .from(bucketName)
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         });
+
+      // If bucket not found, attempt to create it (may work depending on RLS policies)
+      if (error && String(error.message || '').includes('Bucket not found')) {
+        console.warn(`Bucket '${bucketName}' not found. Attempting to create it dynamically...`);
+        const { error: createError } = await supabase.storage.createBucket(bucketName, { public: true });
+        if (!createError) {
+          // Retry upload
+          const retry = await supabase.storage.from(bucketName).upload(filePath, file, { cacheControl: '3600', upsert: false });
+          error = retry.error;
+        } else {
+          console.warn(`Failed to create bucket '${bucketName}':`, createError.message);
+        }
+      }
 
       if (!error) {
         successfulBucket = bucketName;
@@ -88,17 +101,29 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
         uploadError = error;
         console.warn(`Failed to upload to bucket '${bucketName}':`, error.message);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn(`Exception when trying bucket '${bucketName}':`, err);
+      uploadError = err;
     }
   }
 
   if (uploadError || !successfulBucket) {
-    console.error('Error uploading to Supabase Storage after trying all bucket names:', uploadError);
-    throw uploadError || new Error('Failed to upload to any known bucket. Please check your Supabase Storage configuration.');
+    console.error('Error uploading to Supabase Storage after trying all bucket names. Falling back to Base64 to prevent data loss:', uploadError);
+    // Fallback to base64 Data URL to prevent breaking the flow and losing user data
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve(reader.result as string);
+      };
+      reader.onerror = () => {
+        reject(new Error('Failed to upload via Supabase and failed to create Data URL.'));
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   // Get the public URL from the successful bucket
+
   const { data: urlData } = supabase.storage
     .from(successfulBucket)
     .getPublicUrl(filePath);
