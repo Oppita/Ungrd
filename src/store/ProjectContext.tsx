@@ -1394,9 +1394,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (isManual) {
         showAlert(`Ocurrió un error (Posible CORS). Revisa tu consola. ${errorMsg}`);
       }
-    } catch (err: any) {
-  console.error('Error loading from Supabase:', err);
-  setError(`Error: ${err.message}`);
+  
 } finally {
   setSyncing(false);
   setIsCloudCheckComplete(true);
