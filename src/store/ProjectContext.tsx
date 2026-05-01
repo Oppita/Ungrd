@@ -1209,11 +1209,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const { error: upsertError } = await supabase
         .from('app_state')
         .upsert({ 
-          user_id: user.id, 
-          state: { encrypted: encryptedState }, // Store as an object with encrypted field
-          updated_at: new Date().toISOString()
-        });
-
+  user_id: user.id, 
+  state: { encrypted: encryptedState },
+  updated_at: new Date().toISOString()
+}, { onConflict: 'user_id' });   // ← ESTA LÍNEA
       if (upsertError) {
         console.error('Supabase Upsert Error:', upsertError);
         throw new Error(`Error de Supabase: ${upsertError.message || JSON.stringify(upsertError)}`);
