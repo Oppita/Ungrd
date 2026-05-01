@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from "react";
 import { useProject } from "../store/ProjectContext";
-import { FinancialDocument } from "../types";
+import { FinancialDocument, Pago } from "../types";
+import Papa from 'papaparse';
 import {
   FileText,
   Plus,
@@ -26,7 +27,7 @@ import {
   History,
   ChevronRight,
 } from "lucide-react";
-import { formatCurrency } from "../utils/formatters";
+import { formatCurrency, cleanMonetaryValue, parseExcelDate } from "../utils/formatters";
 import { analyzeFinancialDocumentText } from "../services/financialService";
 import { showAlert } from "../utils/alert";
 
@@ -681,6 +682,119 @@ export const FinancialExecutionModule: React.FC<
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsAnalyzing(true);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      delimiter: "", // Auto-detect
+      complete: (results) => {
+        const data = results.data as any[];
+        const docsToSave: FinancialDocument[] = [];
+        const pagosToSave: Pago[] = [];
+
+        data.forEach((row, index) => {
+          const getVal = (keys: string[]) => {
+            for (const key of keys) {
+              const cleanKey = key.toLowerCase().trim();
+              const foundKey = Object.keys(row).find(k => k.toLowerCase().trim() === cleanKey);
+              if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== "") {
+                return String(row[foundKey]).trim();
+              }
+            }
+            return "";
+          };
+
+          const cdpNum = getVal(["no cdp", "no. cdp", "numero cdp", "num cdp", "cdp"]);
+          const cdpDate = parseExcelDate(getVal(["fecha cdp", "fecha_cdp", "fecha c.d.p"]));
+          const cdpVal = cleanMonetaryValue(getVal(["valor cdp", "val cdp", "monto cdp", "valor c.d.p"]));
+          const rcNum = getVal(["no rc", "no. rc", "numero rc", "num rc", "rc", "rp", "registro compromiso"]);
+          const rcDate = parseExcelDate(getVal(["fecha rc", "fecha_rc", "fecha rp", "fecha r.c"]));
+          const rcVal = cleanMonetaryValue(getVal(["valor rc", "val rc", "valor rp", "valor r.c"]));
+          const contractRef = getVal(["contrato", "no. contrato", "numero contrato", "contrato de referencia"]);
+          const pagoVal = cleanMonetaryValue(getVal(["valor pagado", "valor girado", "monto pagado", "total pagado", "valor neto"]));
+          const beneficiario = getVal(["beneficiario", "nombre beneficiario", "contratista", "paguese a", "nombre"]);
+
+          if (cdpNum) {
+            const cdpDoc: FinancialDocument = {
+              id: `FIN-CDP-${Date.now()}-${index}`,
+              projectId: projectId || selectedProjectId || "",
+              tipo: "CDP",
+              numero: cdpNum,
+              fecha: cdpDate || new Date().toISOString().split("T")[0],
+              valor: cdpVal,
+              solicitante: getVal(["solicitante", "area solicitante"]),
+              areaEjecutora: getVal(["area ejecutora", "dependencia"]),
+              rubro: getVal(["rubro", "nombre rubro"]),
+              fuente: getVal(["fuente", "fuente financiacion"]),
+              nombre: beneficiario,
+              descripcion: `Carga Masiva Detallada`,
+            };
+            docsToSave.push(cdpDoc);
+
+            if (rcNum) {
+              let contractId = "";
+              if (contractRef) {
+                const matched = (state.contratos || []).find(c => 
+                  c.numero.toLowerCase() === contractRef.toLowerCase() ||
+                  c.numero.toLowerCase().includes(contractRef.toLowerCase())
+                );
+                if (matched) contractId = matched.id;
+              }
+
+              if (!contractId && contractRef) contractId = "NO-VINCULADO";
+
+              const rcDoc: FinancialDocument = {
+                id: `FIN-RC-${Date.now()}-${index}`,
+                projectId: projectId || selectedProjectId || "",
+                tipo: "RC",
+                numero: rcNum,
+                numeroCdp: cdpNum,
+                fecha: rcDate || cdpDate || new Date().toISOString().split("T")[0],
+                valor: rcVal,
+                contractId: contractId || undefined,
+                contrato: contractRef,
+                descripcion: `Carga Masiva Detallada`,
+              };
+              docsToSave.push(rcDoc);
+
+              if (pagoVal > 0) {
+                pagosToSave.push({
+                  id: `PAG-CSV-${index}-${Date.now()}`,
+                  contractId: contractId || "NO-VINCULADO",
+                  rcId: rcDoc.id,
+                  numero: `P-${Date.now()}-${index}`,
+                  fecha: rcDate || new Date().toISOString().split("T")[0],
+                  valor: pagoVal,
+                  estado: "Pagado",
+                  beneficiario,
+                  cdp: cdpNum,
+                  rc: rcNum,
+                  observaciones: "Carga Masiva Detallada",
+                });
+              }
+            }
+          }
+        });
+
+        if (docsToSave.length > 0) addFinancialDocuments(docsToSave);
+        if (pagosToSave.length > 0) pagosToSave.forEach(p => addPago(p));
+        
+        setIsAnalyzing(false);
+        showAlert(`Carga completada: ${docsToSave.length} documentos y ${pagosToSave.length} pagos.`);
+      },
+      error: (err) => {
+        setIsAnalyzing(false);
+        showAlert(`Error: ${err.message}`);
+      }
+    });
+
+    e.target.value = "";
+  };
+
+  const unusedLegacyUpload = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
