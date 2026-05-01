@@ -78,7 +78,7 @@ export const AIProviderSelector: React.FC<{ className?: string }> = ({ className
         </select>
       </div>
       
-      {(provider === 'openrouter' || provider === 'groq') && (
+      {(provider === 'openrouter' || provider === 'groq' || provider === 'gemini') && (
         <select
           value={model}
           onChange={(e) => handleModelChange(e.target.value)}
@@ -86,7 +86,13 @@ export const AIProviderSelector: React.FC<{ className?: string }> = ({ className
           disabled={isLoadingModels && provider === 'openrouter'}
           title="Modelo de IA"
         >
-          {provider === 'groq' ? (
+          {provider === 'gemini' ? (
+            <>
+              <option value="gemini-1.5-flash">GEMINI 1.5 FLASH (Rápido)</option>
+              <option value="gemini-1.5-pro">GEMINI 1.5 PRO (Inteligente)</option>
+              <option value="gemini-2.0-flash-exp">GEMINI 2.0 FLASH EXP</option>
+            </>
+          ) : provider === 'groq' ? (
             <>
               <option value="llama-3.3-70b-versatile">LLAMA 3.3 70B VERSATILE</option>
               <option value="llama3-70b-8192">LLAMA 3 70B 8192</option>
