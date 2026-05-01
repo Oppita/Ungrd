@@ -29,7 +29,8 @@ import {
   BarChart3,
   PieChart as PieChartIcon,
   ArrowDownRight,
-  Info
+  Info,
+  Eye
 } from 'lucide-react';
 import { ActaComite, Otrosie, Suspension, Afectacion } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,6 +47,8 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import { getIframeSafeUrl, getRepairedUrl } from '../lib/storage';
+import { showAlert } from '../utils/alert';
 
 export const ActasYSuspensionesTab = ({ projectId }: { projectId: string }) => {
   const { state, updateProject } = useProject();
@@ -56,6 +59,7 @@ export const ActasYSuspensionesTab = ({ projectId }: { projectId: string }) => {
   const [selectedActaId, setSelectedActaId] = useState<string | null>(null);
   const [editingActa, setEditingActa] = useState<ActaComite | null>(null);
   const [isSummarizing, setIsSummarizing] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -157,6 +161,36 @@ export const ActasYSuspensionesTab = ({ projectId }: { projectId: string }) => {
       const updatedActas = actas.map(a => a.id === editingActa.id ? editingActa : a);
       updateProject({ ...project, actasComite: updatedActas });
       setEditingActa(null);
+      showAlert('Acta actualizada exitosamente');
+    }
+  };
+
+  const handlePreviewDoc = async (url?: string, documentId?: string) => {
+    if (!url && !documentId) {
+      showAlert('No hay documento asociado');
+      return;
+    }
+
+    let finalUrl = url;
+
+    // If we have a documentId, find it in the state
+    if (documentId) {
+      const doc = state.documentos.find(d => d.id === documentId);
+      if (doc && doc.versiones && doc.versiones.length > 0) {
+        finalUrl = doc.versiones[doc.versiones.length - 1].url;
+      }
+    }
+
+    if (!finalUrl) {
+      showAlert('No se encontro el archivo del documento');
+      return;
+    }
+
+    try {
+      const repaired = await getRepairedUrl(finalUrl);
+      setPreviewUrl(getIframeSafeUrl(repaired || finalUrl));
+    } catch (e) {
+      setPreviewUrl(getIframeSafeUrl(finalUrl));
     }
   };
 
@@ -386,6 +420,14 @@ export const ActasYSuspensionesTab = ({ projectId }: { projectId: string }) => {
                     </div>
                     
                     <div className="flex flex-col gap-3">
+                      {(selectedActa.documentId || (selectedActa as any).documentoUrl) && (
+                        <button 
+                          onClick={() => handlePreviewDoc((selectedActa as any).documentoUrl, selectedActa.documentId)}
+                          className="w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
+                        >
+                          <Eye size={16} /> Ver Documento
+                        </button>
+                      )}
                       <button 
                         onClick={() => setEditingActa(selectedActa)}
                         className="w-full px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-white/10"
@@ -517,9 +559,16 @@ export const ActasYSuspensionesTab = ({ projectId }: { projectId: string }) => {
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Otrosíes Derivados</p>
                           <div className="space-y-3">
                             {otrosies.map(o => (
-                              <div key={o.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center group hover:border-indigo-200 transition-all">
+                              <div 
+                                key={o.id} 
+                                className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center group hover:border-indigo-200 transition-all cursor-pointer"
+                                onClick={() => o.documentoUrl && handlePreviewDoc(o.documentoUrl)}
+                              >
                                 <div>
-                                  <p className="text-xs font-black text-slate-800">Otrosí No. {o.numero}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-xs font-black text-slate-800">Otrosí No. {o.numero}</p>
+                                    {o.documentoUrl && <FileText size={12} className="text-indigo-500" />}
+                                  </div>
                                   <p className="text-[10px] text-slate-500 font-bold">{o.fechaFirma}</p>
                                 </div>
                                 <ArrowUpRight size={16} className="text-slate-300 group-hover:text-indigo-500" />
@@ -816,6 +865,41 @@ export const ActasYSuspensionesTab = ({ projectId }: { projectId: string }) => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Document Preview Overlay */}
+      {previewUrl && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-8 bg-slate-900/60 backdrop-blur-md">
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.9 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-white w-full max-w-6xl h-full rounded-[3rem] shadow-2xl relative overflow-hidden flex flex-col"
+           >
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                 <div className="flex items-center gap-4">
+                   <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg transform -rotate-3">
+                     <FileText size={24} />
+                   </div>
+                   <div>
+                     <h3 className="text-xl font-black text-slate-800 tracking-tighter">Visor de Documentos del Sistema</h3>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vista Segura • Solo Consulta</p>
+                   </div>
+                 </div>
+                 <button 
+                   onClick={() => setPreviewUrl(null)}
+                   className="w-12 h-12 bg-white border border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm"
+                 >
+                   <X size={24} />
+                 </button>
+              </div>
+              <div className="flex-1 bg-slate-100 relative">
+                 <iframe 
+                   src={previewUrl} 
+                   className="w-full h-full absolute inset-0 border-none"
+                   title="Visor de Documento"
+                 />
+              </div>
+           </motion.div>
         </div>
       )}
     </div>
