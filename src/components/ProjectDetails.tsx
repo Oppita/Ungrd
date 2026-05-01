@@ -53,7 +53,7 @@ interface ProjectDetailsProps {
 
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, onUpdateProject, onOpenVista360 }) => {
-  const { state, deleteProject, deleteContract, deleteOtrosie } = useProject();
+  const { state, deleteProject, deleteContract, deleteOtrosie, updateOtrosie } = useProject();
   const [activeTab, setActiveTab] = useState<TabType>('resumen');
   const [activeSubTabTerritorio, setActiveSubTabTerritorio] = useState<string>('actividades');
   const [activeSubTabMonitoreo, setActiveSubTabMonitoreo] = useState<string>('alertas');
@@ -356,10 +356,26 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                 </div>
 
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <h4 className="font-medium text-slate-700 mb-4">Resumen Presupuestal</h4>
+                  <h4 className="font-medium text-slate-700 mb-4">Resumen Presupuestal Detallado</h4>
                   {(() => {
-                    const { valorAdicional: totalAdiciones, valorTotal: totalPresupuestoActual } = calculateProjectTotals(project, contracts, otrosies, state.convenios, state.afectaciones, pagos, project.suspensiones || [], undefined, state.proyectos, undefined, state.presupuestos);
-                    const aportesFngrdActual = (presupuesto.aportesFngrd || 0) + totalAdiciones;
+                    const totals = calculateProjectTotals(project, contracts, otrosies, state.convenios, state.afectaciones, pagos, project.suspensiones || [], undefined, state.proyectos, undefined, state.presupuestos);
+                    const { 
+                      valorOriginal, 
+                      valorTotal: totalPresupuestoActual,
+                      valorContratado,
+                      valorEjecutado,
+                      saldoPorContratar,
+                      saldoPorEjecutar
+                    } = totals;
+                    
+                    const convenioOtrosies = otrosies.filter(o => o.convenioId === project.convenioId);
+                    const contractOtrosies = otrosies.filter(o => contracts.some(c => c.id === o.contractId));
+                    const totalAdicionesConvenio = convenioOtrosies.reduce((acc, o) => acc + (o.valorAdicional || 0), 0);
+                    const totalAdicionesContratos = contractOtrosies.reduce((acc, o) => acc + (o.valorAdicional || 0), 0);
+                    
+                    const adicionesMostradas = totalAdicionesConvenio > 0 ? totalAdicionesConvenio : totalAdicionesContratos;
+
+                    const aportesFngrdActual = (presupuesto.aportesFngrd || 0) + totalAdicionesConvenio;
                     
                     const chartData = [
                       { name: 'Aportes FNGRD', value: aportesFngrdActual, fill: '#4f46e5' },
@@ -370,33 +386,75 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                     return (
                       <div className="space-y-4">
                         <div className="flex justify-between items-end">
-                          <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Presupuesto Actual</p>
+                           <div>
+                            <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Valor Actualizado del Proyecto</p>
                             <p className="text-2xl font-black text-slate-900">{formatCurrency(totalPresupuestoActual)}</p>
                           </div>
-                          {totalAdiciones > 0 && (
+                          {adicionesMostradas > 0 && (
                             <div className="text-right">
                               <p className="text-xs text-emerald-600 font-bold">Adiciones Totales</p>
-                              <p className="text-sm font-bold text-emerald-700">+{formatCurrency(totalAdiciones)}</p>
+                              <p className="text-sm font-bold text-emerald-700">+{formatCurrency(adicionesMostradas)}</p>
                             </div>
                           )}
                         </div>
                         
                         {/* Detalle Presupuestal */}
-                        <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-2 border border-slate-200">
-                          <p className="font-bold text-slate-700 text-xs uppercase">Detalle Financiero</p>
+                        <div className="bg-slate-50 rounded-lg p-4 text-sm space-y-3 border border-slate-200">
+                          <p className="font-bold text-slate-700 text-xs uppercase border-b border-slate-200 pb-2">Composición Financiera</p>
+                          
                           <div className="flex justify-between">
-                            <span>Valor Convenio</span>
-                            <span className="font-bold">{formatCurrency(convenio?.valorTotal || 0)}</span>
+                            <span className="text-slate-600">Presupuesto Base (Inicial)</span>
+                            <span className="font-bold text-slate-800">{formatCurrency(valorOriginal)}</span>
                           </div>
-                          {otrosies.filter(o => o.convenioId === project.convenioId).map(o => (
-                            <div key={o.id} className="flex justify-between text-xs text-slate-600">
-                              <span>Otrosí: {o.objeto}</span>
-                              <span>+{formatCurrency(o.valorAdicional || 0)}</span>
+                          
+                          {convenioOtrosies.length > 0 && (
+                            <div className="pl-2 border-l-2 border-indigo-200 space-y-1 mt-1">
+                               <p className="text-[10px] font-bold text-indigo-600 uppercase">Adiciones de Convenio</p>
+                              {convenioOtrosies.map(o => (
+                                <div key={o.id} className="flex justify-between text-xs text-slate-600 group relative">
+                                  <span className="truncate max-w-[200px]" title={o.objeto}>Otrosí #{o.numero}</span>
+                                  <span className="text-emerald-600 font-semibold">+{formatCurrency(o.valorAdicional || 0)}</span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
+
+                          {contractOtrosies.length > 0 && (
+                            <div className="pl-2 border-l-2 border-amber-200 space-y-1 mt-1">
+                               <p className="text-[10px] font-bold text-amber-600 uppercase">Adiciones a Contratos</p>
+                              {contractOtrosies.map(o => {
+                                const contract = contracts.find(c => c.id === o.contractId);
+                                return (
+                                  <div key={o.id} className="flex justify-between text-xs text-slate-600 group relative">
+                                    <span className="truncate max-w-[200px]" title={o.objeto}>{contract?.tipo} - Otrosí #{o.numero}</span>
+                                    <span className="text-emerald-600 font-semibold">+{formatCurrency(o.valorAdicional || 0)}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          <div className="border-t border-slate-200 pt-2 space-y-2">
+                             <div className="flex justify-between">
+                              <span className="text-slate-600 flex items-center gap-1"><DollarSign size={14}/> Total Contratado</span>
+                              <span className="font-bold text-indigo-700">{formatCurrency(valorContratado)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-500">Saldo por Contratar</span>
+                              <span className={`font-semibold ${saldoPorContratar < 0 ? 'text-rose-600' : 'text-slate-500'}`}>{formatCurrency(saldoPorContratar)}</span>
+                            </div>
+
+                            <div className="flex justify-between mt-2">
+                              <span className="text-slate-600 flex items-center gap-1"><Activity size={14}/> Total Ejecutado (Pagos/Informes)</span>
+                              <span className="font-bold text-emerald-700">{formatCurrency(valorEjecutado)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-500">Saldo por Ejecutar (Pagar)</span>
+                              <span className="font-semibold text-slate-500">{formatCurrency(saldoPorEjecutar)}</span>
+                            </div>
+                          </div>
                         </div>
-                        
+
                         <div className="h-48 mt-4">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -1696,6 +1754,40 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
               <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <h4 className="text-sm font-bold text-slate-700 mb-2">Objeto del Otrosí</h4>
                 <p className="text-sm text-slate-600 leading-relaxed">{selectedOtrosie.objeto}</p>
+              </div>
+
+              <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                <h4 className="text-sm font-bold text-amber-800 mb-2">Edición Rápida (Corrección IA)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Valor Adicional</label>
+                    <input 
+                      type="number"
+                      value={selectedOtrosie.valorAdicional}
+                      onChange={(e) => {
+                        const updated = { ...selectedOtrosie, valorAdicional: Number(e.target.value) || 0 };
+                        setSelectedOtrosie(updated);
+                        updateOtrosie(updated);
+                      }}
+                      className="w-full px-3 py-2 border border-amber-300 rounded text-sm font-bold text-amber-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Plazo Adicional (Meses)</label>
+                    <input 
+                      type="number"
+                      step="0.1"
+                      value={selectedOtrosie.plazoAdicionalMeses}
+                      onChange={(e) => {
+                        const updated = { ...selectedOtrosie, plazoAdicionalMeses: Number(e.target.value) || 0 };
+                        setSelectedOtrosie(updated);
+                        updateOtrosie(updated);
+                      }}
+                      className="w-full px-3 py-2 border border-amber-300 rounded text-sm font-bold text-amber-900"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-amber-600 mt-2 font-medium italic">* Si la IA extrajo incorrectamente los valores cruciales debido a la complejidad del PDF, corríjalos aquí. Los cambios se guardan automáticamente y afectan la trazabilidad.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
