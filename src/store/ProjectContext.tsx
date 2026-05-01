@@ -1024,6 +1024,41 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     loadInitialState();
   }, [clearAllData, recalculateAll]);
 
+  const getCleanStateForStorage = (originalState: GlobalState) => {
+    // 1. Static geographic data can be removed for localStorage, but for Supabase we might want it or not?
+    // Actually we keep municipios and departamentos for Supabase just in case, or we remove them. The previous code didn't remove them.
+    // Wait, the previous code only removed them from localStorage. We'll leave them in Supabase for now.
+    
+    // Create a deep copy using JSON parse/stringify is not needed if we map properly
+    return {
+      ...originalState,
+      documentos: originalState.documentos?.map(d => ({ 
+        ...d, 
+        analysis: undefined,
+        versiones: d.versiones?.map(v => ({
+          ...v,
+          url: v.url?.startsWith('data:') ? '' : v.url
+        })) || []
+      })) || [],
+      documentosSoporte: originalState.documentosSoporte?.map(d => ({
+        ...d,
+        url: d.url?.startsWith('data:') ? '' : d.url
+      })) || [],
+      contratos: originalState.contratos?.map(c => ({ 
+        ...c, 
+        analysis: undefined 
+      })) || [],
+      otrosies: originalState.otrosies?.map(o => ({
+        ...o,
+        documentoUrl: o.documentoUrl?.startsWith('data:') ? '' : o.documentoUrl
+      })) || [],
+      convenios: originalState.convenios?.map(c => ({
+        ...c,
+        documentoUrl: c.documentoUrl?.startsWith('data:') ? '' : c.documentoUrl
+      })) || []
+    };
+  };
+
   // Optimized Save to LocalStorage with Debounce
   useEffect(() => {
     if (loading || !isCloudCheckComplete) return;
@@ -1032,31 +1067,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         if (!state || typeof state !== 'object') return;
         
-        // Optimize: Exclude large/static data from LocalStorage proactively
-        // 1. Static geographic data (municipios, departamentos)
-        const { municipios, departamentos, ...restState } = state;
+        const cleanState = getCleanStateForStorage(state);
+        // Exclude large/static data from LocalStorage proactively
+        const { municipios, departamentos, ...restState } = cleanState;
         
-        // 2. Prune heavy objects that can be re-calculated or aren't critical for initial load
         const stateToSave = {
           ...restState,
-          // Remove AI analysis from documents and contracts as they are very large
-          documentos: state.documentos.map(d => ({ 
-            ...d, 
-            analysis: undefined,
-            // Prune versions as they might contain large URLs/content
-            versiones: d.versiones?.map(v => ({
-              ...v,
-              // Remove base64 from version URLs
-              url: v.url?.startsWith('data:') ? '' : v.url
-            })) || []
-          })),
-          documentosSoporte: state.documentosSoporte?.map(d => ({
-            ...d,
-            // Remove base64 from support document URLs
-            url: d.url?.startsWith('data:') ? '' : d.url
-          })) || [],
-          contratos: state.contratos.map(c => ({ ...c, analysis: undefined })),
-          // Truncate non-critical historical arrays
           historicalEvents: state.historicalEvents?.slice(-100) || [],
           systemReports: state.systemReports?.slice(-20) || [],
           alertas: state.alertas?.slice(-50) || [],
@@ -1197,8 +1213,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
 
-      // Military-Grade Encryption (AES-256 GCM) with GZIP Compression for massive datasets
-      const stateString = JSON.stringify(state);
+      // Clean state of base-64 before saving to cloud to prevent massive payloads timeout
+      const cleanState = getCleanStateForStorage(state);
+      const stateString = JSON.stringify(cleanState);
       
       // Native compression (reduces JSON payload by ~90%, avoiding Supabase 1MB limits)
       const stream = new Blob([stateString]).stream().pipeThrough(new CompressionStream('gzip'));
