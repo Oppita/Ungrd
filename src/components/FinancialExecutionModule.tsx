@@ -28,8 +28,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { formatCurrency, cleanMonetaryValue, parseExcelDate } from "../utils/formatters";
-import { analyzeFinancialDocumentText } from "../services/financialService";
 import { showAlert } from "../utils/alert";
+import { analyzeDocumentWithRigor } from "../services/documentAnalysisService";
+import { analyzeFinancialDocumentText } from "../services/financialService";
+import { calculateProjectTotals } from "../utils/projectCalculations";
 
 import { AIProviderSelector } from "./AIProviderSelector";
 import { AddPagoForm } from "./AddPagoForm";
@@ -578,15 +580,17 @@ export const FinancialExecutionModule: React.FC<
     if (projectId) {
       const p = state.proyectos.find((p) => p.id === projectId);
       if (!p) return 0;
-      const convenio = state.convenios.find((c) => c.id === p.convenioId);
-      return convenio?.valorTotal || p.matrix?.valorTotalProyecto || 0;
+      const pContracts = state.contratos.filter(c => c.projectId === p.id);
+      const totals = calculateProjectTotals(p, pContracts, state.otrosies, state.convenios, state.afectaciones, state.pagos, p.suspensiones || [], undefined, state.proyectos, undefined, state.presupuestos);
+      return totals.valorTotal;
     }
     // Global total
-    return state.convenios.reduce(
-      (sum, c) => sum + (Number(c.valorTotal) || 0),
-      0,
-    );
-  }, [state.proyectos, state.convenios, projectId]);
+    return state.convenios.reduce((sum, c) => {
+      const convOtrosies = state.otrosies.filter(o => o.convenioId === c.id);
+      const valOtrosies = convOtrosies.reduce((acc, o) => acc + (o.valorAdicional || 0), 0);
+      return sum + (Number(c.valorTotal) || 0) + valOtrosies;
+    }, 0);
+  }, [state.proyectos, state.convenios, state.contratos, state.otrosies, state.afectaciones, state.pagos, state.presupuestos, projectId]);
 
   const handleAnalyzeText = async () => {
     if (!pastedText.trim()) return;
@@ -735,7 +739,7 @@ export const FinancialExecutionModule: React.FC<
         showAlert("Documento analizado con éxito usando Rigor IA.");
       } catch (error: any) {
         console.error("Rigor IA Error:", error);
-        showAlert(`Error en análisis de rigor: ${error.message || 'Error desconocido'}`, 'error');
+        showAlert(`Error en análisis de rigor: ${error.message || 'Error desconocido'}`);
       } finally {
         setIsAnalyzing(false);
       }
@@ -851,7 +855,8 @@ export const FinancialExecutionModule: React.FC<
     e.target.value = "";
   };
 
-  const unusedLegacyUpload = () => {
+  // Unused legacy upload logic kept for reference but disabled
+  const unusedLegacyUpload = (e: any) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
