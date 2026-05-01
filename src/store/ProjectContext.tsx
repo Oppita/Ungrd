@@ -399,9 +399,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.removeItem(STORAGE_KEY);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from('app_state').delete().eq('user_id', user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await supabase.from('app_state').delete().eq('user_id', session.user.id);
       }
     } catch (err) {
       console.error('Error clearing data from Supabase:', err);
@@ -1131,33 +1131,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
        return;
     }
 
-    const checkAndAutoLoad = async () => {
-      if (hasSyncedRef.current) return;
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          console.log('Usuario detectado al iniciar, cargando datos de la nube...');
-          await loadFromSupabase(false);
-          hasSyncedRef.current = true;
-        } else {
-          setIsCloudCheckComplete(true);
-        }
-      } catch (e) {
-        setIsCloudCheckComplete(true);
-      }
-    };
-
-    checkAndAutoLoad();
-
     // Suscribirse a cambios de auth para cargar datos al iniciar sesión en caliente
+    // onAuthStateChange con INITIAL_SESSION ya maneja la carga inicial
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Supabase Auth Event:', event, session?.user ? 'User present' : 'No user');
       
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
         if (!hasSyncedRef.current && !isSyncingRef.current) {
           console.log(`Evento ${event}: Iniciando sincronización de datos con la nube...`);
-          await loadFromSupabase(false);
-          hasSyncedRef.current = true;
+          // No esperamos a que termine loadFromSupabase para no bloquear el listener
+          loadFromSupabase(false).then(() => {
+            hasSyncedRef.current = true;
+          }).catch(err => {
+            console.error('Error in deferred loadFromSupabase:', err);
+            setIsCloudCheckComplete(true);
+          });
         }
       } else if (event === 'INITIAL_SESSION' || event === 'SIGNED_OUT') {
         // En estos eventos sin usuario, marcamos el check como completado para liberar la UI
@@ -1187,7 +1175,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (isManual) setError(null);
     
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
+      console.log('🔐 getSession completado. Usuario:', !!user, authError?.message);
+
       if (authError) {
         if (authError.message.includes('Refresh Token Not Found') || authError.message.includes('Invalid Refresh Token')) {
           console.warn('Sesión de Supabase expirada o inválida.');
@@ -1268,32 +1259,24 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSyncing(true);
     if (isManual) setError(null);
     try {
-      console.log('🔐 Llamando auth.getUser()...');
-      const authResult = await Promise.race([
-        supabase.auth.getUser(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('TIMEOUT en auth.getUser() - 8 segundos')), 8000)
-        )
-      ]) as any;
-      console.log('🔐 auth.getUser() completado:', !!authResult?.data?.user, authResult?.error?.message);
-      const { data: { user }, error: authError } = authResult;
-      if (authError) {
-        if (authError.message.includes('Refresh Token Not Found') || authError.message.includes('Invalid Refresh Token')) {
-          console.warn('Sesión de Supabase expirada o inválida durante la carga.');
-          await supabase.auth.signOut();
-          if (isManual) throw new Error('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
-          isSyncingRef.current = false;
-          setSyncing(false);
-          setIsCloudCheckComplete(true);
-          return;
-        }
-        if (isManual) throw new Error(`Error de autenticación: ${authError.message}`);
+      console.log('🔐 Obteniendo sesión de Supabase...');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Error de sesión Supabase:', sessionError.message);
+        if (isManual) throw new Error(`Error de autenticación: ${sessionError.message}`);
+        setIsCloudCheckComplete(true);
         return;
       }
+
+      const user = session?.user;
+      console.log('🔐 Estado de sesión:', user ? 'Usuario autenticado' : 'Sesión no encontrada');
+
       if (!user) {
         if (isManual) {
           throw new Error('Debes iniciar sesión para cargar desde la nube.');
         }
+        setIsCloudCheckComplete(true);
         return;
       }
 
