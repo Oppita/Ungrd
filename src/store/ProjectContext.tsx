@@ -43,6 +43,7 @@ interface ProjectContextType {
   deleteContract: (contractId: string) => void;
   addContractEvent: (event: ContractEvent) => void;
   addOtrosie: (otrosie: Otrosie) => void;
+  updateOtrosie: (otrosie: Otrosie) => void;
   deleteOtrosie: (otrosieId: string) => void;
   addAfectacion: (afectacion: Afectacion) => void;
   updateAfectacion: (afectacion: Afectacion) => void;
@@ -1587,6 +1588,19 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const updateOtrosie = (otrosie: Otrosie) => {
+    setState(prevState => {
+      const newState = {
+        ...prevState,
+        otrosies: prevState.otrosies.map(o => o.id === otrosie.id ? otrosie : o),
+      };
+      
+      // Update followings just like addOtrosie? In this case, we might not update the alerts automatically to keep it simple.
+      // But we must recalculate all.
+      return recalculateAll(newState);
+    });
+  };
+
   const deleteOtrosie = (otrosieId: string) => {
     setState(prevState => {
       const newState = {
@@ -3014,6 +3028,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       deleteContract,
       addContractEvent,
       addOtrosie,
+      updateOtrosie,
       deleteOtrosie,
       addAfectacion,
       updateAfectacion,
