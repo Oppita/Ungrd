@@ -166,11 +166,16 @@ export const ImportPagosCSV: React.FC<ImportPagosCSVProps> = ({ contracts, onCom
             if (numeroContratoOriginal) {
                contractId = contractMap.get(numeroContratoOriginal) || '';
                if (!contractId) {
-                  const matched = contracts.find(c => c.numero && (c.numero === numeroContratoOriginal || c.numero.includes(numeroContratoOriginal)));
+                  const matched = contracts.find(c => c.numero && (c.numero === numeroContratoOriginal || c.numero.toLowerCase().includes(numeroContratoOriginal.toLowerCase())));
                   if (matched) {
                     contractId = matched.id;
                   }
                }
+            }
+            
+            // "No Vinculado" mandatory logic
+            if (!contractId && numeroContratoOriginal) {
+              contractId = 'NO-VINCULADO';
             }
 
             let rcId = undefined;
