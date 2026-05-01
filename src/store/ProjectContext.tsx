@@ -1146,18 +1146,22 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     checkAndAutoLoad();
 
-    // Suscribirse a cambios de auth para cargar datos al iniciar sesión en caliente
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && !hasSyncedWithCloud) {
-        console.log('Evento de sesión:', event, '- Sincronizando datos...');
-        await loadFromSupabase(false);
-      }
-    });
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, [hasSyncedWithCloud]);
+  if (event === 'SIGNED_IN' && session?.user) {
+    console.log('Evento de sesión: SIGNED_IN - Cargando datos...');
+    isSyncingRef.current = false; // Reset forzado antes de cargar
+    await loadFromSupabase(false);
+  } else if (event === 'SIGNED_OUT') {
+    isSyncingRef.current = false;
+    setSyncing(false);
+    setHasSyncedWithCloud(false);
+    setIsCloudCheckComplete(false);
+  }
+});
+return () => {
+  subscription?.unsubscribe();
+};
+}, []); // ← Sin dependencias para evitar re-suscripciones
 
   const saveToSupabase = async (isManual: boolean = false) => {
     if (!isSupabaseConfigured) {
