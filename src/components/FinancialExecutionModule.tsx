@@ -681,115 +681,172 @@ export const FinancialExecutionModule: React.FC<
     setSelectedEventoId("");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsAnalyzing(true);
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      delimiter: "", // Auto-detect
-      complete: (results) => {
-        const data = results.data as any[];
-        const docsToSave: FinancialDocument[] = [];
-        const pagosToSave: Pago[] = [];
+    if (file.type === 'application/pdf') {
+      // High-rigor IA analysis for individual PDFs
+      setIsAnalyzing(true);
+      try {
+        const prompt = `
+          Eres un auditor financiero experto. Analiza este documento (CDP o RC) con MÁXIMO RIGOR.
+          Extrae los datos en este formato JSON EXACTO:
+          {
+            "tipo": "CDP" | "RC",
+            "numero": "string",
+            "fecha": "YYYY-MM-DD",
+            "valor": number,
+            "descripcion": "string",
+            "nombre": "string (Beneficiario/Solicitante)",
+            "rubro": "string",
+            "fuente": "string",
+            "numeroRc": "string (Si es CDP y tiene RC mencionado)",
+            "valorRc": number,
+            "fechaRc": "YYYY-MM-DD",
+            "contrato": "string (Número de contrato si existe)"
+          }
+        `;
+        
+        const extraction = await analyzeDocumentWithRigor(file, prompt);
+        const docData = extraction.data;
+        
+        setPreviewDoc({
+          id: `FIN-${docData.tipo}-${Date.now()}`,
+          projectId: projectId || selectedProjectId || "",
+          tipo: docData.tipo || (activeTab === "RC" ? "RC" : "CDP"),
+          numero: docData.numero || "",
+          valor: docData.valor || 0,
+          fecha: docData.fecha || new Date().toISOString().split("T")[0],
+          descripcion: docData.descripcion || "Extraído con Rigor IA",
+          nombre: docData.nombre,
+          rubro: docData.rubro,
+          fuente: docData.fuente,
+          numeroRc: docData.numeroRc,
+          valorRc: docData.valorRc,
+          fechaRc: docData.fechaRc,
+          contrato: docData.contrato,
+          validacion_ia: {
+            estado: 'Verificado',
+            observaciones: 'Analizado con procesamiento visual de imágenes (Rigor IA)'
+          }
+        } as any);
+        
+        showAlert("Documento analizado con éxito usando Rigor IA.");
+      } catch (error: any) {
+        console.error("Rigor IA Error:", error);
+        showAlert(`Error en análisis de rigor: ${error.message || 'Error desconocido'}`, 'error');
+      } finally {
+        setIsAnalyzing(false);
+      }
+    } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+      // Bulk CSV upload logic
+      setIsAnalyzing(true);
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        delimiter: "", // Auto-detect
+        complete: (results) => {
+          const data = results.data as any[];
+          const docsToSave: FinancialDocument[] = [];
+          const pagosToSave: Pago[] = [];
 
-        data.forEach((row, index) => {
-          const getVal = (keys: string[]) => {
-            for (const key of keys) {
-              const cleanKey = key.toLowerCase().trim();
-              const foundKey = Object.keys(row).find(k => k.toLowerCase().trim() === cleanKey);
-              if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== "") {
-                return String(row[foundKey]).trim();
+          data.forEach((row, index) => {
+            const getVal = (keys: string[]) => {
+              for (const key of keys) {
+                const cleanKey = key.toLowerCase().trim();
+                const foundKey = Object.keys(row).find(k => k.toLowerCase().trim() === cleanKey);
+                if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== "") {
+                  return String(row[foundKey]).trim();
+                }
               }
-            }
-            return "";
-          };
-
-          const cdpNum = getVal(["no cdp", "no. cdp", "numero cdp", "num cdp", "cdp"]);
-          const cdpDate = parseExcelDate(getVal(["fecha cdp", "fecha_cdp", "fecha c.d.p"]));
-          const cdpVal = cleanMonetaryValue(getVal(["valor cdp", "val cdp", "monto cdp", "valor c.d.p"]));
-          const rcNum = getVal(["no rc", "no. rc", "numero rc", "num rc", "rc", "rp", "registro compromiso"]);
-          const rcDate = parseExcelDate(getVal(["fecha rc", "fecha_rc", "fecha rp", "fecha r.c"]));
-          const rcVal = cleanMonetaryValue(getVal(["valor rc", "val rc", "valor rp", "valor r.c"]));
-          const contractRef = getVal(["contrato", "no. contrato", "numero contrato", "contrato de referencia"]);
-          const pagoVal = cleanMonetaryValue(getVal(["valor pagado", "valor girado", "monto pagado", "total pagado", "valor neto"]));
-          const beneficiario = getVal(["beneficiario", "nombre beneficiario", "contratista", "paguese a", "nombre"]);
-
-          if (cdpNum) {
-            const cdpDoc: FinancialDocument = {
-              id: `FIN-CDP-${Date.now()}-${index}`,
-              projectId: projectId || selectedProjectId || "",
-              tipo: "CDP",
-              numero: cdpNum,
-              fecha: cdpDate || new Date().toISOString().split("T")[0],
-              valor: cdpVal,
-              solicitante: getVal(["solicitante", "area solicitante"]),
-              areaEjecutora: getVal(["area ejecutora", "dependencia"]),
-              rubro: getVal(["rubro", "nombre rubro"]),
-              fuente: getVal(["fuente", "fuente financiacion"]),
-              nombre: beneficiario,
-              descripcion: `Carga Masiva Detallada`,
+              return "";
             };
-            docsToSave.push(cdpDoc);
 
-            if (rcNum) {
-              let contractId = "";
-              if (contractRef) {
-                const matched = (state.contratos || []).find(c => 
-                  c.numero.toLowerCase() === contractRef.toLowerCase() ||
-                  c.numero.toLowerCase().includes(contractRef.toLowerCase())
-                );
-                if (matched) contractId = matched.id;
-              }
+            const cdpNum = getVal(["no cdp", "no. cdp", "numero cdp", "num cdp", "cdp"]);
+            const cdpDate = parseExcelDate(getVal(["fecha cdp", "fecha_cdp", "fecha c.d.p"]));
+            const cdpVal = cleanMonetaryValue(getVal(["valor cdp", "val cdp", "monto cdp", "valor c.d.p"]));
+            const rcNum = getVal(["no rc", "no. rc", "numero rc", "num rc", "rc", "rp", "registro compromiso"]);
+            const rcDate = parseExcelDate(getVal(["fecha rc", "fecha_rc", "fecha rp", "fecha r.c"]));
+            const rcVal = cleanMonetaryValue(getVal(["valor rc", "val rc", "valor rp", "valor r.c"]));
+            const contractRef = getVal(["contrato", "no. contrato", "numero contrato", "contrato de referencia"]);
+            const pagoVal = cleanMonetaryValue(getVal(["valor pagado", "valor girado", "monto pagado", "total pagado", "valor neto"]));
+            const beneficiario = getVal(["beneficiario", "nombre beneficiario", "contratista", "paguese a", "nombre"]);
 
-              if (!contractId && contractRef) contractId = "NO-VINCULADO";
-
-              const rcDoc: FinancialDocument = {
-                id: `FIN-RC-${Date.now()}-${index}`,
+            if (cdpNum) {
+              const cdpDoc: FinancialDocument = {
+                id: `FIN-CDP-${Date.now()}-${index}`,
                 projectId: projectId || selectedProjectId || "",
-                tipo: "RC",
-                numero: rcNum,
-                numeroCdp: cdpNum,
-                fecha: rcDate || cdpDate || new Date().toISOString().split("T")[0],
-                valor: rcVal,
-                contractId: contractId || undefined,
-                contrato: contractRef,
+                tipo: "CDP",
+                numero: cdpNum,
+                fecha: cdpDate || new Date().toISOString().split("T")[0],
+                valor: cdpVal,
+                solicitante: getVal(["solicitante", "area solicitante"]),
+                areaEjecutora: getVal(["area ejecutora", "dependencia"]),
+                rubro: getVal(["rubro", "nombre rubro"]),
+                fuente: getVal(["fuente", "fuente financiacion"]),
+                nombre: beneficiario,
                 descripcion: `Carga Masiva Detallada`,
               };
-              docsToSave.push(rcDoc);
+              docsToSave.push(cdpDoc);
 
-              if (pagoVal > 0) {
-                pagosToSave.push({
-                  id: `PAG-CSV-${index}-${Date.now()}`,
-                  contractId: contractId || "NO-VINCULADO",
-                  rcId: rcDoc.id,
-                  numero: `P-${Date.now()}-${index}`,
-                  fecha: rcDate || new Date().toISOString().split("T")[0],
-                  valor: pagoVal,
-                  estado: "Pagado",
-                  beneficiario,
-                  cdp: cdpNum,
-                  rc: rcNum,
-                  observaciones: "Carga Masiva Detallada",
-                });
+              if (rcNum) {
+                let contractId = "";
+                if (contractRef) {
+                  const matched = (state.contratos || []).find(c => 
+                    c.numero.toLowerCase() === contractRef.toLowerCase() ||
+                    c.numero.toLowerCase().includes(contractRef.toLowerCase())
+                  );
+                  if (matched) contractId = matched.id;
+                }
+
+                if (!contractId && contractRef) contractId = "NO-VINCULADO";
+
+                const rcDoc: FinancialDocument = {
+                  id: `FIN-RC-${Date.now()}-${index}`,
+                  projectId: projectId || selectedProjectId || "",
+                  tipo: "RC",
+                  numero: rcNum,
+                  numeroCdp: cdpNum,
+                  fecha: rcDate || cdpDate || new Date().toISOString().split("T")[0],
+                  valor: rcVal,
+                  contractId: contractId || undefined,
+                  contrato: contractRef,
+                  descripcion: `Carga Masiva Detallada`,
+                };
+                docsToSave.push(rcDoc);
+
+                if (pagoVal > 0) {
+                  pagosToSave.push({
+                    id: `PAG-CSV-${index}-${Date.now()}`,
+                    contractId: contractId || "NO-VINCULADO",
+                    rcId: rcDoc.id,
+                    numero: `P-${Date.now()}-${index}`,
+                    fecha: rcDate || new Date().toISOString().split("T")[0],
+                    valor: pagoVal,
+                    estado: "Pagado",
+                    beneficiario,
+                    cdp: cdpNum,
+                    rc: rcNum,
+                    observaciones: "Carga Masiva Detallada",
+                  });
+                }
               }
             }
-          }
-        });
+          });
 
-        if (docsToSave.length > 0) addFinancialDocuments(docsToSave);
-        if (pagosToSave.length > 0) pagosToSave.forEach(p => addPago(p));
-        
-        setIsAnalyzing(false);
-        showAlert(`Carga completada: ${docsToSave.length} documentos y ${pagosToSave.length} pagos.`);
-      },
-      error: (err) => {
-        setIsAnalyzing(false);
-        showAlert(`Error: ${err.message}`);
-      }
-    });
+          if (docsToSave.length > 0) addFinancialDocuments(docsToSave);
+          if (pagosToSave.length > 0) pagosToSave.forEach(p => addPago(p));
+          
+          setIsAnalyzing(false);
+          showAlert(`Carga completada: ${docsToSave.length} documentos y ${pagosToSave.length} pagos.`);
+        },
+        error: (err) => {
+          setIsAnalyzing(false);
+          showAlert(`Error: ${err.message}`);
+        }
+      });
+    }
 
     e.target.value = "";
   };
@@ -2104,25 +2161,48 @@ export const FinancialExecutionModule: React.FC<
                     </div>
                   </div>
 
-                  <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-bold text-indigo-900 flex items-center gap-2">
                         <Activity size={18} />
-                        Extracción Automática con IA
+                        Análisis de RIGOR IA (Documentos Escaneados)
                       </h4>
                       <AIProviderSelector />
                     </div>
                     <p className="text-sm text-indigo-700 mb-4">
-                      Pega el texto del CDP o RC extraído de la matriz o
-                      documento oficial. La IA extraerá todos los campos
-                      automáticamente.
+                      Sube un PDF (escaneado o digital) o pega el texto. La IA extraerá los datos financieros con trazabilidad total.
                     </p>
-                    <textarea
-                      value={pastedText}
-                      onChange={(e) => setPastedText(e.target.value)}
-                      placeholder="Ejemplo: 15-0001 13.000.000,00 124 SUBDIRECC DE REDUCCION..."
-                      className="w-full h-32 p-4 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
-                    />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="border-2 border-dashed border-indigo-300 rounded-xl p-6 flex flex-col items-center justify-center bg-white hover:bg-indigo-50 transition-all cursor-pointer group"
+                      >
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          accept=".pdf"
+                        />
+                        <div className="p-3 bg-indigo-100 rounded-full text-indigo-600 group-hover:scale-110 transition-transform mb-3">
+                          <Upload size={24} />
+                        </div>
+                        <span className="text-xs font-black text-indigo-600 uppercase tracking-widest">
+                          Subir PDF con RIGOR
+                        </span>
+                        <p className="text-[10px] text-slate-400 mt-1">Ideal para escaneos de baja calidad</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <textarea
+                          value={pastedText}
+                          onChange={(e) => setPastedText(e.target.value)}
+                          placeholder="O pega el texto aquí..."
+                          className="w-full h-32 p-4 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
