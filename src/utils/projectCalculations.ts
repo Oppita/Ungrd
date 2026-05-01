@@ -86,8 +86,13 @@ export const calculateProjectTotals = (
   
   const projectPresupuesto = presupuestos?.find(p => p.projectId === project.id);
 
-  // 1. Presupuesto Base: Convenio > Presupuesto > Matrix > Suma Contratos
-  const valorOriginal = convenio ? (Number(convenio.valorTotal) || 0) : (Number(projectPresupuesto?.valorTotal) || Number(project.matrix?.valorTotalProyecto) || relevantContracts.reduce((sum, c) => sum + (Number(c.valor) || 0), 0));
+  // 1. Presupuesto Base
+  const baseFromConvenio = convenio ? (Number(convenio.valorTotal) || 0) : 0;
+  const baseFromPresupuesto = Number(projectPresupuesto?.valorTotal) || 0;
+  const baseFromMatrix = Number(project.matrix?.valorTotalProyecto) || 0;
+  const sumOriginalContracts = relevantContracts.reduce((sum, c) => sum + (Number(c.valor) || 0), 0);
+
+  const valorOriginal = baseFromConvenio || baseFromPresupuesto || baseFromMatrix || sumOriginalContracts;
   
   // 2. Afectaciones Dinámicas y Otrosíes
   // Conciliación: Solo sumamos afectaciones que NO han sido formalizadas por otrosíes
@@ -111,9 +116,15 @@ export const calculateProjectTotals = (
     return sum + (Number(totals.valorAdicional) || 0);
   }, 0);
 
-  // 3. Valor Total = Base (Convenio) + Otrosíes (Convenio)
-  // Nota: Las afectaciones/actas ya no afectan el valor total.
-  const valorTotal = valorOriginal + valorAdicionalConvenioOtrosies;
+  // 3. Valor Total = Base + Adiciones.
+  // Si la base es derivada de contratos (no Convenio, Presupuesto o Matrix), debemos sumarle las adiciones de los contratos para no tener saldo negativo.
+  // Pero además, si es un convenio y SIEMPRE se espera que el "valor actualizado del proyecto" contenga sus propias adiciones:
+  let valorTotal = valorOriginal + valorAdicionalConvenioOtrosies;
+  
+  // Si no hay convenio ni presupuesto explícito, el valor total del proyecto simplemente es el valor contratado.
+  if (!baseFromConvenio && !baseFromPresupuesto && !baseFromMatrix) {
+    valorTotal = valorContratado;
+  }
   
   // 5. Valor Ejecutado (Pagos o Informes)
   const relevantPagos = (pagos || []).filter(p => relevantContracts.some(c => c.id === p.contractId));
