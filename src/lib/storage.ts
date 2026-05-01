@@ -50,11 +50,12 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
   const bucketNamesToTry = [
     storageOverride,
     configuredBucket,
-    'Documents SRR',
     'documents-srr',
+    'Documents SRR',
     'documents',
     'storage',
-    'files'
+    'files',
+    'proyectos'
   ].filter(Boolean) as string[];
   
   // Create a unique file name to avoid collisions
@@ -74,20 +75,41 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
 
   for (const bucketName of bucketNamesToTry) {
     try {
-      let { error } = await supabase.storage
+      let { error, data } = await supabase.storage
         .from(bucketName)
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         });
 
-      if (!error) {
+      if (error && String(error.message || '').includes('Bucket not found')) {
+        console.warn(`Bucket '${bucketName}' not found. Attempting to create it dynamically...`);
+        // Attempt to create the bucket dynamically as public
+        const { error: createError } = await supabase.storage.createBucket(bucketName, { public: true });
+        if (!createError || String(createError.message).includes('already exists')) {
+          // Retry upload
+          const retry = await supabase.storage.from(bucketName).upload(filePath, file, { cacheControl: '3600', upsert: false });
+          error = retry.error;
+          data = retry.data;
+        }
+      }
+
+      if (!error && data) {
         successfulBucket = bucketName;
         uploadError = null;
+        
+        // Attempt to force the bucket to be public, just in case it was created as private
+        // This is safe to call even if we don't have permissions, it'll just fail silently
+        try {
+          await supabase.storage.updateBucket(bucketName, { public: true });
+        } catch (e) {
+          // Ignore if user lacks permissions
+        }
+        
         break; // Upload succeeded, stop trying other names
       } else {
-        uploadError = error;
-        console.warn(`Failed to upload to bucket '${bucketName}':`, error.message);
+        uploadError = error || new Error('Error desconocido en la subida');
+        console.warn(`Failed to upload to bucket '${bucketName}':`, error?.message);
       }
     } catch (err: any) {
       console.warn(`Exception when trying bucket '${bucketName}':`, err);
@@ -98,7 +120,7 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
   if (uploadError || !successfulBucket) {
     console.error('Error uploading to Supabase Storage after trying all bucket names:', uploadError);
     // Remove the base64 fallback because it ruins Local Storage and causes Supabase timeouts
-    throw uploadError || new Error('No se pudo encontrar o crear un bucket de almacenamiento (Storage) en Supabase. Verifica que tengas el bucket "documents-srr" configurado.');
+    throw uploadError || new Error(`No se pudo encontrar o crear un bucket de almacenamiento (Storage) en Supabase para el bucket: ${bucketNamesToTry[0]}. Por favor, crea un bucket Público llamado "documents-srr" en Supabase -> Storage.`);
   }
 
   // Get the public URL from the successful bucket
@@ -166,7 +188,8 @@ export const getRepairedUrl = async (url: string): Promise<string | null> => {
       'documents-srr',
       'documents',
       'storage',
-      'files'
+      'files',
+      'proyectos'
     ].filter(Boolean) as string[];
 
     // Remove duplicates but keep order
@@ -187,12 +210,56 @@ export const getRepairedUrl = async (url: string): Promise<string | null> => {
         // Continue
       }
     }
+
+    // If public URLs all fail, it might be a private bucket. Try generating a signed URL for the original bucket
+    if (originalBucket && filePath) {
+      try {
+        const { data: signedData } = await supabase.storage.from(decodeURIComponent(originalBucket)).createSignedUrl(filePath, 60 * 60 * 24);
+        if (signedData?.signedUrl) {
+          console.info(`Auto-repair: Generated signed URL for private bucket: ${originalBucket}`);
+          return signedData.signedUrl;
+        }
+      } catch (signError) {
+        // Ignore
+      }
+      
+      // Also try generating signed URL for 'documents-srr' just in case
+      try {
+        const { data: signedData } = await supabase.storage.from('documents-srr').createSignedUrl(filePath, 60 * 60 * 24);
+        if (signedData?.signedUrl) {
+          console.info(`Auto-repair: Generated signed URL for private bucket: documents-srr`);
+          return signedData.signedUrl;
+        }
+      } catch (signError) {
+        // Ignore
+      }
+    }
   } catch (error) {
     console.warn('Error during URL repair check:', error);
   }
 
   // If we reach here, all attempts failed.
   return null;
+};
+
+/**
+ * Returns a URL that is safe for iframe embedding.
+ * For PDFs, it uses Google Docs Viewer as a proxy.
+ */
+export const getIframeSafeUrl = (url: string | null | undefined): string => {
+  if (!url || url === '#' || !url.startsWith('http')) return '';
+  
+  // If it's a PDF, wrap it in Google Docs Viewer to avoid X-Frame-Options issues in Chrome
+  const isPdf = url.toLowerCase().split('?')[0].endsWith('.pdf') || 
+                url.includes('application/pdf') ||
+                url.includes('financial-docs') || 
+                url.includes('documents');
+
+  if (isPdf) {
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+  }
+  
+  return url;
 };
 
 /**
