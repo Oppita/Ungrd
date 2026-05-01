@@ -819,6 +819,9 @@ export interface Contract {
   faseId?: string;
   responsibleId?: string; // New field
   valorPagado?: number;
+  avanceFisico?: number;
+  avanceProgramado?: number;
+  avanceFinanciero?: number;
   analysis?: {
     summary: string;
     type: string;
@@ -1219,7 +1222,7 @@ export interface Otrosie {
   }[];
   nuevasObligaciones: string[];
   riesgosIdentificados: string[];
-  analisisOptimización?: string;
+  analisisOptimización: string;
   tipoModificacion?: 'Adición' | 'Prórroga' | 'Adición y Prórroga' | 'Aclaración' | 'Modificación de Cláusulas';
   supervisorResponsable?: string;
   nitEntidad?: string;
