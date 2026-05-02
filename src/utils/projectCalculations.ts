@@ -119,7 +119,7 @@ export const calculateProjectTotals = (
   // 3. Valor Total = Base + Adiciones.
   // Si la base es derivada de contratos (no Convenio, Presupuesto o Matrix), debemos sumarle las adiciones de los contratos para no tener saldo negativo.
   // Pero además, si es un convenio y SIEMPRE se espera que el "valor actualizado del proyecto" contenga sus propias adiciones:
-  let valorTotal = valorOriginal + valorAdicionalConvenioOtrosies;
+  let valorTotal = valorOriginal + adiciones - reducciones + valorAdicionalConvenioOtrosies + valorAdicionalOtrosies;
   
   // Si no hay convenio ni presupuesto explícito, el valor total del proyecto simplemente es el valor contratado.
   if (!baseFromConvenio && !baseFromPresupuesto && !baseFromMatrix) {
@@ -160,7 +160,7 @@ export const calculateProjectTotals = (
 
   return {
     valorOriginal,
-    valorAdicional: valorAdicionalConvenioOtrosies,
+    valorAdicional: valorTotal - valorOriginal,
     valorTotal,
     valorContratado,
     valorEjecutado,
