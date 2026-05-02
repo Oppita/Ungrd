@@ -50,6 +50,7 @@ const CDPListItem = ({
   onAddRC,
   onUploadDoc,
   onPreviewDoc,
+  onRemoveDoc,
   uploadingDocId,
   state,
 }: any) => {
@@ -115,16 +116,30 @@ const CDPListItem = ({
                   </div>
                 )}
                 {doc.documento_url ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPreviewDoc(doc.documento_url);
-                    }}
-                    className="flex items-center gap-1.5 text-[10px] font-black text-indigo-600 uppercase bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors border border-indigo-100"
-                    title={`Ver Documento: ${doc.documentoNombre || 'Evidencia'}`}
-                  >
-                    <FileText size={12} /> Ver DOC
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPreviewDoc(doc.documento_url);
+                      }}
+                      className="flex items-center gap-1.5 text-[10px] font-black text-indigo-600 uppercase bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors border border-indigo-100"
+                      title={`Ver Documento: ${doc.documentoNombre || 'Evidencia'}`}
+                    >
+                      <FileText size={12} /> Ver DOC
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if(window.confirm("¿Está seguro de eliminar el PDF adjunto?")) {
+                          onRemoveDoc(doc);
+                        }
+                      }}
+                      className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                      title="Eliminar PDF"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 ) : (
                   <label 
                     onClick={(e) => e.stopPropagation()}
@@ -519,6 +534,7 @@ export const FinancialExecutionModule: React.FC<
   const [showModal, setShowModal] = useState(false);
   const [showImportPagosModal, setShowImportPagosModal] = useState(false);
   const [showAddPagoModal, setShowAddPagoModal] = useState(false);
+  const [showLiberarDetails, setShowLiberarDetails] = useState(false);
   const [showLinkRCModal, setShowLinkRCModal] = useState<any>(null); // CDP Doc
   const [selectedRCForPago, setSelectedRCForPago] = useState<any>(null);
   const [selectedPagoToEdit, setSelectedPagoToEdit] = useState<any>(null);
@@ -690,6 +706,17 @@ export const FinancialExecutionModule: React.FC<
     
     // Reset file input
     e.target.value = '';
+  };
+
+  const handleRemoveDoc = (doc: any, type: 'RC' | 'CDP' | 'Pago') => {
+    if (type === 'Pago') {
+      const updatedPago = { ...doc, soporteUrl: undefined, soporteNombre: undefined };
+      updatePago(updatedPago);
+      showAlert("Documento eliminado del Pago.");
+    } else {
+      updateFinancialDocument({ ...doc, documento_url: undefined, documentoNombre: undefined });
+      showAlert(`Documento eliminado del ${type}.`);
+    }
   };
 
   const handleSave = () => {
@@ -1133,6 +1160,22 @@ export const FinancialExecutionModule: React.FC<
     }
   };
 
+  const cdpLiberarDetails = useMemo(() => {
+    return projectDocs
+      .filter(d => d.tipo === 'CDP')
+      .map(doc => {
+        const linkedRCs = projectDocs.filter(d => d.tipo === 'RC' && d.numeroCdp === doc.numero);
+        const totalComprometido = linkedRCs.reduce((sum, rc) => sum + rc.valor, 0);
+        return {
+          ...doc,
+          comprometido: totalComprometido,
+          porLiberar: Math.max(0, doc.valor - totalComprometido)
+        };
+      })
+      .filter(d => d.porLiberar > 0)
+      .sort((a, b) => b.porLiberar - a.porLiberar);
+  }, [projectDocs]);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -1202,12 +1245,18 @@ export const FinancialExecutionModule: React.FC<
           return (
             <div
               key={stat.label}
-              className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm"
+              onClick={() => stat.label === "Recursos por Liberar" && setShowLiberarDetails(true)}
+              className={`bg-white p-5 rounded-2xl border border-slate-200 shadow-sm transition-all ${stat.label === "Recursos por Liberar" ? "cursor-pointer hover:border-amber-400 hover:shadow-lg hover:translate-y-[-2px] group" : ""}`}
             >
               <div className="flex justify-between items-start mb-2">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider group-hover:text-amber-600 transition-colors">
                   {stat.label}
                 </p>
+                {stat.label === "Recursos por Liberar" && (
+                  <div className="w-5 h-5 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                    <ChevronRight size={14} />
+                  </div>
+                )}
                 <p className={`text-sm font-black text-${stat.color}-600`}>
                   {percentage.toFixed(1)}%
                 </p>
@@ -1416,6 +1465,7 @@ export const FinancialExecutionModule: React.FC<
                   }}
                   onUploadDoc={(e: any, doc: any) => handleUploadRealPdf(e, doc, 'CDP')}
                   onPreviewDoc={(url: string) => handlePreviewDoc(url)}
+                  onRemoveDoc={(doc: any) => handleRemoveDoc(doc, 'CDP')}
                   uploadingDocId={uploadingDocId}
                   state={state}
                 />
@@ -1536,16 +1586,30 @@ export const FinancialExecutionModule: React.FC<
 
                     <div className="mt-4 flex gap-2">
                       {doc.documento_url ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePreviewDoc(doc.documento_url);
-                          }}
-                          className="flex items-center justify-center gap-2 px-3 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 transition-colors"
-                          title="Ver Documento"
-                        >
-                          <FileText size={16} />
-                        </button>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePreviewDoc(doc.documento_url);
+                            }}
+                            className="flex items-center justify-center gap-2 px-3 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 transition-colors"
+                            title="Ver Documento"
+                          >
+                            <FileText size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if(window.confirm("¿Está seguro de eliminar el PDF?")) {
+                                handleRemoveDoc(doc, 'RC');
+                              }
+                            }}
+                            className="p-3 bg-rose-50 text-rose-400 rounded-xl hover:bg-rose-100 hover:text-rose-600 transition-colors"
+                            title="Eliminar PDF"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
                       ) : (
                         <label 
                           onClick={(e) => e.stopPropagation()}
@@ -1563,12 +1627,23 @@ export const FinancialExecutionModule: React.FC<
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setSelectedRCForPago(doc);
+                          setShowAddPagoModal(true);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 transform hover:scale-105 active:scale-95"
+                        title="Añadir Pago a este RC"
+                      >
+                        <Plus size={14} /> Registrar Pago
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setFilterRcId(doc.id);
                           setActiveTab("Pagos");
                         }}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-200 transition-colors shadow-sm"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors border border-indigo-100"
                       >
-                        <Search size={14} /> Ver Pagos Integrados
+                        <Search size={14} /> Ver Pagos
                       </button>
                       <button
                         onClick={(e) => {
@@ -1577,10 +1652,10 @@ export const FinancialExecutionModule: React.FC<
                             deleteFinancialDocument(doc.id);
                           }
                         }}
-                        className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+                        className="p-3 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
                         title="Eliminar RC"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </div>
@@ -1656,24 +1731,38 @@ export const FinancialExecutionModule: React.FC<
                       >
                         {pago.estado}
                       </div>
-                      <div className="flex items-center">
+                      <div className="flex items-center gap-1.5 ml-auto">
                         {pago.soporteUrl ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePreviewDoc(pago.soporteUrl!);
-                            }}
-                            className="p-1.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all ml-2"
-                            title={`Ver Documento: ${pago.soporteNombre || 'Evidencia'}`}
-                          >
-                            <FileText size={14} />
-                          </button>
+                          <div className="flex items-center bg-indigo-50 rounded-xl p-1 border border-indigo-100">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePreviewDoc(pago.soporteUrl!);
+                              }}
+                              className="p-2 text-indigo-600 hover:bg-white rounded-lg transition-all"
+                              title={`Ver Soporte: ${pago.soporteNombre || 'Evidencia'}`}
+                            >
+                              <FileText size={16} />
+                            </button>
+                            <button
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 if(window.confirm("¿Eliminar soporte del pago?")) {
+                                   handleRemoveDoc(pago, 'Pago');
+                                 }
+                               }}
+                               className="p-2 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                               title="Eliminar Soporte"
+                             >
+                               <X size={14} />
+                             </button>
+                          </div>
                         ) : (
-                          <label className="p-1.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all ml-2 cursor-pointer flex items-center justify-center relative" title="Cargar Documento Físico (PDF)">
+                          <label className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer flex items-center justify-center relative border border-dashed border-slate-200" title="Cargar Soporte de Pago (PDF)">
                             {uploadingDocId === pago.id ? (
-                              <Loader2 size={14} className="animate-spin text-emerald-600" />
+                              <Loader2 size={16} className="animate-spin text-emerald-600" />
                             ) : (
-                              <Upload size={14} />
+                              <Upload size={16} />
                             )}
                             <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleUploadRealPdf(e, pago, 'Pago')} disabled={uploadingDocId === pago.id} />
                           </label>
@@ -1683,10 +1772,10 @@ export const FinancialExecutionModule: React.FC<
                             e.stopPropagation();
                             setSelectedPagoToEdit(pago);
                           }}
-                          className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all ml-1"
+                          className="p-2.5 bg-slate-50 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-slate-100"
                           title="Editar Pago"
                         >
-                          <Edit size={14} />
+                          <Edit size={16} />
                         </button>
                         <button
                           onClick={(e) => {
@@ -1695,10 +1784,10 @@ export const FinancialExecutionModule: React.FC<
                               deletePago(pago.id);
                             }
                           }}
-                          className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all ml-1"
+                          className="p-2.5 bg-slate-50 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-slate-100"
                           title="Eliminar Pago"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </div>
@@ -2535,6 +2624,79 @@ export const FinancialExecutionModule: React.FC<
                 className="w-full h-full absolute inset-0 border-none"
                 title="Visor de PDF"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recursos por Liberar Details Overlay */}
+      {showLiberarDetails && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-amber-50/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center shadow-lg transform -rotate-3">
+                  <Activity size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 tracking-tighter">Recursos por Liberar</h3>
+                  <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">CDPs con Saldo No Comprometido</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowLiberarDetails(false)}
+                className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto">
+              <div className="space-y-4">
+                {cdpLiberarDetails.length === 0 ? (
+                  <div className="text-center py-12">
+                    <CheckCircle2 size={48} className="mx-auto text-emerald-500 mb-4" />
+                    <p className="text-slate-400 font-bold">Todos los recursos están 100% comprometidos.</p>
+                  </div>
+                ) : (
+                  cdpLiberarDetails.map((cdp) => (
+                    <div key={cdp.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:border-amber-200 transition-all">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">CDP No. {cdp.numero}</p>
+                          <h4 className="text-sm font-black text-slate-800 leading-tight line-clamp-1">{cdp.nombre || 'Certificado de Disponibilidad'}</h4>
+                        </div>
+                        <span className="text-xs font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+                          {((cdp.porLiberar / cdp.valor) * 100).toFixed(1)}% Libre
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">Presupuesto</p>
+                          <p className="text-sm font-black text-slate-700">{formatCurrency(cdp.valor)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">Por Liberar</p>
+                          <p className="text-sm font-black text-amber-600">{formatCurrency(cdp.porLiberar)}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 h-1.5 bg-white rounded-full overflow-hidden border border-slate-200 p-[1px]">
+                        <div 
+                          className="h-full bg-amber-500 rounded-full" 
+                          style={{ width: `${(cdp.porLiberar / cdp.valor) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[10px] font-black uppercase text-slate-400">
+              <span>Total por Liberar:</span>
+              <span className="text-amber-600 text-sm tracking-tight">{formatCurrency(difference)}</span>
             </div>
           </div>
         </div>
