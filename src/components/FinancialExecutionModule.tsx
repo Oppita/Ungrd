@@ -535,6 +535,9 @@ export const FinancialExecutionModule: React.FC<
   const [showImportPagosModal, setShowImportPagosModal] = useState(false);
   const [showAddPagoModal, setShowAddPagoModal] = useState(false);
   const [showLiberarDetails, setShowLiberarDetails] = useState(false);
+  const [showCDPDetails, setShowCDPDetails] = useState(false);
+  const [showRCDetails, setShowRCDetails] = useState(false);
+  const [showPagosDetails, setShowPagosDetails] = useState(false);
   const [showLinkRCModal, setShowLinkRCModal] = useState<any>(null); // CDP Doc
   const [selectedRCForPago, setSelectedRCForPago] = useState<any>(null);
   const [selectedPagoToEdit, setSelectedPagoToEdit] = useState<any>(null);
@@ -1242,21 +1245,35 @@ export const FinancialExecutionModule: React.FC<
         ].map((stat) => {
           const percentage =
             projectTotal > 0 ? (stat.value / projectTotal) * 100 : 0;
+            
+          const handleClick = () => {
+            if (stat.label === "Recursos por Liberar") {
+              setShowLiberarDetails(true);
+            } else if (stat.label === "CDP Registrados") {
+              setActiveTab("CDP");
+              window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            } else if (stat.label === "RC Registrados (Compromisos)") {
+              setActiveTab("RC");
+              window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            } else if (stat.label === "Total Pagado (Consolidado)") {
+              setActiveTab("Pagos");
+              window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }
+          };
+          
           return (
             <div
               key={stat.label}
-              onClick={() => stat.label === "Recursos por Liberar" && setShowLiberarDetails(true)}
-              className={`bg-white p-5 rounded-2xl border border-slate-200 shadow-sm transition-all ${stat.label === "Recursos por Liberar" ? "cursor-pointer hover:border-amber-400 hover:shadow-lg hover:translate-y-[-2px] group" : ""}`}
+              onClick={handleClick}
+              className={`bg-white p-5 rounded-2xl border border-slate-200 shadow-sm transition-all cursor-pointer hover:border-${stat.color}-400 hover:shadow-lg hover:translate-y-[-2px] group`}
             >
               <div className="flex justify-between items-start mb-2">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider group-hover:text-amber-600 transition-colors">
+                <p className={`text-xs font-bold text-slate-400 uppercase tracking-wider group-hover:text-${stat.color}-600 transition-colors`}>
                   {stat.label}
                 </p>
-                {stat.label === "Recursos por Liberar" && (
-                  <div className="w-5 h-5 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                    <ChevronRight size={14} />
-                  </div>
-                )}
+                <div className={`w-5 h-5 bg-${stat.color}-50 text-${stat.color}-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all`}>
+                  <ChevronRight size={14} />
+                </div>
                 <p className={`text-sm font-black text-${stat.color}-600`}>
                   {percentage.toFixed(1)}%
                 </p>
