@@ -636,6 +636,7 @@ export interface Poliza {
   impacto_financiero_potencial: string;
   relacion_con_otrosi?: string;
   documento_url?: string;
+  documento_nombre?: string;
   aprobada_por?: string;
   fecha_aprobacion_interventoria?: string;
   interventoria_valida?: boolean;
