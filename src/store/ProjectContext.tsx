@@ -1035,29 +1035,24 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...originalState,
       documentos: originalState.documentos?.map(d => ({ 
         ...d, 
-        analysis: undefined,
-        versiones: d.versiones?.map(v => ({
-          ...v,
-          url: v.url?.startsWith('data:') ? '' : v.url
-        })) || []
-      })) || [],
-      documentosSoporte: originalState.documentosSoporte?.map(d => ({
-        ...d,
-        url: d.url?.startsWith('data:') ? '' : d.url
+        analysis: undefined
       })) || [],
       contratos: originalState.contratos?.map(c => ({ 
         ...c, 
         analysis: undefined 
-      })) || [],
-      otrosies: originalState.otrosies?.map(o => ({
-        ...o,
-        documentoUrl: o.documentoUrl?.startsWith('data:') ? '' : o.documentoUrl
-      })) || [],
-      convenios: originalState.convenios?.map(c => ({
-        ...c,
-        documentoUrl: c.documentoUrl?.startsWith('data:') ? '' : c.documentoUrl
       })) || []
     };
+  };
+
+  const stringifyWithoutBase64 = (obj: any) => {
+    return JSON.stringify(obj, (key, value) => {
+      // Also remove analysis globally just in case to save space
+      if (key === 'analysis') return undefined;
+      if (typeof value === 'string' && value.startsWith('data:')) {
+        return '';
+      }
+      return value;
+    });
   };
 
   // Optimized Save to LocalStorage with Debounce
@@ -1080,7 +1075,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           seguimientos: state.seguimientos?.slice(-100) || []
         };
         
-        const serialized = JSON.stringify(stateToSave);
+        const serialized = stringifyWithoutBase64(stateToSave);
         
         try {
           const stream = new Blob([serialized]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -1216,7 +1211,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       // Clean state of base-64 before saving to cloud to prevent massive payloads timeout
       const cleanState = getCleanStateForStorage(state);
-      const stateString = JSON.stringify(cleanState);
+      const stateString = stringifyWithoutBase64(cleanState);
       
       // Native compression (reduces JSON payload by ~90%, avoiding Supabase 1MB limits)
       const stream = new Blob([stateString]).stream().pipeThrough(new CompressionStream('gzip'));
