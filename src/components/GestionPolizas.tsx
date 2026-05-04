@@ -31,6 +31,54 @@ export const GestionPolizas: React.FC<GestionPolizasProps> = ({ projectId }) => 
   const [isPastingText, setIsPastingText] = useState(false);
   const [isAssigningTasks, setIsAssigningTasks] = useState(false);
   const [polizaToDelete, setPolizaToDelete] = useState<string | null>(null);
+  
+  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
+
+  const handleUploadRealPdf = async (e: React.ChangeEvent<HTMLInputElement>, poliza: Poliza) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDocId(poliza.id);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const updatedPoliza = {
+          ...poliza,
+          documento_url: reader.result as string,
+          documento_nombre: file.name
+        };
+        updatePoliza(updatedPoliza);
+        showAlert("Documento de la póliza cargado exitosamente.");
+        setUploadingDocId(null);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      showAlert("Error al procesar el documento.");
+      setUploadingDocId(null);
+    }
+  };
+
+  const handleRemoveDoc = (poliza: Poliza) => {
+    updatePoliza({ ...poliza, documento_url: undefined, documento_nombre: undefined });
+    showAlert("Documento eliminado de la póliza.");
+  };
+
+  const handlePreviewDoc = (url: string) => {
+    if (url.startsWith('data:application/pdf;base64,')) {
+      const byteCharacters = atob(url.split(',')[1]);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    } else {
+      window.open(url, '_blank');
+    }
+  };
 
   const [riskQuery, setRiskQuery] = useState('');
   const [showRiskResults, setShowRiskResults] = useState(false);
@@ -762,8 +810,47 @@ export const GestionPolizas: React.FC<GestionPolizasProps> = ({ projectId }) => 
                     </div>
                  </div>
 
-                 <div className="flex justify-end gap-2 mt-8 pt-4 border-t border-slate-100">
-                    {!poliza.interventoria_valida && (
+                 <div className="flex justify-between items-center mt-8 pt-4 border-t border-slate-100 w-full">
+                    <div className="flex items-center">
+                      {poliza.documento_url ? (
+                        <div className="flex items-center bg-indigo-50 rounded-xl p-1 border border-indigo-100">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePreviewDoc(poliza.documento_url!);
+                            }}
+                            className="p-2 text-indigo-600 hover:bg-white rounded-lg transition-all"
+                            title={`Ver Soporte: ${poliza.documento_nombre || 'Evidencia'}`}
+                          >
+                            <FileText size={16} />
+                          </button>
+                          <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               if (window.confirm("¿Está seguro de eliminar el documento de esta póliza?")) {
+                                 handleRemoveDoc(poliza);
+                               }
+                             }}
+                             className="p-2 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                             title="Eliminar Soporte"
+                           >
+                             <X size={14} />
+                           </button>
+                        </div>
+                      ) : (
+                        <label className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer flex items-center justify-center relative border border-dashed border-slate-200" title="Cargar PDF de la Póliza">
+                          {uploadingDocId === poliza.id ? (
+                            <Loader2 size={16} className="animate-spin text-emerald-600" />
+                          ) : (
+                            <Upload size={16} />
+                          )}
+                          <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleUploadRealPdf(e, poliza)} disabled={uploadingDocId === poliza.id} />
+                        </label>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                       {!poliza.interventoria_valida && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -802,6 +889,7 @@ export const GestionPolizas: React.FC<GestionPolizasProps> = ({ projectId }) => 
                     >
                       <Trash2 size={18} />
                     </button>
+                 </div>
                  </div>
                </motion.div>
              );
@@ -918,7 +1006,44 @@ export const GestionPolizas: React.FC<GestionPolizasProps> = ({ projectId }) => 
                     </div>
                   </td>
                   <td className="p-4 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end items-center gap-2">
+                      {/* Document Actions */}
+                      {poliza.documento_url ? (
+                        <div className="flex items-center bg-indigo-50 rounded-lg p-0.5 border border-indigo-100 mr-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePreviewDoc(poliza.documento_url!);
+                            }}
+                            className="p-1.5 text-indigo-600 hover:bg-white rounded-md transition-all"
+                            title={`Ver Soporte: ${poliza.documento_nombre || 'Evidencia'}`}
+                          >
+                            <FileText size={14} />
+                          </button>
+                          <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               if (window.confirm("¿Está seguro de eliminar el documento de esta póliza?")) {
+                                 handleRemoveDoc(poliza);
+                               }
+                             }}
+                             className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md transition-colors"
+                             title="Eliminar Soporte"
+                           >
+                             <X size={12} />
+                           </button>
+                        </div>
+                      ) : (
+                        <label className="p-1.5 mr-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer flex items-center justify-center border border-dashed border-slate-200" title="Cargar PDF de la Póliza">
+                          {uploadingDocId === poliza.id ? (
+                            <Loader2 size={14} className="animate-spin text-emerald-600" />
+                          ) : (
+                            <Upload size={14} />
+                          )}
+                          <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleUploadRealPdf(e, poliza)} disabled={uploadingDocId === poliza.id} />
+                        </label>
+                      )}
+
                       {!poliza.interventoria_valida && (
                         <button
                           onClick={() => {
