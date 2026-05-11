@@ -1208,6 +1208,8 @@ export interface Otrosie {
   justificacionJuridica: string;
   valorAdicional: number;
   plazoAdicionalMeses: number;
+  fechaInicioProrroga?: string;
+  fechaFinProrroga?: string;
   alcanceModificado?: string;
   documentoUrl?: string;
   documentoNombre?: string;
