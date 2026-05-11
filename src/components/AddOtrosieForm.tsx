@@ -460,13 +460,18 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
     try {
       if (formType === 'otrosie') {
         const otsId = `OTS-${Date.now()}`;
-        const newOts = { ...otrosie, id: otsId } as Otrosie;
-        addOtrosie(newOts);
+        let finalOtrosie = { ...otrosie, id: otsId } as Otrosie;
+        if (uploadedFile) {
+          const folderPath = `Contratos/${otrosie.contractId || 'general'}/Otrosíes`;
+          const publicUrl = await uploadDocumentToStorage(uploadedFile.file, folderPath);
+          finalOtrosie = { ...finalOtrosie, documentoUrl: publicUrl, documentoNombre: uploadedFile.name };
+        }
+        addOtrosie(finalOtrosie);
 
         // Conciliación: Buscar afectaciones abiertas que coincidan con este otrosí para cerrarlas
         const matchingAfectaciones = state.afectaciones.filter(af => 
           af.estado === 'Abierta' && 
-          reconciliationService.isAfectacionFormalized(af, [newOts])
+          reconciliationService.isAfectacionFormalized(af, [finalOtrosie])
         );
         
         matchingAfectaciones.forEach(af => {
@@ -478,10 +483,10 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
         });
 
         // Actualizar fechas del proyecto si el otrosí afecta el plazo
-        const contract = state.contratos.find(c => c.id === newOts.contractId);
+        const contract = state.contratos.find(c => c.id === finalOtrosie.contractId);
         const project = state.proyectos.find(p => p.id === contract?.projectId);
-        if (project && newOts.plazoAdicionalMeses) {
-          const reconciledDates = reconciliationService.reconcileProjectDates(project, [...state.otrosies, newOts], project.actasComite || []);
+        if (project && finalOtrosie.plazoAdicionalMeses) {
+          const reconciledDates = reconciliationService.reconcileProjectDates(project, [...state.otrosies, finalOtrosie], project.actasComite || []);
           updateProject({
             ...project,
             fechaFin: reconciledDates.fechaFin
@@ -605,12 +610,12 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
         }
       }
 
-      if (uploadedFile) {
-        const contractId = formType === 'otrosie' ? otrosie.contractId : afectacion.contractId;
+      if (uploadedFile && formType !== 'otrosie') {
+        const contractId = afectacion.contractId;
         const contract = contracts.find(c => c.id === contractId);
         const project = state.proyectos.find(p => p.id === contract?.projectId);
         const projectName = project?.nombre || 'Proyecto';
-        const folderPath = `${projectName}/${formType === 'otrosie' ? 'Otrosíes' : 'Documentos'}`;
+        const folderPath = `${projectName}/${formType === 'afectacion' ? 'Documentos' : 'Actas'}`;
 
         const publicUrl = await uploadDocumentToStorage(uploadedFile.file, folderPath);
 
@@ -618,8 +623,8 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
           id: `DOC-${Date.now()}`,
           projectId: project?.id || '',
           contractId: contractId,
-          titulo: `${formType === 'otrosie' ? 'Otrosí' : formType === 'afectacion' ? 'Afectación' : 'Acta de Inicio'} ${formType === 'otrosie' ? otrosie.numero : formType === 'afectacion' ? afectacion.numero : actaInicio.numero}`,
-          tipo: formType === 'otrosie' ? 'Otrosí' : 'Documento Contractual',
+          titulo: `${formType === 'afectacion' ? 'Afectación' : 'Acta de Inicio'} ${formType === 'afectacion' ? afectacion.numero : actaInicio.numero}`,
+          tipo: 'Documento Contractual',
           descripcion: `Documento de ${formType}`,
           fechaCreacion: new Date().toISOString(),
           ultimaActualizacion: new Date().toISOString(),
@@ -760,9 +765,39 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                     <span className="text-sm font-semibold text-slate-700">Valor Adicional (COP)</span>
                     <input type="number" value={otrosie.valorAdicional} onChange={e => setOtrosie(prev => ({...prev, valorAdicional: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="block">
+                      <span className="text-sm font-semibold text-slate-700">Inicio Prórroga</span>
+                      <input type="date" value={otrosie.fechaInicioProrroga || ''} onChange={(e) => {
+                        const d1 = e.target.value;
+                        const d2 = otrosie.fechaFinProrroga || '';
+                        let p = otrosie.plazoAdicionalMeses;
+                        if(d1 && d2) {
+                           const t1 = new Date(d1).getTime();
+                           const t2 = new Date(d2).getTime();
+                           if(!isNaN(t1) && !isNaN(t2) && t2 > t1) p = Number((Math.ceil((t2-t1)/(1000*3600*24))/30).toFixed(1));
+                        }
+                        setOtrosie(prev => ({...prev, fechaInicioProrroga: d1, plazoAdicionalMeses: p}));
+                      }} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-semibold text-slate-700">Fin Prórroga</span>
+                      <input type="date" value={otrosie.fechaFinProrroga || ''} onChange={(e) => {
+                        const d2 = e.target.value;
+                        const d1 = otrosie.fechaInicioProrroga || '';
+                        let p = otrosie.plazoAdicionalMeses;
+                        if(d1 && d2) {
+                           const t1 = new Date(d1).getTime();
+                           const t2 = new Date(d2).getTime();
+                           if(!isNaN(t1) && !isNaN(t2) && t2 > t1) p = Number((Math.ceil((t2-t1)/(1000*3600*24))/30).toFixed(1));
+                        }
+                        setOtrosie(prev => ({...prev, fechaFinProrroga: d2, plazoAdicionalMeses: p}));
+                      }} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </label>
+                  </div>
                   <label className="block">
-                    <span className="text-sm font-semibold text-slate-700">Prórroga (Meses)</span>
-                    <input type="number" value={otrosie.plazoAdicionalMeses} onChange={e => setOtrosie(prev => ({...prev, plazoAdicionalMeses: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <span className="text-sm font-semibold text-slate-700">Prórroga Manual (Meses)</span>
+                    <input type="number" step="0.1" value={otrosie.plazoAdicionalMeses} onChange={e => setOtrosie(prev => ({...prev, plazoAdicionalMeses: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">NIT Entidad</span>
