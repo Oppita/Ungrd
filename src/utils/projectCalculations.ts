@@ -186,7 +186,15 @@ export const calculateProjectTotals = (
     .reduce((sum, s) => sum + (s.plazoMeses || 0), 0);
 
   let fechaFinCalculada = originalEndDate || '';
-  if (startDate && originalEndDate) {
+  
+  // Find the latest Otrosie with a fechaFinProrroga
+  const latestOtrosieWithDate = [...convenioOtrosies]
+    .filter(o => o.fechaFinProrroga)
+    .sort((a, b) => new Date(b.fechaFirma).getTime() - new Date(a.fechaFirma).getTime())[0];
+
+  if (latestOtrosieWithDate?.fechaFinProrroga) {
+    fechaFinCalculada = latestOtrosieWithDate.fechaFinProrroga;
+  } else if (startDate && originalEndDate) {
       const d = new Date(originalEndDate);
       if (!isNaN(d.getTime())) {
           d.setMonth(d.getMonth() + plazoAdicionalMeses + Math.floor(tiempoSuspension));
