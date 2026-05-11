@@ -2432,7 +2432,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return {
       project,
       contracts: projectContracts,
-      otrosies: state.otrosies.filter(o => projectContracts.some(c => c.id === o.contractId)),
+      otrosies: state.otrosies.filter(o => projectContracts.some(c => c.id === o.contractId) || (project.convenioId && o.convenioId === project.convenioId)),
       afectaciones: state.afectaciones.filter(a => a.projectId === projectId),
       presupuesto,
       avances: state.avances.filter(a => a.projectId === projectId),
