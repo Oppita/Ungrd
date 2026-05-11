@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { ProjectData, Avance, Seguimiento, ProjectDocument, Contract, Otrosie } from '../types';
 import { useProject } from '../store/ProjectContext';
 import { StatusBadge } from './Dashboard';
-import { downloadFileWithAutoRepair } from '../lib/storage';
+import { downloadFileWithAutoRepair, uploadDocumentToStorage, getIframeSafeUrl } from '../lib/storage';
 import { 
   ArrowLeft, Building2, FileText, DollarSign, Activity, 
   AlertTriangle, Leaf, Calendar, MapPin, Target, Users,
@@ -72,6 +72,35 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
   const [contractToDelete, setContractToDelete] = useState<string | null>(null);
   const [otrosieToDelete, setOtrosieToDelete] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  const [isUploadingOtrosiePDF, setIsUploadingOtrosiePDF] = useState(false);
+
+  const calculatePlazo = (start: string, end: string) => {
+    if (!start || !end) return 0;
+    const d1 = new Date(start);
+    const d2 = new Date(end);
+    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0;
+    const diffTime = d2.getTime() - d1.getTime();
+    if (diffTime < 0) return 0;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    return Number((diffDays / 30).toFixed(1));
+  };
+
+  const handleUploadOtrosiePDF = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !selectedOtrosie) return;
+    const file = e.target.files[0];
+    setIsUploadingOtrosiePDF(true);
+    try {
+      const url = await uploadDocumentToStorage(file, `Contratos/${selectedOtrosie.contractId || 'general'}/Otrosies`);
+      const updated = { ...selectedOtrosie, documentoUrl: url, documentoNombre: file.name };
+      setSelectedOtrosie(updated);
+      updateOtrosie(updated);
+    } catch(err) {
+      alert("Error subiendo el archivo: " + String(err));
+    } finally {
+      setIsUploadingOtrosiePDF(false);
+    }
+  };
   const [showAlerts, setShowAlerts] = useState(true);
   const reportRef = useRef<HTMLDivElement>(null);
   const { 
@@ -368,14 +397,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                       saldoPorEjecutar
                     } = totals;
                     
-                    const convenioOtrosies = otrosies.filter(o => o.convenioId === project.convenioId);
-                    const contractOtrosies = otrosies.filter(o => contracts.some(c => c.id === o.contractId));
-                    const totalAdicionesConvenio = convenioOtrosies.reduce((acc, o) => acc + (o.valorAdicional || 0), 0);
-                    const totalAdicionesContratos = contractOtrosies.reduce((acc, o) => acc + (o.valorAdicional || 0), 0);
-                    
-                    const adicionesMostradas = totalAdicionesConvenio > 0 ? totalAdicionesConvenio : totalAdicionesContratos;
-
-                    const aportesFngrdActual = (presupuesto.aportesFngrd || 0) + totalAdicionesConvenio;
+                    const convenioOtrosies = otrosies.filter(o => o.convenioId === project.convenioId || (o.contractId && contracts.some(c => c.id === o.contractId && c.tipo === 'Convenio')) || (!o.contractId && !o.convenioId));
+                    const aportesFngrdActual = (presupuesto.aportesFngrd || 0) + totals.valorAdicional;
                     
                     const chartData = [
                       { name: 'Aportes FNGRD', value: aportesFngrdActual, fill: '#4f46e5' },
@@ -403,28 +426,16 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                           
                           {convenioOtrosies.length > 0 && (
                             <div className="pl-2 border-l-2 border-indigo-200 space-y-1 mt-1">
-                               <p className="text-[10px] font-bold text-indigo-600 uppercase">Adiciones de Convenio</p>
+                               <p className="text-[10px] font-bold text-indigo-600 uppercase">Adiciones al Proyecto / Convenio</p>
                               {convenioOtrosies.map(o => (
                                 <div key={o.id} className="flex justify-between text-xs text-slate-600 group relative">
                                   <span className="truncate max-w-[200px]" title={o.objeto}>Otrosí #{o.numero}</span>
-                                  <span className="text-emerald-600 font-semibold">+{formatCurrency(o.valorAdicional || 0)}</span>
+                                  <span className="text-emerald-600 font-semibold space-x-2">
+                                    {(o.valorAdicional || 0) > 0 && <span>+{formatCurrency(o.valorAdicional || 0)}</span>}
+                                    {(o.plazoAdicionalMeses || 0) > 0 && <span>+{o.plazoAdicionalMeses} meses</span>}
+                                  </span>
                                 </div>
                               ))}
-                            </div>
-                          )}
-
-                          {contractOtrosies.length > 0 && (
-                            <div className="pl-2 border-l-2 border-amber-200 space-y-1 mt-1">
-                               <p className="text-[10px] font-bold text-amber-600 uppercase">Adiciones a Contratos</p>
-                              {contractOtrosies.map(o => {
-                                const contract = contracts.find(c => c.id === o.contractId);
-                                return (
-                                  <div key={o.id} className="flex justify-between text-xs text-slate-600 group relative">
-                                    <span className="truncate max-w-[200px]" title={o.objeto}>{contract?.tipo} - Otrosí #{o.numero}</span>
-                                    <span className="text-emerald-600 font-semibold">+{formatCurrency(o.valorAdicional || 0)}</span>
-                                  </div>
-                                );
-                              })}
                             </div>
                           )}
 
@@ -908,8 +919,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                       </div>
                       
                       {(() => {
-                        const convenioOtrosies = otrosies.filter(o => o.convenioId === project.convenioId);
-                         const contractOtrosies = otrosies.filter(o => contracts.some(c => c.id === o.contractId));
+                        const convenioOtrosies = otrosies.filter(o => o.convenioId === project.convenioId || (o.contractId && contracts.some(c => c.id === o.contractId && c.tipo === 'Convenio')) || (!o.contractId && !o.convenioId));
+                         const contractOtrosies = otrosies.filter(o => contracts.some(c => c.id === o.contractId) && !convenioOtrosies.some(co => co.id === o.id));
                         
                         if (convenioOtrosies.length === 0 && contractOtrosies.length === 0) {
                            return <div className="p-4 text-center text-slate-400 text-sm font-medium border border-dashed border-slate-200 rounded-lg">No hay adiciones registradas mediante otrosíes para este proyecto.</div>;
@@ -923,7 +934,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                                 {convenioOtrosies.map(o => (
                                   <div key={o.id} className="flex justify-between text-sm bg-indigo-50/50 p-2 rounded-md">
                                     <span className="font-medium text-slate-700">Otrosí No. {o.numero} <span className="text-xs font-normal text-slate-500 ml-1">({o.fechaFirma})</span></span>
-                                    <span className="font-black text-emerald-600">+{formatCurrency(o.valorAdicional || 0)}</span>
+                                    <span className="font-black text-emerald-600 space-x-3">
+                                      {(o.valorAdicional || 0) > 0 && <span>+{formatCurrency(o.valorAdicional || 0)}</span>}
+                                      {(o.plazoAdicionalMeses || 0) > 0 && <span>+{o.plazoAdicionalMeses} meses</span>}
+                                    </span>
                                   </div>
                                 ))}
                               </div>
@@ -940,7 +954,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                                         <span className="text-xs bg-white border border-amber-200 px-1 py-0.5 rounded mr-2 text-amber-800">{contract?.tipo}</span>
                                         Otrosí No. {o.numero} <span className="text-xs font-normal text-slate-500 ml-1">({o.fechaFirma})</span>
                                       </span>
-                                      <span className="font-black text-emerald-600">+{formatCurrency(o.valorAdicional || 0)}</span>
+                                      <span className="font-black text-emerald-600 space-x-3">
+                                        {(o.valorAdicional || 0) > 0 && <span>+{formatCurrency(o.valorAdicional || 0)}</span>}
+                                        {(o.plazoAdicionalMeses || 0) > 0 && <span>+{o.plazoAdicionalMeses} meses</span>}
+                                      </span>
                                     </div>
                                   );
                                 })}
@@ -1824,8 +1841,48 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                       className="w-full px-3 py-2 border border-amber-300 rounded text-sm font-bold text-amber-900"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Plazo Adicional (Meses)</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Inicio Prórroga</label>
+                      <input 
+                        type="date"
+                        value={selectedOtrosie.fechaInicioProrroga || ''}
+                        onChange={(e) => {
+                          const fechaInicio = e.target.value;
+                          const plazoCalculado = calculatePlazo(fechaInicio, selectedOtrosie.fechaFinProrroga || '');
+                          const updated = { 
+                            ...selectedOtrosie, 
+                            fechaInicioProrroga: fechaInicio,
+                            plazoAdicionalMeses: plazoCalculado || selectedOtrosie.plazoAdicionalMeses
+                          };
+                          setSelectedOtrosie(updated);
+                          updateOtrosie(updated);
+                        }}
+                        className="w-full px-3 py-2 border border-amber-300 rounded text-sm font-bold text-amber-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Fin Prórroga</label>
+                      <input 
+                        type="date"
+                        value={selectedOtrosie.fechaFinProrroga || ''}
+                        onChange={(e) => {
+                          const fechaFin = e.target.value;
+                          const plazoCalculado = calculatePlazo(selectedOtrosie.fechaInicioProrroga || '', fechaFin);
+                          const updated = { 
+                            ...selectedOtrosie, 
+                            fechaFinProrroga: fechaFin,
+                            plazoAdicionalMeses: plazoCalculado || selectedOtrosie.plazoAdicionalMeses
+                          };
+                          setSelectedOtrosie(updated);
+                          updateOtrosie(updated);
+                        }}
+                        className="w-full px-3 py-2 border border-amber-300 rounded text-sm font-bold text-amber-900"
+                      />
+                    </div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Plazo Adicional Manual (Meses)</label>
                     <input 
                       type="number"
                       step="0.1"
@@ -1840,6 +1897,58 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                   </div>
                 </div>
                 <p className="text-[10px] text-amber-600 mt-2 font-medium italic">* Si la IA extrajo incorrectamente los valores cruciales debido a la complejidad del PDF, corríjalos aquí. Los cambios se guardan automáticamente y afectan la trazabilidad.</p>
+              </div>
+
+              {/* PDF Document Upload and Preview */}
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <h4 className="text-sm font-bold text-slate-800 flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <FileText size={16} className="text-indigo-600" />
+                    Documento Principal (PDF)
+                  </div>
+                  {!selectedOtrosie.documentoUrl && (
+                    <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-colors">
+                      {isUploadingOtrosiePDF ? <Activity size={14} className="animate-spin" /> : <Upload size={14} />}
+                      Subir o Reemplazar PDF
+                      <input type="file" accept="application/pdf" className="hidden" onChange={handleUploadOtrosiePDF} disabled={isUploadingOtrosiePDF} />
+                    </label>
+                  )}
+                </h4>
+                
+                {selectedOtrosie.documentoUrl ? (
+                  <div className="space-y-3">
+                    <div className="w-full h-96 bg-white border border-slate-300 rounded-lg overflow-hidden relative">
+                      <iframe 
+                        src={getIframeSafeUrl(selectedOtrosie.documentoUrl)} 
+                        title={`PDF Otrosí ${selectedOtrosie.numero}`}
+                        className="w-full h-full"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                       <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors">
+                        {isUploadingOtrosiePDF ? <Activity size={14} className="animate-spin" /> : <Upload size={14} />}
+                        Reemplazar PDF
+                        <input type="file" accept="application/pdf" className="hidden" onChange={handleUploadOtrosiePDF} disabled={isUploadingOtrosiePDF} />
+                      </label>
+                      <button 
+                        onClick={() => downloadFileWithAutoRepair(selectedOtrosie.documentoUrl!, selectedOtrosie.documentoNombre || `Otrosí_${selectedOtrosie.numero}.pdf`)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors"
+                      >
+                        <Download size={14} /> Descargar PDF Original
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-300 rounded-lg bg-white">
+                    <FileText size={32} className="text-slate-300 mb-2" />
+                    <p className="text-sm font-medium text-slate-500 mb-4">No se ha adjuntado el documento original</p>
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-100 transition-colors">
+                      {isUploadingOtrosiePDF ? <Activity size={18} className="animate-spin" /> : <Upload size={18} />}
+                      {isUploadingOtrosiePDF ? 'Subiendo...' : 'Seleccionar archivo PDF'}
+                      <input type="file" accept="application/pdf" className="hidden" onChange={handleUploadOtrosiePDF} disabled={isUploadingOtrosiePDF} />
+                    </label>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
