@@ -434,11 +434,52 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
                   onChange={e => setNewOtrosie({...newOtrosie, valorAdicional: Number(e.target.value)})} 
                 />
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Inicio Prórroga</label>
+                  <input 
+                    type="date" 
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" 
+                    value={newOtrosie.fechaInicioProrroga || ''} 
+                    onChange={e => {
+                      const d1 = e.target.value;
+                      const d2 = newOtrosie.fechaFinProrroga || '';
+                      let p = newOtrosie.plazoAdicionalMeses;
+                      if(d1 && d2) {
+                         const t1 = new Date(d1).getTime();
+                         const t2 = new Date(d2).getTime();
+                         if(!isNaN(t1) && !isNaN(t2) && t2 > t1) p = Number((Math.ceil((t2-t1)/(1000*3600*24))/30).toFixed(1));
+                      }
+                      setNewOtrosie({...newOtrosie, fechaInicioProrroga: d1, plazoAdicionalMeses: p});
+                    }} 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Fin Prórroga</label>
+                  <input 
+                    type="date" 
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" 
+                    value={newOtrosie.fechaFinProrroga || ''} 
+                    onChange={e => {
+                      const d2 = e.target.value;
+                      const d1 = newOtrosie.fechaInicioProrroga || '';
+                      let p = newOtrosie.plazoAdicionalMeses;
+                      if(d1 && d2) {
+                         const t1 = new Date(d1).getTime();
+                         const t2 = new Date(d2).getTime();
+                         if(!isNaN(t1) && !isNaN(t2) && t2 > t1) p = Number((Math.ceil((t2-t1)/(1000*3600*24))/30).toFixed(1));
+                      }
+                      setNewOtrosie({...newOtrosie, fechaFinProrroga: d2, plazoAdicionalMeses: p});
+                    }} 
+                  />
+                </div>
+              </div>
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Prórroga (Meses)</label>
+                <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Prórroga Manual (Meses)</label>
                 <input 
                   required 
                   type="number" 
+                  step="0.1"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" 
                   value={newOtrosie.plazoAdicionalMeses} 
                   onChange={e => setNewOtrosie({...newOtrosie, plazoAdicionalMeses: Number(e.target.value)})} 
