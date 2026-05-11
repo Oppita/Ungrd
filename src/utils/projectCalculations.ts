@@ -82,7 +82,7 @@ export const calculateProjectTotals = (
   
   const relevantContracts = contracts.filter(c => relevantProjectIds.includes(c.projectId));
   const relevantAfectaciones = afectaciones.filter(a => relevantProjectIds.includes(a.projectId || ''));
-  const convenioOtrosies = isConvenio ? otrosies.filter(o => o.convenioId === project.convenioId) : [];
+  const convenioOtrosies = otrosies.filter(o => (isConvenio && o.convenioId === project.convenioId) || (o.contractId && relevantContracts.some(c => c.id === o.contractId && c.tipo === 'Convenio')) || (!o.contractId && !o.convenioId));
   
   const projectPresupuesto = presupuestos?.find(p => p.projectId === project.id);
 
@@ -95,18 +95,18 @@ export const calculateProjectTotals = (
   const valorOriginal = baseFromConvenio || baseFromPresupuesto || baseFromMatrix || sumOriginalContracts;
   
   // 2. Afectaciones Dinámicas y Otrosíes
-  // Conciliación: Solo sumamos afectaciones que NO han sido formalizadas por otrosíes
-  const adiciones = relevantAfectaciones
-    .filter(a => a.tipo === 'Adición' && !reconciliationService.isAfectacionFormalized(a, otrosies))
-    .reduce((sum, a) => sum + (Number(a.valor) || 0), 0);
+  // Eliminamos las afectaciones de la suma del valor total actualizado para evitar colisiones con otrosíes e items inflados
+  // según solicitud explícita del usuario, el valor actualizado es el Presupuesto Inicial + Otrosíes del Convenio.
+  const adiciones = 0;
     
-  const reducciones = relevantAfectaciones
-    .filter(a => a.tipo === 'Reducción' || a.tipo === 'Liberación')
-    .reduce((sum, a) => sum + (Number(a.valor) || 0), 0);
+  const reducciones = 0;
+  
   const valorAdicionalConvenioOtrosies = convenioOtrosies.reduce((sum, o) => sum + (Number(o.valorAdicional) || 0), 0);
   
+  const executionContracts = relevantContracts.filter(c => c.tipo !== 'Convenio');
+
   // 4. Valor Contratado (Contratos + Otrosíes)
-  const valorContratado = relevantContracts.reduce((sum, c) => {
+  const valorContratado = executionContracts.reduce((sum, c) => {
     const totals = calculateContractTotals(c, otrosies, events?.filter(e => e.contractId === c.id));
     return sum + (Number(totals.valorTotal) || 0);
   }, 0);
@@ -116,11 +116,11 @@ export const calculateProjectTotals = (
     return sum + (Number(totals.valorAdicional) || 0);
   }, 0);
 
-  // 3. Valor Total = Valor Contratado según instrucciones
-  let valorTotal = valorContratado;
+  // 3. Valor Total = Valor Original + Afectaciones (Adiciones/Reducciones) y Otrosíes del Convenio
+  const valorTotal = valorOriginal + adiciones + valorAdicionalConvenioOtrosies - reducciones;
   
   // 5. Valor Ejecutado (Pagos o Informes)
-  const relevantPagos = (pagos || []).filter(p => relevantContracts.some(c => c.id === p.contractId));
+  const relevantPagos = (pagos || []).filter(p => executionContracts.some(c => c.id === p.contractId));
   
   let valorEjecutado = relevantPagos
     .reduce((sum, p) => {
@@ -140,28 +140,72 @@ export const calculateProjectTotals = (
   }
 
   // 6. Plazo (considerando suspensiones)
-  const plazoOriginalMeses = relevantContracts.reduce((sum, c) => sum + (c.plazoMeses || 0), 0);
-  const plazoAdicionalMeses = relevantContracts.reduce((sum, c) => {
-    const totals = calculateContractTotals(c, otrosies, events?.filter(e => e.contractId === c.id));
-    return sum + totals.plazoAdicionalMeses;
-  }, 0);
+  const diffMonths = (d1: string, d2: string) => {
+    if (!d1 || !d2) return 0;
+    const t1 = new Date(d1).getTime();
+    const t2 = new Date(d2).getTime();
+    if (isNaN(t1) || isNaN(t2) || t2 < t1) return 0;
+    return Number((Math.ceil((t2-t1)/(1000*3600*24))/30).toFixed(1));
+  };
+
+  let startDate = project.fechaInicio || (convenio ? convenio.fechaInicio : null);
+  let originalEndDate = project.fechaFin || (convenio ? convenio.fechaFin : null);
+
+  if (!startDate || !originalEndDate) {
+    let minDate = new Date(8640000000000000);
+    let maxDate = new Date(-8640000000000000);
+    let found = false;
+    for (const c of relevantContracts) {
+      if (c.fechaInicio) {
+        const d = new Date(c.fechaInicio);
+        if (!isNaN(d.getTime())) {
+          if (d < minDate) minDate = d;
+          if (!startDate) found = true;
+        }
+      }
+      if (c.fechaFin) {
+        const d = new Date(c.fechaFin);
+        if (!isNaN(d.getTime())) {
+          if (d > maxDate) maxDate = d;
+          if (!originalEndDate) found = true;
+        }
+      }
+    }
+    if (!startDate && found && minDate < new Date(8640000000000000)) startDate = minDate.toISOString().split('T')[0];
+    if (!originalEndDate && found && maxDate > new Date(-8640000000000000)) originalEndDate = maxDate.toISOString().split('T')[0];
+  }
+
+  const plazoOriginalMeses = diffMonths(startDate || '', originalEndDate || '') || 0;
+  
+  // Plazo adicional viene de los otrosíes del convenio directamente, o si no de eventos del proyecto
+  let plazoAdicionalMeses = convenioOtrosies.reduce((sum, o) => sum + (Number(o.plazoAdicionalMeses) || 0), 0);
   
   // Ajuste por suspensiones
   const tiempoSuspension = (suspensiones || [])
     .filter(s => relevantContracts.some(c => c.id === s.contractId))
     .reduce((sum, s) => sum + (s.plazoMeses || 0), 0);
 
+  let fechaFinCalculada = originalEndDate || '';
+  if (startDate && originalEndDate) {
+      const d = new Date(originalEndDate);
+      if (!isNaN(d.getTime())) {
+          d.setMonth(d.getMonth() + plazoAdicionalMeses + Math.floor(tiempoSuspension));
+          d.setDate(d.getDate() + Math.round((tiempoSuspension % 1) * 30));
+          fechaFinCalculada = d.toISOString().split('T')[0];
+      }
+  }
+
   return {
     valorOriginal,
-    valorAdicional: valorTotal - valorOriginal,
+    valorAdicional: adiciones + valorAdicionalConvenioOtrosies - reducciones,
     valorTotal,
     valorContratado,
     valorEjecutado,
-    saldoPorContratar: valorTotal - valorContratado,
-    saldoPorEjecutar: valorContratado - valorEjecutado,
+    saldoPorContratar: Math.max(0, valorTotal - valorContratado),
+    saldoPorEjecutar: Math.max(0, valorContratado - valorEjecutado),
     plazoOriginalMeses,
     plazoAdicionalMeses,
     plazoTotalMeses: plazoOriginalMeses + plazoAdicionalMeses + tiempoSuspension,
-    fechaFinCalculada: project.fechaFin || ''
+    fechaFinCalculada
   };
 };
