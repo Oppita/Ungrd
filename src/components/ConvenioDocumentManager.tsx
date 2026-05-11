@@ -15,7 +15,8 @@ import {
   ExternalLink,
   Activity,
   Save,
-  Download
+  Download,
+  Edit2
 } from 'lucide-react';
 import { Convenio, Otrosie, ProjectDocument, DocumentType } from '../types';
 import { useProject } from '../store/ProjectContext';
@@ -36,8 +37,9 @@ interface ConvenioDocumentManagerProps {
 }
 
 export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = ({ convenio }) => {
-  const { state, addOtrosie, deleteOtrosie, addDocument, deleteDocument } = useProject();
+  const { state, addOtrosie, updateOtrosie, deleteOtrosie, addDocument, deleteDocument } = useProject();
   const [showAddOtrosie, setShowAddOtrosie] = useState(false);
+  const [editingOtrosieId, setEditingOtrosieId] = useState<string | null>(null);
   const [showAddDoc, setShowAddDoc] = useState(false);
   
   const [newOtrosie, setNewOtrosie] = useState<Partial<Otrosie>>({
@@ -197,49 +199,60 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const id = `OTS-${Date.now()}`;
-      let documentUrl = '';
+      let documentUrl = newOtrosie.documentoUrl || '';
       
       if (uploadedFile) {
         documentUrl = await uploadDocumentToStorage(uploadedFile, `Convenios/${convenio.numero}/Otrosies`);
       }
 
-      const finalOtrosie = {
-        ...newOtrosie,
-        id,
-        documentoUrl: documentUrl,
-        documentoNombre: uploadedFile?.name
-      } as Otrosie;
+      if (editingOtrosieId) {
+        const finalOtrosie = {
+          ...newOtrosie,
+          id: editingOtrosieId,
+          documentoUrl: documentUrl,
+          documentoNombre: uploadedFile ? uploadedFile.name : newOtrosie.documentoNombre
+        } as Otrosie;
+        updateOtrosie(finalOtrosie);
+      } else {
+        const id = `OTS-${Date.now()}`;
+        const finalOtrosie = {
+          ...newOtrosie,
+          id,
+          documentoUrl: documentUrl,
+          documentoNombre: uploadedFile?.name
+        } as Otrosie;
 
-      addOtrosie(finalOtrosie);
+        addOtrosie(finalOtrosie);
 
-      // Also add as a document
-      if (uploadedFile) {
-        addDocument({
-          id: `DOC-${Date.now()}`,
-          convenioId: convenio.id,
-          titulo: `Otrosí No. ${finalOtrosie.numero}`,
-          tipo: 'Otrosí',
-          descripcion: finalOtrosie.objeto,
-          fechaCreacion: new Date().toISOString(),
-          ultimaActualizacion: new Date().toISOString(),
-          versiones: [{
-            id: `VER-${Date.now()}`,
-            version: 1,
-            fecha: new Date().toISOString(),
-            url: documentUrl,
-            nombreArchivo: uploadedFile.name,
-            subidoPor: 'Sistema',
-            accion: 'Subida',
-            estado: 'Aprobado'
-          }],
-          tags: ['Otrosí', 'Convenio'],
-          estado: 'Aprobado',
-          otrosiId: id
-        });
+        // Also add as a document if it's new and has a file
+        if (uploadedFile) {
+          addDocument({
+            id: `DOC-${Date.now()}`,
+            convenioId: convenio.id,
+            titulo: `Otrosí No. ${finalOtrosie.numero}`,
+            tipo: 'Otrosí',
+            descripcion: finalOtrosie.objeto,
+            fechaCreacion: new Date().toISOString(),
+            ultimaActualizacion: new Date().toISOString(),
+            versiones: [{
+              id: `VER-${Date.now()}`,
+              version: 1,
+              fecha: new Date().toISOString(),
+              url: documentUrl,
+              nombreArchivo: uploadedFile.name,
+              subidoPor: 'Sistema',
+              accion: 'Subida',
+              estado: 'Aprobado'
+            }],
+            tags: ['Otrosí', 'Convenio'],
+            estado: 'Aprobado',
+            otrosiId: id
+          });
+        }
       }
 
       setShowAddOtrosie(false);
+      setEditingOtrosieId(null);
       setNewOtrosie({
         convenioId: convenio.id,
         numero: '',
@@ -262,11 +275,17 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
       });
       setUploadedFile(null);
     } catch (error: any) {
-      console.error('Error adding otrosie:', error);
+      console.error('Error adding/updating otrosie:', error);
       alert(error.message || 'Error al guardar el otrosí o subir el documento adjunto.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleEditOtrosie = (o: Otrosie) => {
+    setNewOtrosie(o);
+    setEditingOtrosieId(o.id);
+    setShowAddOtrosie(true);
   };
 
   const handleAddDocument = async (e: React.FormEvent) => {
@@ -319,11 +338,45 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
         </h3>
         <div className="flex gap-2">
           <button 
-            onClick={() => setShowAddOtrosie(!showAddOtrosie)}
-            className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
+            onClick={() => {
+              if (showAddOtrosie && editingOtrosieId) {
+                setEditingOtrosieId(null);
+                setNewOtrosie({
+                  convenioId: convenio.id,
+                  numero: '',
+                  fechaFirma: '',
+                  objeto: '',
+                  justificacionTecnica: '',
+                  justificacionJuridica: '',
+                  valorAdicional: 0,
+                  plazoAdicionalMeses: 0,
+                  analisisOptimización: '',
+                  tipoModificacion: 'Adición y Prórroga',
+                  supervisorResponsable: '',
+                  nitEntidad: '',
+                  nitContratista: '',
+                  estado: 'Firmado',
+                  clausulasModificadas: [],
+                  impactoPresupuestal: [],
+                  nuevasObligaciones: [],
+                  riesgosIdentificados: [],
+                });
+              }
+              setShowAddOtrosie(!showAddOtrosie);
+            }}
+            className={`px-3 py-1.5 ${showAddOtrosie && editingOtrosieId ? 'bg-amber-600' : 'bg-indigo-600'} text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-colors flex items-center gap-1.5`}
           >
-            <Plus size={14} />
-            Nuevo Otrosí
+            {showAddOtrosie && editingOtrosieId ? (
+              <>
+                <ChevronUp size={14} />
+                Cancelar Edición
+              </>
+            ) : (
+              <>
+                <Plus size={14} />
+                Nuevo Otrosí
+              </>
+            )}
           </button>
           <button 
             onClick={() => setShowAddDoc(!showAddDoc)}
@@ -340,8 +393,13 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
         {showAddOtrosie && (
           <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-4">
-              <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Nuevo Otrosí para Convenio</h4>
-              <button onClick={() => setShowAddOtrosie(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                {editingOtrosieId ? 'Editar Otrosí' : 'Nuevo Otrosí para Convenio'}
+              </h4>
+              <button onClick={() => {
+                setShowAddOtrosie(false);
+                setEditingOtrosieId(null);
+              }} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             
             <div className="mb-4 space-y-4">
@@ -738,7 +796,7 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
                   className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSubmitting ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                  Guardar Otrosí
+                  {editingOtrosieId ? 'Guardar Cambios' : 'Guardar Otrosí'}
                 </button>
               </div>
             </form>
@@ -847,7 +905,18 @@ export const ConvenioDocumentManager: React.FC<ConvenioDocumentManagerProps> = (
                       </button>
                     )}
                     <button 
-                      onClick={() => deleteOtrosie(o.id)}
+                      onClick={() => handleEditOtrosie(o)}
+                      className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                      title="Editar Otrosí"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if(confirm('¿Está seguro de eliminar este otrosí?')) {
+                          deleteOtrosie(o.id);
+                        }
+                      }}
                       className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                     >
                       <Trash2 size={16} />
