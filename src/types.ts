@@ -674,6 +674,9 @@ export interface Convenio {
   valorTotal: number;
   valorAportadoFondo: number;
   valorAportadoContrapartida: number;
+  aportesFngrd?: number;
+  aportesLocal?: number;
+  aportesOtros?: number;
   fechaInicio: string; // Cambiado de fechaFirma
   fechaFin: string;
   estado: 'Activo' | 'Liquidado' | 'En liquidación';
@@ -686,6 +689,7 @@ export interface Convenio {
   cdp?: string;
   rp?: string;
   riesgosImpactadosIds?: string[];
+  fases?: Fase[];
   
   // Mandatory fields for effective tracking
   plazoInicialMesesConvenio?: number;
@@ -718,6 +722,8 @@ export interface Convenio {
 export interface Fase {
   id: string;
   nombre: string;
+  fechaInicio?: string;
+  fechaFin?: string;
 }
 
 export interface ActaInicioData {
@@ -818,6 +824,9 @@ export interface Contract {
   reinicios?: { fecha: string; motivo: string; }[];
   estado: 'En ejecución' | 'En liquidación' | 'Liquidado';
   faseId?: string;
+  aportesFngrd?: number;
+  aportesLocal?: number;
+  aportesOtros?: number;
   responsibleId?: string; // New field
   valorPagado?: number;
   avanceFisico?: number;
@@ -855,6 +864,7 @@ export interface Pago {
   numero: string;
   fecha: string;
   valor: number;
+  referencia?: string;
   estado: 'Pendiente' | 'Pagado' | 'Rechazado';
   observaciones: string;
   soporteUrl?: string;
@@ -1207,6 +1217,9 @@ export interface Otrosie {
   justificacionTecnica: string;
   justificacionJuridica: string;
   valorAdicional: number;
+  aportesFngrd?: number;
+  aportesLocal?: number;
+  aportesOtros?: number;
   plazoAdicionalMeses: number;
   fechaInicioProrroga?: string;
   fechaFinProrroga?: string;
