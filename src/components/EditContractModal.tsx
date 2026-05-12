@@ -184,9 +184,19 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
           </div>
 
           <form id="edit-contract-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
+            <div className="md:col-span-1">
               <label className="block text-sm font-bold text-slate-700 mb-1">Número de Contrato</label>
               <input type="text" value={formData.numero} onChange={e => setFormData({...formData, numero: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">CDP</label>
+                <input type="text" value={formData.cdp || ''} onChange={e => setFormData({...formData, cdp: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="CP-XXX" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">RP</label>
+                <input type="text" value={formData.rp || ''} onChange={e => setFormData({...formData, rp: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="RP-XXX" />
+              </div>
             </div>
 
             <div className="md:col-span-2">
