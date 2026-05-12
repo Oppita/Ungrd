@@ -569,7 +569,15 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onSave, on
               <select 
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 value={project.convenioId || ''}
-                onChange={(e) => setProject(prev => ({ ...prev, convenioId: e.target.value }))}
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  const selectedConv = state.convenios.find(c => c.id === selectedId);
+                  setProject(prev => ({ 
+                    ...prev, 
+                    convenioId: selectedId,
+                    fases: selectedConv?.fases || prev.fases || []
+                  }));
+                }}
               >
                 <option value="">Sin Convenio</option>
                 {state.convenios.map(c => (
