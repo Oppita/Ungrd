@@ -23,6 +23,19 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
   const [pasteText, setPasteText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Dynamic value calculation for presupuesto
+  React.useEffect(() => {
+    if (presupuestoData) {
+      const total = (Number(presupuestoData.aportesFngrd) || 0) + 
+                    (Number(presupuestoData.aportesMunicipio) || 0) + 
+                    (Number(presupuestoData.aportesOtros) || 0);
+      
+      if (total > 0 && total !== presupuestoData.valorTotal) {
+        setPresupuestoData(prev => prev ? { ...prev, valorTotal: total } : prev);
+      }
+    }
+  }, [presupuestoData?.aportesFngrd, presupuestoData?.aportesMunicipio, presupuestoData?.aportesOtros]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -72,6 +85,17 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
         Object.keys(extracted.matrix).forEach(key => {
           compareAndUpdate(key, (extracted.matrix as any)[key], true);
         });
+      }
+
+      // Sync budget if extracted
+      if (extracted.valorTotalProyecto && presupuestoData) {
+        setPresupuestoData(prev => prev ? { ...prev, valorTotal: extracted.valorTotalProyecto } : prev);
+      }
+      if (extracted.aporteFngrdObraInterventoria && presupuestoData) {
+        setPresupuestoData(prev => prev ? { ...prev, aportesFngrd: extracted.aporteFngrdObraInterventoria } : prev);
+      }
+      if (extracted.aporteMunicipioGobernacionObraInterventoria && presupuestoData) {
+         setPresupuestoData(prev => prev ? { ...prev, aportesMunicipio: extracted.aporteMunicipioGobernacionObraInterventoria, aportesLocal: extracted.aporteMunicipioGobernacionObraInterventoria } : prev);
       }
 
       setFormData(updatedData);
@@ -336,41 +360,53 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
               </div>
 
               {presupuestoData && (
-                <>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Valor Total del Proyecto</label>
-                    <input 
-                      type="number" 
-                      name="valorTotal"
-                      value={presupuestoData.valorTotal || ''}
-                      onChange={handlePresupuestoChange}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                      placeholder="Ej: 150000000"
-                    />
+                <div className="col-span-2 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">Presupuesto y Aportes</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Aporte FNGRD</label>
+                      <input 
+                        type="number" 
+                        name="aportesFngrd"
+                        value={presupuestoData.aportesFngrd || ''}
+                        onChange={handlePresupuestoChange}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Aporte Distrito</label>
+                      <input 
+                        type="number" 
+                        name="aportesMunicipio"
+                        value={presupuestoData.aportesMunicipio || ''}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setPresupuestoData(prev => prev ? { ...prev, aportesMunicipio: val, aportesLocal: val } : prev);
+                        }}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-emerald-600"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Otros Aportes</label>
+                      <input 
+                        type="number" 
+                        name="aportesOtros"
+                        value={presupuestoData.aportesOtros || ''}
+                        onChange={handlePresupuestoChange}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-amber-600"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="bg-slate-900 p-2 rounded-xl flex flex-col justify-center text-center">
+                      <label className="block text-[8px] font-black text-slate-500 uppercase mb-0.5">Total</label>
+                      <p className="text-sm font-black text-white truncate">
+                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(presupuestoData.valorTotal || 0)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Aportes FNGRD</label>
-                    <input 
-                      type="number" 
-                      name="aportesFngrd"
-                      value={presupuestoData.aportesFngrd || ''}
-                      onChange={handlePresupuestoChange}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                      placeholder="Ej: 100000000"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Aportes Municipio</label>
-                    <input 
-                      type="number" 
-                      name="aportesMunicipio"
-                      value={presupuestoData.aportesMunicipio || ''}
-                      onChange={handlePresupuestoChange}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                      placeholder="Ej: 50000000"
-                    />
-                  </div>
-                </>
+                </div>
               )}
 
               {/* Profesionales Asignados */}
