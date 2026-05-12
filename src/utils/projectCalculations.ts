@@ -13,9 +13,26 @@ export interface ProjectCalculatedState {
   plazoAdicionalMeses: number;
   plazoTotalMeses: number;
   fechaFinCalculada: string;
+  aportesFngrd: number;
+  aportesLocal: number;
+  aportesOtros: number;
 }
 
-export const calculateContractTotals = (contract: Contract, otrosies: Otrosie[], events?: ContractEvent[], pagos?: Pago[]) => {
+export interface ContractCalculatedState {
+  valorOriginal: number;
+  valorAdicional: number;
+  valorTotal: number;
+  valorPagado: number;
+  plazoOriginalMeses: number;
+  plazoAdicionalMeses: number;
+  plazoTotalMeses: number;
+  fechaFinCalculada: string;
+  aportesFngrd: number;
+  aportesLocal: number;
+  aportesOtros: number;
+}
+
+export const calculateContractTotals = (contract: Contract, otrosies: Otrosie[], events?: ContractEvent[], pagos?: Pago[]): ContractCalculatedState => {
   const contractOtrosies = otrosies.filter(o => o.contractId === contract.id);
   const contractEvents = events || contract.eventos || [];
   
@@ -28,6 +45,15 @@ export const calculateContractTotals = (contract: Contract, otrosies: Otrosie[],
   const plazoAdicionalMeses = plazoAdicionalMesesOtrosies + plazoAdicionalMesesEventos;
   
   const valorTotal = contract.valor + valorAdicional;
+
+  // Aportes calculations
+  const aportesFngrdOtrosies = contractOtrosies.reduce((sum, o) => sum + (o.aportesFngrd || 0), 0);
+  const aportesLocalOtrosies = contractOtrosies.reduce((sum, o) => sum + (o.aportesLocal || 0), 0);
+  const aportesOtrosOtrosies = contractOtrosies.reduce((sum, o) => sum + (o.aportesOtros || 0), 0);
+
+  const finalAportesFngrd = (contract.aportesFngrd || 0) + aportesFngrdOtrosies;
+  const finalAportesLocal = (contract.aportesLocal || 0) + aportesLocalOtrosies;
+  const finalAportesOtros = (contract.aportesOtros || 0) + aportesOtrosOtrosies;
 
   // Calculate valor pagado
   const contractPagos = (pagos || []).filter(p => p.contractId === contract.id && (p.estado?.trim().toLowerCase() === 'pagado' || p.estado === 'Pagado'));
@@ -52,7 +78,10 @@ export const calculateContractTotals = (contract: Contract, otrosies: Otrosie[],
     plazoOriginalMeses: contract.plazoMeses,
     plazoAdicionalMeses,
     plazoTotalMeses: (contract.plazoMeses || 0) + plazoAdicionalMeses,
-    fechaFinCalculada
+    fechaFinCalculada,
+    aportesFngrd: finalAportesFngrd,
+    aportesLocal: finalAportesLocal,
+    aportesOtros: finalAportesOtros
   };
 };
 
@@ -203,6 +232,19 @@ export const calculateProjectTotals = (
       }
   }
 
+  // 7. Aportes Disgregados
+  const aportesFngrdInit = Number(convenio?.aportesFngrd || projectPresupuesto?.aportesFngrd || project.matrix?.aporteFngrdObraInterventoria || 0);
+  const aportesLocalInit = Number(convenio?.aportesLocal || projectPresupuesto?.aportesMunicipio || project.matrix?.aporteMunicipioGobernacionObraInterventoria || 0);
+  const aportesOtrosInit = Number(convenio?.aportesOtros || 0);
+
+  const aportesFngrdAdicional = convenioOtrosies.reduce((sum, o) => sum + (Number(o.aportesFngrd) || 0), 0);
+  const aportesLocalAdicional = convenioOtrosies.reduce((sum, o) => sum + (Number(o.aportesLocal) || 0), 0);
+  const aportesOtrosAdicional = convenioOtrosies.reduce((sum, o) => sum + (Number(o.aportesOtros) || 0), 0);
+
+  const finalAportesFngrd = aportesFngrdInit + aportesFngrdAdicional + relevantAfectaciones.reduce((sum, a) => sum + (a.aportesFngrd || 0), 0);
+  const finalAportesLocal = aportesLocalInit + aportesLocalAdicional + relevantAfectaciones.reduce((sum, a) => sum + (a.aportesLocal || 0), 0);
+  const finalAportesOtros = aportesOtrosInit + aportesOtrosAdicional + relevantAfectaciones.reduce((sum, a) => sum + (a.aportesOtros || 0), 0);
+
   return {
     valorOriginal,
     valorAdicional: adiciones + valorAdicionalConvenioOtrosies - reducciones,
@@ -214,6 +256,9 @@ export const calculateProjectTotals = (
     plazoOriginalMeses,
     plazoAdicionalMeses,
     plazoTotalMeses: plazoOriginalMeses + plazoAdicionalMeses + tiempoSuspension,
-    fechaFinCalculada
+    fechaFinCalculada,
+    aportesFngrd: finalAportesFngrd,
+    aportesLocal: finalAportesLocal,
+    aportesOtros: finalAportesOtros
   };
 };
