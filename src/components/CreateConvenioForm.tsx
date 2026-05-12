@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Briefcase, Save, X, Upload, Loader2, BrainCircuit, FileText } from 'lucide-react';
-import { Convenio } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Briefcase, Save, X, Upload, Loader2, BrainCircuit, FileText, Layers, Plus, Trash2 } from 'lucide-react';
+import { Convenio, Fase } from '../types';
 import { useProject } from '../store/ProjectContext';
 import { showAlert } from '../utils/alert';
 import { uploadDocumentToStorage, formatDateForInput } from '../lib/storage';
@@ -22,18 +22,55 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
     valorTotal: 0,
     valorAportadoFondo: 0,
     valorAportadoContrapartida: 0,
+    aportesFngrd: 0,
+    aportesLocal: 0,
+    aportesOtros: 0,
     fechaInicio: '',
     fechaFin: '',
     estado: 'Activo',
     tipo: 'específico',
+    fases: [
+      { id: 'fase-1', nombre: 'Pre-Factibilidad' },
+      { id: 'fase-2', nombre: 'Factibilidad / Estudios' },
+      { id: 'fase-3', nombre: 'Ejecución de Obra' },
+      { id: 'fase-4', nombre: 'Cierre y Liquidación' }
+    ],
     metadata: {}
   });
+
+  // Dynamic value calculation
+  useEffect(() => {
+    const total = (Number(convenio.aportesFngrd) || 0) + 
+                  (Number(convenio.aportesLocal) || 0) + 
+                  (Number(convenio.aportesOtros) || 0);
+    
+    if (total !== convenio.valorTotal) {
+      setConvenio(prev => ({ ...prev, valorTotal: total }));
+    }
+  }, [convenio.aportesFngrd, convenio.aportesLocal, convenio.aportesOtros]);
+
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState('');
   const [showTextModal, setShowTextModal] = useState(false);
   const [pastedText, setPastedText] = useState('');
+
+  const addFase = () => {
+    const newFase: Fase = { id: `fase-${Date.now()}`, nombre: '' };
+    setConvenio(prev => ({ ...prev, fases: [...(prev.fases || []), newFase] }));
+  };
+
+  const removeFase = (id: string) => {
+    setConvenio(prev => ({ ...prev, fases: (prev.fases || []).filter(f => f.id !== id) }));
+  };
+
+  const updateFase = (id: string, nombre: string) => {
+    setConvenio(prev => ({
+      ...prev,
+      fases: (prev.fases || []).map(f => f.id === id ? { ...f, nombre } : f)
+    }));
+  };
 
   const handleTextExtraction = async () => {
     if (!pastedText.trim()) return;
@@ -174,11 +211,15 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
         valorTotal: Number(convenio.valorTotal),
         valorAportadoFondo: Number(convenio.valorAportadoFondo || 0),
         valorAportadoContrapartida: Number(convenio.valorAportadoContrapartida || 0),
+        aportesFngrd: Number(convenio.aportesFngrd || 0),
+        aportesLocal: Number(convenio.aportesLocal || 0),
+        aportesOtros: Number(convenio.aportesOtros || 0),
         fechaInicio: convenio.fechaInicio || '',
         fechaFin: convenio.fechaFin || '',
         estado: convenio.estado as any || 'Activo',
         tipo: convenio.tipo as any || 'específico',
         documentoUrl: documentUrl || undefined,
+        fases: convenio.fases || [],
         metadata: {
           ...convenio.metadata
         }
@@ -230,8 +271,11 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
         <AIProviderSelector />
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-slate-100">
+          <div className="md:col-span-2">
+             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Información General</h3>
+          </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1">Número de Convenio *</label>
             <input 
@@ -301,28 +345,98 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
               <option value="Liquidado">Liquidado</option>
             </select>
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Valor Total *</label>
-            <input 
-              type="number" 
-              value={convenio.valorTotal || ''} 
-              onChange={e => setConvenio({...convenio, valorTotal: Number(e.target.value)})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-              required
-            />
+        {/* Composición Financiera */}
+        <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 space-y-6">
+          <div className="flex items-center gap-2">
+             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Composición Financiera Dinámica</h3>
           </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+              <label className="block text-xs font-black text-indigo-600 uppercase mb-2">Aporte FNGRD (COP)</label>
+              <input 
+                type="number" 
+                value={convenio.aportesFngrd || ''} 
+                onChange={e => setConvenio({...convenio, aportesFngrd: Number(e.target.value)})}
+                className="w-full p-3 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-black text-indigo-700"
+                placeholder="0"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Valor Aportado Fondo</label>
-            <input 
-              type="number" 
-              value={convenio.valorAportadoFondo || ''} 
-              onChange={e => setConvenio({...convenio, valorAportadoFondo: Number(e.target.value)})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-            />
+            <div>
+              <label className="block text-xs font-black text-emerald-600 uppercase mb-2">Aporte Local (Entidad)</label>
+              <input 
+                type="number" 
+                value={convenio.aportesLocal || ''} 
+                onChange={e => setConvenio({...convenio, aportesLocal: Number(e.target.value)})}
+                className="w-full p-3 bg-white border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-black text-emerald-700"
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black text-amber-600 uppercase mb-2">Otros Aportes</label>
+              <input 
+                type="number" 
+                value={convenio.aportesOtros || ''} 
+                onChange={e => setConvenio({...convenio, aportesOtros: Number(e.target.value)})}
+                className="w-full p-3 bg-white border border-amber-100 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none font-black text-amber-700"
+                placeholder="0"
+              />
+            </div>
+
+            <div className="bg-slate-900 p-3 rounded-2xl flex flex-col justify-center">
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Total Calculado</label>
+              <p className="text-lg font-black text-white truncate">
+                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(convenio.valorTotal || 0)}
+              </p>
+            </div>
           </div>
+        </div>
 
+        {/* Fases del Proyecto */}
+        <div className="p-6 bg-white rounded-3xl border-2 border-slate-50 space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <Layers size={18} className="text-indigo-600" />
+              Estructura de Fases Requeridas
+            </h3>
+            <button 
+              type="button"
+              onClick={addFase}
+              className="flex items-center gap-1 text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-tighter hover:bg-indigo-100 transition-colors"
+            >
+              <Plus size={14} />
+              Agregar Fase
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 font-medium">Define las fases que compondrán la trazabilidad de los contratos vinculados a este convenio.</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(convenio.fases || []).map((fase) => (
+              <div key={fase.id} className="flex gap-2 items-center bg-slate-50 p-2 rounded-xl border border-slate-100 group">
+                <input 
+                  type="text" 
+                  value={fase.nombre}
+                  onChange={(e) => updateFase(fase.id, e.target.value)}
+                  className="flex-1 bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-700"
+                  placeholder="Nombre de la fase (Ej: Obra Etapa 1)"
+                />
+                <button 
+                  type="button"
+                  onClick={() => removeFase(fase.id)}
+                  className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1">Fecha de Inicio</label>
             <input 
