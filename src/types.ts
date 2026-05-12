@@ -800,6 +800,8 @@ export interface Contract {
   id: string;
   projectId: string;
   numero: string;
+  cdp?: string;
+  rp?: string;
   tipo: ContractType;
   contratista: string;
   nit: string;
@@ -1176,6 +1178,8 @@ export interface Presupuesto {
   valorTotal: number;
   aportesFngrd: number;
   aportesMunicipio: number;
+  aportesLocal?: number; // Alias for consistency
+  aportesOtros?: number;
   pagosRealizados: number;
   valorComprometidoProfesionales?: number;
   valorComprometidoComisiones?: number;
@@ -1256,6 +1260,9 @@ export interface Afectacion {
   descripcion: string;
   fecha: string;
   valor: number;
+  aportesFngrd?: number;
+  aportesLocal?: number;
+  aportesOtros?: number;
   impacto?: 'Alto' | 'Medio' | 'Bajo';
   estado?: 'Abierta' | 'Cerrada';
   documentoUrl?: string;
