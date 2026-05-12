@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Save, Loader2, Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Contract } from '../types';
 import { useProject } from '../store/ProjectContext';
@@ -21,6 +21,18 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
   const [showChanges, setShowChanges] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Dynamic value calculation
+  useEffect(() => {
+    const total = (Number(formData.aportesFngrd) || 0) + 
+                  (Number(formData.aportesLocal) || 0) + 
+                  (Number(formData.aportesOtros) || 0);
+    
+    // Only update if the sum of aportes is greater than 0
+    if (total > 0 && total !== formData.valor) {
+      setFormData(prev => ({ ...prev, valor: total }));
+    }
+  }, [formData.aportesFngrd, formData.aportesLocal, formData.aportesOtros]);
 
   const calculatePlazo = (inicio: string, fin: string) => {
     if (!inicio || !fin) return formData.plazoMeses;
@@ -182,42 +194,73 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
               <textarea value={formData.objetoContractual} onChange={e => setFormData({...formData, objetoContractual: e.target.value})} rows={3} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Valor</label>
-              <input type="number" value={formData.valor} onChange={e => setFormData({...formData, valor: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Fase del Proyecto</label>
+                <select 
+                  value={formData.faseId || ''} 
+                  onChange={e => setFormData({...formData, faseId: e.target.value})} 
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium"
+                >
+                  <option value="">Sin Fase Asignada</option>
+                  {state.proyectos.find(p => p.id === projectId)?.fases?.map(f => (
+                    <option key={f.id} value={f.id}>{f.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Tipo</label>
+                <select value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                  <option value="Obra">Obra</option>
+                  <option value="Interventoría">Interventoría</option>
+                  <option value="Consultoría">Consultoría</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Plazo (Meses)</label>
-              <input type="number" value={formData.plazoMeses} onChange={e => setFormData({...formData, plazoMeses: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor Total</label>
+                <input type="number" value={formData.valor} onChange={e => setFormData({...formData, valor: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600" required />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Aporte FNGRD</label>
+                <input type="number" value={formData.aportesFngrd || ''} onChange={e => setFormData({...formData, aportesFngrd: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Aporte Local (Distrito)</label>
+                <input type="number" value={formData.aportesLocal || ''} onChange={e => setFormData({...formData, aportesLocal: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Otros Aportes</label>
+                <input type="number" value={formData.aportesOtros || ''} onChange={e => setFormData({...formData, aportesOtros: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Contratista</label>
-              <input type="text" value={formData.contratista} onChange={e => setFormData({...formData, contratista: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Plazo (Meses)</label>
+                <input type="number" value={formData.plazoMeses} onChange={e => setFormData({...formData, plazoMeses: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Estado</label>
+                <select value={formData.estado} onChange={e => setFormData({...formData, estado: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium text-indigo-600">
+                  <option value="En ejecución">En ejecución</option>
+                  <option value="En liquidación">En liquidación</option>
+                  <option value="Liquidado">Liquidado</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">NIT Contratista</label>
-              <input type="text" value={formData.nit} onChange={e => setFormData({...formData, nit: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Estado</label>
-              <select value={formData.estado} onChange={e => setFormData({...formData, estado: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                <option value="En ejecución">En ejecución</option>
-                <option value="En liquidación">En liquidación</option>
-                <option value="Liquidado">Liquidado</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Tipo</label>
-              <select value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                <option value="Obra">Obra</option>
-                <option value="Interventoría">Interventoría</option>
-                <option value="Consultoría">Consultoría</option>
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Contratista</label>
+                <input type="text" value={formData.contratista} onChange={e => setFormData({...formData, contratista: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">NIT Contratista</label>
+                <input type="text" value={formData.nit} onChange={e => setFormData({...formData, nit: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+              </div>
             </div>
 
             <div>
