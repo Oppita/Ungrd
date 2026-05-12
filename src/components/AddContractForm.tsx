@@ -1,594 +1,584 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Save, X, Upload, Loader2, BrainCircuit, FileText, Layers, Plus, Trash2 } from 'lucide-react';
-import { Convenio, Fase } from '../types';
+import { Type } from '@google/genai';
+import { extractDataFromPDF, extractDataFromText } from '../services/pdfExtractorService';
+import { Contract } from '../types';
 import { useProject } from '../store/ProjectContext';
-import { showAlert } from '../utils/alert';
-import { uploadDocumentToStorage, formatDateForInput } from '../lib/storage';
+import { FileText, Upload, Loader2, CheckCircle2, AlertCircle, X, Type as TypeIcon, DollarSign } from 'lucide-react';
+import { ConfirmationModal } from './ConfirmationModal';
+import { uploadDocumentToStorage } from '../lib/storage';
 import { AIProviderSelector } from './AIProviderSelector';
-import { extractConvenioData, extractConvenioDataFromPDF } from '../services/geminiService';
+import { formatCurrency } from '../utils/formatters';
 
-interface CreateConvenioFormProps {
-  onSave: (convenio: Convenio) => void;
-  onCancel: () => void;
+interface AddContractFormProps {
+  projectId: string;
+  onClose: () => void;
 }
 
-export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, onCancel }) => {
-  const { addDocument } = useProject();
-  const [convenio, setConvenio] = useState<Partial<Convenio>>({
+export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onClose }) => {
+  const { state, addContract, addDocument } = useProject();
+  const project = state.proyectos.find(p => p.id === projectId);
+  const [contract, setContract] = useState<Partial<Contract>>({
+    projectId,
     numero: '',
-    nombre: '',
-    objeto: '',
-    partes: '',
-    valorTotal: 0,
-    valorAportadoFondo: 0,
-    valorAportadoContrapartida: 0,
+    tipo: 'Obra',
+    contratista: '',
+    nit: '',
+    valor: 0,
     aportesFngrd: 0,
     aportesLocal: 0,
     aportesOtros: 0,
+    objetoContractual: '',
+    plazoMeses: 0,
     fechaInicio: '',
     fechaFin: '',
-    estado: 'Activo',
-    tipo: 'específico',
-    fases: [
-      { id: 'fase-1', nombre: 'Pre-Factibilidad' },
-      { id: 'fase-2', nombre: 'Factibilidad / Estudios' },
-      { id: 'fase-3', nombre: 'Ejecución de Obra' },
-      { id: 'fase-4', nombre: 'Cierre y Liquidación' }
-    ],
-    metadata: {}
+    supervisor: '',
+    formaPago: '',
+    garantias: [],
+    obligacionesPrincipales: [],
+    vigencia: '',
+    lineaInversion: '',
   });
 
   // Dynamic value calculation
   useEffect(() => {
-    const total = (Number(convenio.aportesFngrd) || 0) + 
-                  (Number(convenio.aportesLocal) || 0) + 
-                  (Number(convenio.aportesOtros) || 0);
+    const total = (Number(contract.aportesFngrd) || 0) + 
+                  (Number(contract.aportesLocal) || 0) + 
+                  (Number(contract.aportesOtros) || 0);
     
-    if (total !== convenio.valorTotal) {
-      setConvenio(prev => ({ ...prev, valorTotal: total }));
+    // Only update if the sum of aportes is greater than 0, 
+    // to allow manual entry if no aportes are specified yet
+    if (total > 0 && total !== contract.valor) {
+      setContract(prev => ({ ...prev, valor: total }));
     }
-  }, [convenio.aportesFngrd, convenio.aportesLocal, convenio.aportesOtros]);
-
-  const [file, setFile] = useState<File | null>(null);
+  }, [contract.aportesFngrd, contract.aportesLocal, contract.aportesOtros]);
+  
+  const [isParsing, setIsParsing] = useState(false);
+  const [parsingStep, setParsingStep] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; file: File } | null>(null);
+  const [manualText, setManualText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState('');
-  const [showTextModal, setShowTextModal] = useState(false);
-  const [pastedText, setPastedText] = useState('');
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
-  const addFase = () => {
-    const newFase: Fase = { id: `fase-${Date.now()}`, nombre: '' };
-    setConvenio(prev => ({ ...prev, fases: [...(prev.fases || []), newFase] }));
-  };
-
-  const removeFase = (id: string) => {
-    setConvenio(prev => ({ ...prev, fases: (prev.fases || []).filter(f => f.id !== id) }));
-  };
-
-  const updateFase = (id: string, nombre: string) => {
-    setConvenio(prev => ({
-      ...prev,
-      fases: (prev.fases || []).map(f => f.id === id ? { ...f, nombre } : f)
-    }));
-  };
-
-  const handleTextExtraction = async () => {
-    if (!pastedText.trim()) return;
-    setIsAnalyzing(true);
+  const handleTextAnalysis = async () => {
+    if (!manualText) return;
+    setIsParsing(true);
+    setParsingStep('Analizando texto con IA de alto rigor...');
+    setProgress(50);
     try {
-      const extracted = await extractConvenioData(pastedText);
-      console.log('Extracted data:', extracted);
-      if (extracted) {
-        setConvenio(prev => ({
-          ...prev,
-          numero: extracted.numeroConvenio || prev.numero,
-          nombre: extracted.partesConvenio || prev.nombre,
-          objeto: extracted.objetoConvenio || prev.objeto,
-          partes: extracted.partesConvenio || prev.partes,
-          valorTotal: extracted.valorTotalProyecto || prev.valorTotal,
-          valorAportadoFondo: extracted.aporteFngrdObraInterventoria || prev.valorAportadoFondo,
-          valorAportadoContrapartida: extracted.aporteMunicipioGobernacionObraInterventoria || prev.valorAportadoContrapartida,
-          fechaInicio: extracted.actaInicioConvenio || prev.fechaInicio,
-          fechaFin: extracted.fechaFinalizacionConvenio || prev.fechaFin,
-        }));
-        showAlert('Datos extraídos del texto correctamente.');
-        setShowTextModal(false);
-        setPastedText('');
-      } else {
-        console.warn('Extraction returned null or empty');
-        showAlert('La IA no pudo extraer datos del texto proporcionado.');
-      }
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          numero: { type: Type.STRING },
+          contratista: { type: Type.STRING },
+          valor: { type: Type.NUMBER },
+          objetoContractual: { type: Type.STRING },
+          fechaInicio: { type: Type.STRING },
+          fechaFin: { type: Type.STRING },
+          obligacionesPrincipales: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ['numero', 'contratista', 'valor', 'objetoContractual', 'fechaInicio', 'fechaFin', 'obligacionesPrincipales'],
+      };
+      
+      const prompt = `Analiza este contrato con máximo rigor. Extrae los detalles clave, incluyendo todas las obligaciones principales.`;
+      
+      const extractedData = await extractDataFromText(manualText, prompt, responseSchema);
+      setContract(prev => ({ ...prev, ...extractedData }));
+      setProgress(100);
+      setParsingStep('Análisis completado');
+      setTimeout(() => setIsParsing(false), 1000);
     } catch (error) {
-      console.error('Error extracting convenio data:', error);
-      showAlert('Error al extraer datos del texto.');
-    } finally {
-      setIsAnalyzing(false);
+      console.error("Error parsing text:", error);
+      setParsingStep('Error en el análisis');
+      setTimeout(() => setIsParsing(false), 2000);
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-    setFile(selectedFile);
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    if (selectedFile.type === 'application/pdf') {
-      setIsAnalyzing(true);
-      setAnalysisProgress('Analizando PDF con IA de alto rigor...');
-      try {
-        console.log('Iniciando extracción de datos de convenio desde PDF...');
-        const extracted = await extractConvenioDataFromPDF(selectedFile);
-        console.log('Datos extraídos del convenio:', extracted);
-
-        if (extracted) {
-          // Mapeo robusto para convenio
-          const robustExtracted = { ...extracted };
-          if (extracted.numeroConvenio && !robustExtracted.numero) robustExtracted.numero = extracted.numeroConvenio;
-          if (extracted.partesConvenio && !robustExtracted.nombre) robustExtracted.nombre = extracted.partesConvenio;
-          if (extracted.partesConvenio && !robustExtracted.partes) robustExtracted.partes = extracted.partesConvenio;
-          if (extracted.objetoConvenio && !robustExtracted.objeto) robustExtracted.objeto = extracted.objetoConvenio;
-          if (extracted.valorTotalProyecto && !robustExtracted.valorTotal) robustExtracted.valorTotal = extracted.valorTotalProyecto;
-          if (extracted.actaInicioConvenio && !robustExtracted.fechaInicio) robustExtracted.fechaInicio = extracted.actaInicioConvenio;
-          if (extracted.fechaFinalizacionConvenio && !robustExtracted.fechaFin) robustExtracted.fechaFin = extracted.fechaFinalizacionConvenio;
-
-          setConvenio(prev => ({
-            ...prev,
-            numero: robustExtracted.numero || prev.numero,
-            nombre: robustExtracted.nombre || prev.nombre,
-            objeto: robustExtracted.objeto || prev.objeto,
-            partes: robustExtracted.partes || prev.partes,
-            valorTotal: robustExtracted.valorTotal || prev.valorTotal,
-            valorAportadoFondo: extracted.aporteFngrdObraInterventoria || prev.valorAportadoFondo,
-            valorAportadoContrapartida: extracted.aporteMunicipioGobernacionObraInterventoria || prev.valorAportadoContrapartida,
-            fechaInicio: robustExtracted.fechaInicio || prev.fechaInicio,
-            fechaFin: robustExtracted.fechaFin || prev.fechaFin,
-            metadata: {
-              ...prev.metadata,
-              ...extracted
-            }
-          }));
-          showAlert('Datos extraídos del PDF correctamente. Por favor, verifícalos.');
-          setAnalysisProgress('Análisis completado.');
-        } else {
-          throw new Error('No se recibió respuesta válida de la IA.');
-        }
-      } catch (error: any) {
-        console.error('Error en extracción de PDF:', error);
-        showAlert(`Error al analizar el PDF: ${error.message || 'Error desconocido'}. Intente pegar el texto manualmente.`);
-        setAnalysisProgress('Error en el análisis.');
-      } finally {
-        setIsAnalyzing(false);
-      }
+    setUploadedFile({ name: file.name, file });
+    setIsParsing(true);
+    setParsingStep('Analizando documento con IA...');
+    setProgress(50);
+    
+    try {
+      const prompt = `Extract contract details, including all main obligations, from this PDF with maximum rigor.
+      Devuelve un objeto JSON con exactamente esta estructura:
+      {
+        "numero": "string",
+        "contratista": "string",
+        "valor": 0,
+        "objetoContractual": "string",
+        "fechaInicio": "YYYY-MM-DD",
+        "fechaFin": "YYYY-MM-DD",
+        "obligacionesPrincipales": ["obligación 1", "obligación 2"]
+      }`;
+      const responseSchema = {
+          type: Type.OBJECT,
+          properties: {
+            numero: { type: Type.STRING },
+            contratista: { type: Type.STRING },
+            valor: { type: Type.NUMBER },
+            objetoContractual: { type: Type.STRING },
+            fechaInicio: { type: Type.STRING },
+            fechaFin: { type: Type.STRING },
+            obligacionesPrincipales: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ['numero', 'contratista', 'valor', 'objetoContractual', 'fechaInicio', 'fechaFin', 'obligacionesPrincipales'],
+        };
+      
+      const extractedData = await extractDataFromPDF(file, prompt, responseSchema);
+      setProgress(90);
+      
+      setContract(prev => ({ ...prev, ...extractedData }));
+      setProgress(100);
+      setParsingStep('Análisis completado con éxito');
+      
+      setTimeout(() => {
+        setIsParsing(false);
+        setProgress(0);
+        setParsingStep('');
+      }, 1500);
+    } catch (error) {
+      console.error("Error parsing PDF:", error);
+      setParsingStep('Error en el análisis del documento');
+      setTimeout(() => setIsParsing(false), 3000);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!convenio.numero || !convenio.nombre || !convenio.valorTotal) {
-      showAlert('Por favor complete los campos obligatorios (Número, Nombre, Valor Total).');
+    
+    // Check for duplicate
+    const isDuplicate = state.contratos.some(c => c.numero === contract.numero);
+    if (isDuplicate) {
+      setShowDuplicateModal(true);
       return;
     }
 
+    confirmSubmit();
+  };
+
+  const confirmSubmit = async () => {
     setIsSubmitting(true);
+    
     try {
-      const convenioId = `CONV-${Date.now()}`;
-      let documentUrl = '';
+      const contractId = `CTR-${Date.now()}`;
+      const newContract = { ...contract, id: contractId } as Contract;
+      addContract(newContract);
 
-      if (file) {
-        const folderPath = `convenios/${convenioId}`;
-        documentUrl = await uploadDocumentToStorage(file, folderPath);
+      // If a file was uploaded, add it to the repository
+      if (uploadedFile) {
+        const project = state.proyectos.find(p => p.id === projectId);
+        const projectName = project?.nombre || 'Proyecto';
+        const folderPath = `${projectName}/Contratos`;
+        
+        // Upload to Supabase
+        const publicUrl = await uploadDocumentToStorage(uploadedFile.file, folderPath);
+        
+        // Find contractor by NIT if they exist
+        const contractor = state.contratistas.find(c => c.nit === newContract.nit);
 
-        if (documentUrl) {
-          addDocument({
-            id: Math.random().toString(36).substr(2, 9),
-            convenioId: convenioId,
-            titulo: file.name,
-            tipo: 'Convenio',
-            fechaCreacion: new Date().toISOString(),
-            ultimaActualizacion: new Date().toISOString(),
-            estado: 'Aprobado',
-            tags: ['Convenio', 'Soporte'],
-            folderPath,
-            versiones: [{
-              id: Math.random().toString(36).substr(2, 9),
-              version: 1,
-              fecha: new Date().toISOString(),
-              url: documentUrl,
-              nombreArchivo: file.name,
-              subidoPor: 'Sistema',
-              accion: 'Subida',
-              estado: 'Aprobado'
-            }]
-          });
-        }
+        addDocument({
+          id: `DOC-${Date.now()}`,
+          projectId,
+          contractId,
+          contractorId: contractor?.id,
+          titulo: `Contrato ${newContract.numero} - ${newContract.contratista}`,
+          tipo: 'Contrato',
+          descripcion: `Documento original del contrato ${newContract.numero}`,
+          fechaCreacion: new Date().toISOString(),
+          ultimaActualizacion: new Date().toISOString(),
+          versiones: [{
+            id: `VER-${Date.now()}`,
+            version: 1,
+            fecha: new Date().toISOString(),
+            url: publicUrl,
+            nombreArchivo: uploadedFile.name,
+            subidoPor: 'Sistema (Extracción IA)',
+            accion: 'Subida',
+            estado: 'Borrador'
+          }],
+          tags: ['Contrato', newContract.tipo],
+          folderPath,
+          estado: 'Borrador'
+        });
       }
 
-      const newConvenio: Convenio = {
-        id: convenioId,
-        numero: convenio.numero!,
-        nombre: convenio.nombre!,
-        objeto: convenio.objeto || '',
-        partes: convenio.partes || '',
-        valorTotal: Number(convenio.valorTotal),
-        valorAportadoFondo: Number(convenio.valorAportadoFondo || 0),
-        valorAportadoContrapartida: Number(convenio.valorAportadoContrapartida || 0),
-        aportesFngrd: Number(convenio.aportesFngrd || 0),
-        aportesLocal: Number(convenio.aportesLocal || 0),
-        aportesOtros: Number(convenio.aportesOtros || 0),
-        fechaInicio: convenio.fechaInicio || '',
-        fechaFin: convenio.fechaFin || '',
-        estado: convenio.estado as any || 'Activo',
-        tipo: convenio.tipo as any || 'específico',
-        documentoUrl: documentUrl || undefined,
-        fases: convenio.fases || [],
-        metadata: {
-          ...convenio.metadata
-        }
-      };
-
-      onSave(newConvenio);
+      onClose();
     } catch (error) {
-      console.error('Error creating convenio:', error);
-      showAlert('Error al crear el convenio.');
+      console.error("Error saving contract:", error);
+      alert("Hubo un error al guardar el contrato y el documento.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-slate-900 rounded-xl text-white">
-            <Briefcase size={24} />
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in duration-200">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50/50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-600 rounded-xl text-white">
+              <FileText size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Configuración de Contrato</h2>
+              <p className="text-sm text-slate-500">Carga el PDF para extracción automática de alto rigor</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">Crear Nuevo Convenio</h2>
-            <p className="text-slate-500">Nodo principal de la jerarquía del sistema</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <button onClick={onCancel} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
-            <X size={24} />
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-8 flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
-        <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Cerebro de Análisis SRR:</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowTextModal(true)}
-            className="flex items-center gap-2 bg-white text-indigo-600 border border-indigo-200 px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors shadow-sm text-sm font-bold"
-          >
-            <FileText size={18} />
-            Pegar Texto
-          </button>
-        </div>
-        <AIProviderSelector />
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-slate-100">
-          <div className="md:col-span-2">
-             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Información General</h3>
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Número de Convenio *</label>
-            <input 
-              type="text" 
-              value={convenio.numero} 
-              onChange={e => setConvenio({...convenio, numero: e.target.value})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-              placeholder="Ej. 9677-PPAL001-2023"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Nombre / Título *</label>
-            <input 
-              type="text" 
-              value={convenio.nombre} 
-              onChange={e => setConvenio({...convenio, nombre: e.target.value})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-              placeholder="Nombre descriptivo del convenio"
-              required
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-slate-700 mb-1">Objeto del Convenio</label>
-            <textarea 
-              value={convenio.objeto} 
-              onChange={e => setConvenio({...convenio, objeto: e.target.value})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none min-h-[100px]"
-              placeholder="Descripción detallada del objeto..."
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-slate-700 mb-1">Partes Involucradas</label>
-            <input 
-              type="text" 
-              value={convenio.partes} 
-              onChange={e => setConvenio({...convenio, partes: e.target.value})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-              placeholder="Ej. UNGRD, Municipio de Cartagena"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Convenio</label>
-            <select 
-              value={convenio.tipo} 
-              onChange={e => setConvenio({...convenio, tipo: e.target.value as any})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-            >
-              <option value="marco">Marco</option>
-              <option value="específico">Específico</option>
-              <option value="interadministrativo">Interadministrativo</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Estado</label>
-            <select 
-              value={convenio.estado} 
-              onChange={e => setConvenio({...convenio, estado: e.target.value as any})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-            >
-              <option value="Activo">Activo</option>
-              <option value="En liquidación">En liquidación</option>
-              <option value="Liquidado">Liquidado</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Composición Financiera */}
-        <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 space-y-6">
-          <div className="flex items-center gap-2">
-             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Composición Financiera Dinámica</h3>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div>
-              <label className="block text-xs font-black text-indigo-600 uppercase mb-2">Aporte FNGRD (COP)</label>
-              <input 
-                type="number" 
-                value={convenio.aportesFngrd || ''} 
-                onChange={e => setConvenio({...convenio, aportesFngrd: Number(e.target.value)})}
-                className="w-full p-3 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-black text-indigo-700"
-                placeholder="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-black text-emerald-600 uppercase mb-2">Aporte Local (Entidad)</label>
-              <input 
-                type="number" 
-                value={convenio.aportesLocal || ''} 
-                onChange={e => setConvenio({...convenio, aportesLocal: Number(e.target.value)})}
-                className="w-full p-3 bg-white border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-black text-emerald-700"
-                placeholder="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-black text-amber-600 uppercase mb-2">Otros Aportes</label>
-              <input 
-                type="number" 
-                value={convenio.aportesOtros || ''} 
-                onChange={e => setConvenio({...convenio, aportesOtros: Number(e.target.value)})}
-                className="w-full p-3 bg-white border border-amber-100 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none font-black text-amber-700"
-                placeholder="0"
-              />
-            </div>
-
-            <div className="bg-slate-900 p-3 rounded-2xl flex flex-col justify-center">
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Total Calculado</label>
-              <p className="text-lg font-black text-white truncate">
-                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(convenio.valorTotal || 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Fases del Proyecto */}
-        <div className="p-6 bg-white rounded-3xl border-2 border-slate-50 space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-              <Layers size={18} className="text-indigo-600" />
-              Estructura de Fases Requeridas
-            </h3>
-            <button 
-              type="button"
-              onClick={addFase}
-              className="flex items-center gap-1 text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-tighter hover:bg-indigo-100 transition-colors"
-            >
-              <Plus size={14} />
-              Agregar Fase
+            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+              <X size={20} className="text-slate-500" />
             </button>
           </div>
-          <p className="text-xs text-slate-500 font-medium">Define las fases que compondrán la trazabilidad de los contratos vinculados a este convenio.</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(convenio.fases || []).map((fase) => (
-              <div key={fase.id} className="flex gap-2 items-center bg-slate-50 p-2 rounded-xl border border-slate-100 group">
-                <input 
-                  type="text" 
-                  value={fase.nombre}
-                  onChange={(e) => updateFase(fase.id, e.target.value)}
-                  className="flex-1 bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-700"
-                  placeholder="Nombre de la fase (Ej: Obra Etapa 1)"
-                />
-                <button 
-                  type="button"
-                  onClick={() => removeFase(fase.id)}
-                  className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Fecha de Inicio</label>
-            <input 
-              type="date" 
-              value={formatDateForInput(convenio.fechaInicio)} 
-              onChange={e => setConvenio({...convenio, fechaInicio: e.target.value})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-            />
+        <div className="flex-1 overflow-y-auto p-8">
+          <div className="mb-6 flex items-center justify-between bg-indigo-50/30 p-4 rounded-2xl border border-indigo-100/50">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Cerebro de Análisis:</span>
+            </div>
+            <AIProviderSelector />
           </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Fecha de Finalización</label>
-            <input 
-              type="date" 
-              value={formatDateForInput(convenio.fechaFin)} 
-              onChange={e => setConvenio({...convenio, fechaFin: e.target.value})}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-slate-700 mb-1">Documento Soporte (Opcional)</label>
-            <div className="flex items-center gap-4">
-              <label className="flex-1 flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+          <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-800 mb-4">Carga o Análisis de Contrato</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <label className="group relative flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-slate-300 rounded-2xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/30 transition-all">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <Upload className="w-8 h-8 text-slate-400 mb-2" />
-                  <p className="mb-2 text-sm text-slate-500">
-                    <span className="font-semibold">Click para subir</span> o arrastra y suelta
-                  </p>
-                  <p className="text-xs text-slate-500">PDF, DOCX, XLSX (MAX. 10MB)</p>
-                </div>
-                <input 
-                  type="file" 
-                  className="hidden" 
-                  accept=".pdf,.doc,.docx,.xls,.xlsx"
-                  onChange={handleFileUpload}
-                />
-              </label>
-              {file && (
-                <div className="flex-1 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                  <p className="text-sm font-medium text-indigo-900 truncate">{file.name}</p>
-                  <p className="text-xs text-indigo-700 mt-1">
-                    {(file.size / 1024 / 1024).toFixed(2)} MB
-                  </p>
-                  {isAnalyzing && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <Loader2 size={14} className="animate-spin text-indigo-600" />
-                      <span className="text-xs text-indigo-600 font-medium">{analysisProgress}</span>
+                  {isParsing ? (
+                    <div className="flex flex-col items-center gap-4">
+                      <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-slate-700">{parsingStep}</p>
+                        <div className="w-48 h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden">
+                          <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  {!isAnalyzing && analysisProgress && (
-                    <p className="mt-1 text-xs text-emerald-600 font-medium">{analysisProgress}</p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFile(null);
-                      setAnalysisProgress('');
-                    }}
-                    className="mt-2 text-xs text-red-600 hover:text-red-800 font-medium"
-                  >
-                    Eliminar archivo
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-          <button 
-            type="button" 
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button 
-            type="submit"
-            disabled={isSubmitting}
-            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-md disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save size={20} />
-                Guardar Convenio
-              </>
-            )}
-          </button>
-        </div>
-      </form>
-
-      {/* Text Extraction Modal */}
-      {showTextModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white">
-              <h3 className="text-xl font-bold flex items-center gap-2">
-                <FileText size={24} />
-                Extraer Datos de Convenio
-              </h3>
-              <button onClick={() => setShowTextModal(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors">
-                <X size={24} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-slate-600">
-                Pegue aquí el texto del convenio para que la IA extraiga los campos automáticamente.
-              </p>
-              <textarea
-                value={pastedText}
-                onChange={(e) => setPastedText(e.target.value)}
-                className="w-full h-64 p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none font-mono text-sm"
-                placeholder="Pegue el contenido aquí..."
-              />
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowTextModal(false)}
-                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-50 rounded-lg transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleTextExtraction}
-                  disabled={isAnalyzing || !pastedText.trim()}
-                  className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Analizando...
-                    </>
                   ) : (
                     <>
-                      <BrainCircuit size={18} />
-                      Extraer Datos
+                      <div className="p-3 bg-indigo-100 rounded-full text-indigo-600 mb-3 group-hover:scale-110 transition-transform">
+                        <Upload size={24} />
+                      </div>
+                      <p className="mb-2 text-sm text-slate-700 font-semibold">Haz clic para cargar el Contrato (PDF)</p>
+                      <p className="text-xs text-slate-400">Análisis IA de alto rigor</p>
                     </>
                   )}
+                </div>
+                <input type="file" className="hidden" accept="application/pdf" onChange={handlePdfUpload} disabled={isParsing} />
+              </label>
+              
+              <div className="flex flex-col gap-2">
+                <textarea 
+                  rows={6} 
+                  value={manualText} 
+                  onChange={e => setManualText(e.target.value)} 
+                  className="w-full h-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  placeholder="O pegue aquí el texto del contrato para análisis manual..."
+                />
+                <button 
+                  type="button" 
+                  onClick={handleTextAnalysis}
+                  disabled={isParsing || !manualText}
+                  className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
+                >
+                  Analizar Texto
                 </button>
               </div>
             </div>
           </div>
+
+          <form onSubmit={handleSubmit} className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Número de Contrato</label>
+                <input 
+                  required
+                  value={contract.numero} 
+                  onChange={e => setContract(prev => ({...prev, numero: e.target.value}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                  placeholder="Ej: 2024-001"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fase</label>
+                <select 
+                  value={contract.faseId || ''} 
+                  onChange={e => setContract(prev => ({...prev, faseId: e.target.value}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
+                >
+                  <option value="">Seleccionar Fase</option>
+                  {state.proyectos.find(p => p.id === projectId)?.fases?.map(f => (
+                    <option key={f.id} value={f.id}>{f.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tipo de Contrato</label>
+                <select 
+                  value={contract.tipo} 
+                  onChange={e => setContract(prev => ({...prev, tipo: e.target.value as any}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
+                >
+                  <option value="Convenio">Convenio</option>
+                  <option value="Obra">Obra</option>
+                  <option value="Interventoría">Interventoría</option>
+                  <option value="OPS">OPS</option>
+                  <option value="Interadministrativo">Interadministrativo</option>
+                  <option value="Consultoría">Consultoría</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Valor Total</label>
+                <input 
+                  type="number"
+                  required
+                  value={contract.valor} 
+                  onChange={e => setContract(prev => ({...prev, valor: Number(e.target.value)}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono text-indigo-600 font-bold"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Aporte FNGRD</label>
+                <input 
+                  type="number"
+                  value={contract.aportesFngrd || ''} 
+                  onChange={e => setContract(prev => ({...prev, aportesFngrd: Number(e.target.value)}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono text-indigo-500/70"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Aporte Local (Distrito)</label>
+                <input 
+                  type="number"
+                  value={contract.aportesLocal || ''} 
+                  onChange={e => setContract(prev => ({...prev, aportesLocal: Number(e.target.value)}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono text-emerald-500/70"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Otros Aportes</label>
+                <input 
+                  type="number"
+                  value={contract.aportesOtros || ''} 
+                  onChange={e => setContract(prev => ({...prev, aportesOtros: Number(e.target.value)}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono text-slate-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vigencia</label>
+                <select 
+                  value={contract.vigencia} 
+                  onChange={e => setContract(prev => ({...prev, vigencia: e.target.value}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
+                >
+                  <option value="">Seleccionar Vigencia</option>
+                  {state.vigencias.map(v => (
+                    <option key={v.id} value={v.anio}>{v.anio}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Línea de Inversión</label>
+                <select 
+                  value={contract.lineaInversion} 
+                  onChange={e => setContract(prev => ({...prev, lineaInversion: e.target.value}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
+                >
+                  <option value="">Seleccionar Línea</option>
+                  {state.lineasInversion.map(l => (
+                    <option key={l.id} value={l.nombre}>{l.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fase del Proyecto</label>
+                <select 
+                  value={contract.faseId} 
+                  onChange={e => setContract(prev => ({...prev, faseId: e.target.value}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all appearance-none bg-white font-bold text-slate-700"
+                >
+                  <option value="">Sin Fase Asignada</option>
+                  {project.fases?.map(f => (
+                    <option key={f.id} value={f.id}>{f.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Estado Actual</label>
+                <select 
+                  value={contract.estado} 
+                  onChange={e => setContract(prev => ({...prev, estado: e.target.value as any}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all appearance-none bg-white font-bold text-slate-700"
+                >
+                  <option value="Activo">Activo / En Ejecución</option>
+                  <option value="Por Iniciar">Por Iniciar</option>
+                  <option value="Suspendido">Suspendido</option>
+                  <option value="Liquidado">Liquidado</option>
+                  <option value="Cerrado">Cerrado</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="text-indigo-600" size={18} />
+                <h4 className="text-xs font-black text-indigo-900 uppercase tracking-widest">Disgregación Financiera del Contrato</h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Aporte FNGRD (COP)</label>
+                  <input 
+                    type="number"
+                    value={contract.aportesFngrd} 
+                    onChange={e => setContract(prev => ({...prev, aportesFngrd: Number(e.target.value)}))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Aporte Local (Distrito)</label>
+                  <input 
+                    type="number"
+                    value={contract.aportesLocal} 
+                    onChange={e => setContract(prev => ({...prev, aportesLocal: Number(e.target.value)}))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Otros Aportes</label>
+                  <input 
+                    type="number"
+                    value={contract.aportesOtros} 
+                    onChange={e => setContract(prev => ({...prev, aportesOtros: Number(e.target.value)}))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <p className="text-[9px] text-slate-500 italic font-medium">El valor total del contrato ({formatCurrency(contract.valor)}) debería idealmente coincidir con la suma de los aportes.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contratista</label>
+                <input 
+                  required
+                  value={contract.contratista} 
+                  onChange={e => setContract(prev => ({...prev, contratista: e.target.value}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">NIT / Identificación</label>
+                <input 
+                  required
+                  value={contract.nit} 
+                  onChange={e => setContract(prev => ({...prev, nit: e.target.value}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Objeto Contractual Detallado</label>
+              <textarea 
+                required
+                rows={4}
+                value={contract.objetoContractual} 
+                onChange={e => setContract(prev => ({...prev, objetoContractual: e.target.value}))}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all resize-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Plazo (Meses)</label>
+                <input 
+                  type="number"
+                  value={contract.plazoMeses} 
+                  onChange={e => setContract(prev => ({...prev, plazoMeses: Number(e.target.value)}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fecha Inicio</label>
+                <input 
+                  type="date"
+                  value={contract.fechaInicio} 
+                  onChange={e => setContract(prev => ({...prev, fechaInicio: e.target.value}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Supervisor</label>
+                <input 
+                  value={contract.supervisor} 
+                  onChange={e => setContract(prev => ({...prev, supervisor: e.target.value}))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {contract.obligacionesPrincipales && contract.obligacionesPrincipales.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-emerald-500" />
+                  Obligaciones Principales Extraídas
+                </h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {contract.obligacionesPrincipales.map((ob, idx) => (
+                    <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-600 flex gap-3">
+                      <span className="font-bold text-indigo-600">{idx + 1}.</span>
+                      {ob}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-6 flex justify-end gap-4 border-t border-slate-100">
+              <button 
+                type="button" 
+                onClick={onClose}
+                className="px-6 py-3 rounded-xl text-slate-600 font-semibold hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit"
+                disabled={isSubmitting}
+                className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                {isSubmitting ? 'Guardando...' : 'Confirmar y Guardar Contrato'}
+              </button>
+            </div>
+          </form>
         </div>
-      )}
+      </div>
+
+      <ConfirmationModal
+        isOpen={showDuplicateModal}
+        onClose={() => setShowDuplicateModal(false)}
+        onConfirm={confirmSubmit}
+        title="Contrato Duplicado Detectado"
+        message="Ya existe un contrato con este número. ¿Deseas crearlo de todas formas?"
+        confirmLabel="Sí, crear duplicado"
+        cancelLabel="No, cancelar"
+      />
     </div>
   );
 };
