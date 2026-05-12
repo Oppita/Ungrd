@@ -1,584 +1,532 @@
-import React, { useState, useEffect } from 'react';
-import { Type } from '@google/genai';
-import { extractDataFromPDF, extractDataFromText } from '../services/pdfExtractorService';
-import { Contract } from '../types';
+import React, { useState } from 'react';
+import { X, Save, Loader2, Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Project, Presupuesto } from '../types';
 import { useProject } from '../store/ProjectContext';
-import { FileText, Upload, Loader2, CheckCircle2, AlertCircle, X, Type as TypeIcon, DollarSign } from 'lucide-react';
-import { ConfirmationModal } from './ConfirmationModal';
-import { uploadDocumentToStorage } from '../lib/storage';
+import { extractProjectData } from '../services/geminiService';
+import DocumentReader from './DocumentReader';
 import { AIProviderSelector } from './AIProviderSelector';
-import { formatCurrency } from '../utils/formatters';
 
-interface AddContractFormProps {
-  projectId: string;
+interface EditProjectModalProps {
+  project: Project;
+  presupuesto?: Presupuesto;
   onClose: () => void;
 }
 
-export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onClose }) => {
-  const { state, addContract, addDocument } = useProject();
-  const project = state.proyectos.find(p => p.id === projectId);
-  const [contract, setContract] = useState<Partial<Contract>>({
-    projectId,
-    numero: '',
-    tipo: 'Obra',
-    contratista: '',
-    nit: '',
-    valor: 0,
-    aportesFngrd: 0,
-    aportesLocal: 0,
-    aportesOtros: 0,
-    objetoContractual: '',
-    plazoMeses: 0,
-    fechaInicio: '',
-    fechaFin: '',
-    supervisor: '',
-    formaPago: '',
-    garantias: [],
-    obligacionesPrincipales: [],
-    vigencia: '',
-    lineaInversion: '',
-  });
-
-  // Dynamic value calculation
-  useEffect(() => {
-    const total = (Number(contract.aportesFngrd) || 0) + 
-                  (Number(contract.aportesLocal) || 0) + 
-                  (Number(contract.aportesOtros) || 0);
-    
-    // Only update if the sum of aportes is greater than 0, 
-    // to allow manual entry if no aportes are specified yet
-    if (total > 0 && total !== contract.valor) {
-      setContract(prev => ({ ...prev, valor: total }));
-    }
-  }, [contract.aportesFngrd, contract.aportesLocal, contract.aportesOtros]);
-  
+export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, presupuesto, onClose }) => {
+  const { updateProject, updatePresupuesto, state } = useProject();
+  const [formData, setFormData] = useState<Project>({ ...project });
+  const [presupuestoData, setPresupuestoData] = useState<Presupuesto | undefined>(presupuesto ? { ...presupuesto } : undefined);
   const [isParsing, setIsParsing] = useState(false);
   const [parsingStep, setParsingStep] = useState('');
-  const [progress, setProgress] = useState(0);
-  const [uploadedFile, setUploadedFile] = useState<{ name: string; file: File } | null>(null);
-  const [manualText, setManualText] = useState('');
+  const [changes, setChanges] = useState<{ field: string; old: any; new: any }[]>([]);
+  const [showChanges, setShowChanges] = useState(false);
+  const [pasteText, setPasteText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
-  const handleTextAnalysis = async () => {
-    if (!manualText) return;
+  // Dynamic value calculation for presupuesto
+  React.useEffect(() => {
+    if (presupuestoData) {
+      const total = (Number(presupuestoData.aportesFngrd) || 0) + 
+                    (Number(presupuestoData.aportesMunicipio) || 0) + 
+                    (Number(presupuestoData.aportesOtros) || 0);
+      
+      if (total > 0 && total !== presupuestoData.valorTotal) {
+        setPresupuestoData(prev => prev ? { ...prev, valorTotal: total } : prev);
+      }
+    }
+  }, [presupuestoData?.aportesFngrd, presupuestoData?.aportesMunicipio, presupuestoData?.aportesOtros]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePresupuestoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPresupuestoData(prev => prev ? { ...prev, [name]: Number(value) } : prev);
+  };
+
+  const handleAIExtraction = async (text: string) => {
     setIsParsing(true);
-    setParsingStep('Analizando texto con IA de alto rigor...');
-    setProgress(50);
+    setParsingStep('Analizando con IA SRR...');
     try {
-      const responseSchema = {
-        type: Type.OBJECT,
-        properties: {
-          numero: { type: Type.STRING },
-          contratista: { type: Type.STRING },
-          valor: { type: Type.NUMBER },
-          objetoContractual: { type: Type.STRING },
-          fechaInicio: { type: Type.STRING },
-          fechaFin: { type: Type.STRING },
-          obligacionesPrincipales: { type: Type.ARRAY, items: { type: Type.STRING } },
-        },
-        required: ['numero', 'contratista', 'valor', 'objetoContractual', 'fechaInicio', 'fechaFin', 'obligacionesPrincipales'],
+      const extracted = await extractProjectData(text);
+      
+      const newChanges: { field: string; old: any; new: any }[] = [];
+      const updatedData = { ...formData };
+
+      // Compare and track changes
+      const compareAndUpdate = (field: string, newValue: any, isMatrix = false) => {
+        const oldValue = isMatrix ? (formData.matrix as any)?.[field] : (formData as any)[field];
+        if (newValue !== undefined && newValue !== null && newValue !== oldValue) {
+          newChanges.push({ field, old: oldValue, new: newValue });
+          if (isMatrix) {
+            if (!updatedData.matrix) updatedData.matrix = {} as any;
+            (updatedData.matrix as any)[field] = newValue;
+          } else {
+            (updatedData as any)[field] = newValue;
+          }
+        }
       };
-      
-      const prompt = `Analiza este contrato con máximo rigor. Extrae los detalles clave, incluyendo todas las obligaciones principales.`;
-      
-      const extractedData = await extractDataFromText(manualText, prompt, responseSchema);
-      setContract(prev => ({ ...prev, ...extractedData }));
-      setProgress(100);
+
+      // General fields
+      if (extracted.nombre) compareAndUpdate('nombre', extracted.nombre);
+      if (extracted.departamento) compareAndUpdate('departamento', extracted.departamento);
+      if (extracted.municipio) compareAndUpdate('municipio', extracted.municipio);
+      if (extracted.linea) compareAndUpdate('linea', extracted.linea);
+      if (extracted.vigencia) compareAndUpdate('vigencia', extracted.vigencia);
+      if (extracted.justificacion) compareAndUpdate('justificacion', extracted.justificacion);
+      if (extracted.objetivoGeneral) compareAndUpdate('objetivoGeneral', extracted.objetivoGeneral);
+      if (extracted.alcance) compareAndUpdate('alcance', extracted.alcance);
+      if (extracted.beneficiarios) compareAndUpdate('beneficiarios', extracted.beneficiarios);
+
+      // Matrix fields
+      if (extracted.matrix) {
+        Object.keys(extracted.matrix).forEach(key => {
+          compareAndUpdate(key, (extracted.matrix as any)[key], true);
+        });
+      }
+
+      // Sync budget if extracted
+      if (extracted.valorTotalProyecto && presupuestoData) {
+        setPresupuestoData(prev => prev ? { ...prev, valorTotal: extracted.valorTotalProyecto } : prev);
+      }
+      if (extracted.aporteFngrdObraInterventoria && presupuestoData) {
+        setPresupuestoData(prev => prev ? { ...prev, aportesFngrd: extracted.aporteFngrdObraInterventoria } : prev);
+      }
+      if (extracted.aporteMunicipioGobernacionObraInterventoria && presupuestoData) {
+         setPresupuestoData(prev => prev ? { ...prev, aportesMunicipio: extracted.aporteMunicipioGobernacionObraInterventoria, aportesLocal: extracted.aporteMunicipioGobernacionObraInterventoria } : prev);
+      }
+
+      setFormData(updatedData);
+      setChanges(newChanges);
+      setShowChanges(true);
       setParsingStep('Análisis completado');
-      setTimeout(() => setIsParsing(false), 1000);
     } catch (error) {
-      console.error("Error parsing text:", error);
+      console.error('Error in AI extraction:', error);
       setParsingStep('Error en el análisis');
+    } finally {
       setTimeout(() => setIsParsing(false), 2000);
     }
   };
 
-  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadedFile({ name: file.name, file });
-    setIsParsing(true);
-    setParsingStep('Analizando documento con IA...');
-    setProgress(50);
-    
-    try {
-      const prompt = `Extract contract details, including all main obligations, from this PDF with maximum rigor.
-      Devuelve un objeto JSON con exactamente esta estructura:
-      {
-        "numero": "string",
-        "contratista": "string",
-        "valor": 0,
-        "objetoContractual": "string",
-        "fechaInicio": "YYYY-MM-DD",
-        "fechaFin": "YYYY-MM-DD",
-        "obligacionesPrincipales": ["obligación 1", "obligación 2"]
-      }`;
-      const responseSchema = {
-          type: Type.OBJECT,
-          properties: {
-            numero: { type: Type.STRING },
-            contratista: { type: Type.STRING },
-            valor: { type: Type.NUMBER },
-            objetoContractual: { type: Type.STRING },
-            fechaInicio: { type: Type.STRING },
-            fechaFin: { type: Type.STRING },
-            obligacionesPrincipales: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: ['numero', 'contratista', 'valor', 'objetoContractual', 'fechaInicio', 'fechaFin', 'obligacionesPrincipales'],
-        };
-      
-      const extractedData = await extractDataFromPDF(file, prompt, responseSchema);
-      setProgress(90);
-      
-      setContract(prev => ({ ...prev, ...extractedData }));
-      setProgress(100);
-      setParsingStep('Análisis completado con éxito');
-      
-      setTimeout(() => {
-        setIsParsing(false);
-        setProgress(0);
-        setParsingStep('');
-      }, 1500);
-    } catch (error) {
-      console.error("Error parsing PDF:", error);
-      setParsingStep('Error en el análisis del documento');
-      setTimeout(() => setIsParsing(false), 3000);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Check for duplicate
-    const isDuplicate = state.contratos.some(c => c.numero === contract.numero);
-    if (isDuplicate) {
-      setShowDuplicateModal(true);
-      return;
+    // Add traceability: update date and type
+    const updatedProject = {
+      ...formData,
+      matrix: {
+        ...formData.matrix,
+        valorTotalProyecto: presupuestoData?.valorTotal || formData.matrix?.valorTotalProyecto,
+        aporteFngrdObraInterventoria: presupuestoData?.aportesFngrd || formData.matrix?.aporteFngrdObraInterventoria,
+        aporteMunicipioGobernacionObraInterventoria: presupuestoData?.aportesMunicipio || formData.matrix?.aporteMunicipioGobernacionObraInterventoria,
+      },
+      ultimaActualizacion: new Date().toISOString(),
+      tipoActualizacion: 'Edición Manual de Datos',
+    };
+    updateProject(updatedProject);
+    if (presupuestoData) {
+      updatePresupuesto(presupuestoData);
     }
-
-    confirmSubmit();
-  };
-
-  const confirmSubmit = async () => {
-    setIsSubmitting(true);
-    
-    try {
-      const contractId = `CTR-${Date.now()}`;
-      const newContract = { ...contract, id: contractId } as Contract;
-      addContract(newContract);
-
-      // If a file was uploaded, add it to the repository
-      if (uploadedFile) {
-        const project = state.proyectos.find(p => p.id === projectId);
-        const projectName = project?.nombre || 'Proyecto';
-        const folderPath = `${projectName}/Contratos`;
-        
-        // Upload to Supabase
-        const publicUrl = await uploadDocumentToStorage(uploadedFile.file, folderPath);
-        
-        // Find contractor by NIT if they exist
-        const contractor = state.contratistas.find(c => c.nit === newContract.nit);
-
-        addDocument({
-          id: `DOC-${Date.now()}`,
-          projectId,
-          contractId,
-          contractorId: contractor?.id,
-          titulo: `Contrato ${newContract.numero} - ${newContract.contratista}`,
-          tipo: 'Contrato',
-          descripcion: `Documento original del contrato ${newContract.numero}`,
-          fechaCreacion: new Date().toISOString(),
-          ultimaActualizacion: new Date().toISOString(),
-          versiones: [{
-            id: `VER-${Date.now()}`,
-            version: 1,
-            fecha: new Date().toISOString(),
-            url: publicUrl,
-            nombreArchivo: uploadedFile.name,
-            subidoPor: 'Sistema (Extracción IA)',
-            accion: 'Subida',
-            estado: 'Borrador'
-          }],
-          tags: ['Contrato', newContract.tipo],
-          folderPath,
-          estado: 'Borrador'
-        });
-      }
-
-      onClose();
-    } catch (error) {
-      console.error("Error saving contract:", error);
-      alert("Hubo un error al guardar el contrato y el documento.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in duration-200">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 rounded-xl text-white">
-              <FileText size={24} />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Configuración de Contrato</h2>
-              <p className="text-sm text-slate-500">Carga el PDF para extracción automática de alto rigor</p>
-            </div>
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50/50">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Editar Proyecto</h2>
+            <p className="text-sm text-slate-500 mt-1">Modifica los datos generales y específicos del proyecto.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-              <X size={20} className="text-slate-500" />
+            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors">
+              <X size={20} />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="mb-6 flex items-center justify-between bg-indigo-50/30 p-4 rounded-2xl border border-indigo-100/50">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-              <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Cerebro de Análisis:</span>
-            </div>
-            <AIProviderSelector />
-          </div>
-
-          <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
-            <h3 className="text-sm font-bold text-slate-800 mb-4">Carga o Análisis de Contrato</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <label className="group relative flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-slate-300 rounded-2xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/30 transition-all">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  {isParsing ? (
-                    <div className="flex flex-col items-center gap-4">
-                      <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-                      <div className="text-center">
-                        <p className="text-sm font-bold text-slate-700">{parsingStep}</p>
-                        <div className="w-48 h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden">
-                          <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${progress}%` }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="p-3 bg-indigo-100 rounded-full text-indigo-600 mb-3 group-hover:scale-110 transition-transform">
-                        <Upload size={24} />
-                      </div>
-                      <p className="mb-2 text-sm text-slate-700 font-semibold">Haz clic para cargar el Contrato (PDF)</p>
-                      <p className="text-xs text-slate-400">Análisis IA de alto rigor</p>
-                    </>
-                  )}
+        <div className="p-6 overflow-y-auto flex-1">
+          {/* AI Extraction Section */}
+          <div className="mb-8 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-600 text-white rounded-lg">
+                  <Upload size={18} />
                 </div>
-                <input type="file" className="hidden" accept="application/pdf" onChange={handlePdfUpload} disabled={isParsing} />
-              </label>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Actualización Inteligente (IA SRR)</h3>
+                  <p className="text-xs text-slate-500">Carga un documento o pega texto para actualizar campos automáticamente.</p>
+                </div>
+              </div>
+              <AIProviderSelector />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <DocumentReader 
+                onDataExtracted={(data) => {
+                  // DocumentReader might return specific document data, 
+                  // but here we want to use the general extraction for the whole project
+                  // If DocumentReader provides text, we can use it.
+                  // For now, let's assume we use the text extraction logic.
+                }}
+                onTextExtracted={handleAIExtraction}
+              />
               
-              <div className="flex flex-col gap-2">
-                <textarea 
-                  rows={6} 
-                  value={manualText} 
-                  onChange={e => setManualText(e.target.value)} 
-                  className="w-full h-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                  placeholder="O pegue aquí el texto del contrato para análisis manual..."
+              <div className="relative">
+                <textarea
+                  className="w-full h-32 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium resize-none bg-white"
+                  placeholder="O pega aquí el texto del proyecto/contrato..."
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
                 />
-                <button 
-                  type="button" 
-                  onClick={handleTextAnalysis}
-                  disabled={isParsing || !manualText}
-                  className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
+                {isParsing && (
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center animate-in fade-in duration-300">
+                    <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-2" />
+                    <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">{parsingStep}</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleAIExtraction(pasteText)}
+                  disabled={isParsing || pasteText.length < 50}
+                  className="mt-2 w-full py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Analizar Texto
+                  {isParsing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  Analizar y Extraer Datos
                 </button>
               </div>
             </div>
-          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Número de Contrato</label>
-                <input 
-                  required
-                  value={contract.numero} 
-                  onChange={e => setContract(prev => ({...prev, numero: e.target.value}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                  placeholder="Ej: 2024-001"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fase</label>
-                <select 
-                  value={contract.faseId || ''} 
-                  onChange={e => setContract(prev => ({...prev, faseId: e.target.value}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
-                >
-                  <option value="">Seleccionar Fase</option>
-                  {state.proyectos.find(p => p.id === projectId)?.fases?.map(f => (
-                    <option key={f.id} value={f.id}>{f.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tipo de Contrato</label>
-                <select 
-                  value={contract.tipo} 
-                  onChange={e => setContract(prev => ({...prev, tipo: e.target.value as any}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
-                >
-                  <option value="Convenio">Convenio</option>
-                  <option value="Obra">Obra</option>
-                  <option value="Interventoría">Interventoría</option>
-                  <option value="OPS">OPS</option>
-                  <option value="Interadministrativo">Interadministrativo</option>
-                  <option value="Consultoría">Consultoría</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Valor Total</label>
-                <input 
-                  type="number"
-                  required
-                  value={contract.valor} 
-                  onChange={e => setContract(prev => ({...prev, valor: Number(e.target.value)}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono text-indigo-600 font-bold"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Aporte FNGRD</label>
-                <input 
-                  type="number"
-                  value={contract.aportesFngrd || ''} 
-                  onChange={e => setContract(prev => ({...prev, aportesFngrd: Number(e.target.value)}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono text-indigo-500/70"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Aporte Local (Distrito)</label>
-                <input 
-                  type="number"
-                  value={contract.aportesLocal || ''} 
-                  onChange={e => setContract(prev => ({...prev, aportesLocal: Number(e.target.value)}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono text-emerald-500/70"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Otros Aportes</label>
-                <input 
-                  type="number"
-                  value={contract.aportesOtros || ''} 
-                  onChange={e => setContract(prev => ({...prev, aportesOtros: Number(e.target.value)}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono text-slate-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vigencia</label>
-                <select 
-                  value={contract.vigencia} 
-                  onChange={e => setContract(prev => ({...prev, vigencia: e.target.value}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
-                >
-                  <option value="">Seleccionar Vigencia</option>
-                  {state.vigencias.map(v => (
-                    <option key={v.id} value={v.anio}>{v.anio}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Línea de Inversión</label>
-                <select 
-                  value={contract.lineaInversion} 
-                  onChange={e => setContract(prev => ({...prev, lineaInversion: e.target.value}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
-                >
-                  <option value="">Seleccionar Línea</option>
-                  {state.lineasInversion.map(l => (
-                    <option key={l.id} value={l.nombre}>{l.nombre}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fase del Proyecto</label>
-                <select 
-                  value={contract.faseId} 
-                  onChange={e => setContract(prev => ({...prev, faseId: e.target.value}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all appearance-none bg-white font-bold text-slate-700"
-                >
-                  <option value="">Sin Fase Asignada</option>
-                  {project.fases?.map(f => (
-                    <option key={f.id} value={f.id}>{f.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Estado Actual</label>
-                <select 
-                  value={contract.estado} 
-                  onChange={e => setContract(prev => ({...prev, estado: e.target.value as any}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all appearance-none bg-white font-bold text-slate-700"
-                >
-                  <option value="Activo">Activo / En Ejecución</option>
-                  <option value="Por Iniciar">Por Iniciar</option>
-                  <option value="Suspendido">Suspendido</option>
-                  <option value="Liquidado">Liquidado</option>
-                  <option value="Cerrado">Cerrado</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="text-indigo-600" size={18} />
-                <h4 className="text-xs font-black text-indigo-900 uppercase tracking-widest">Disgregación Financiera del Contrato</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Aporte FNGRD (COP)</label>
-                  <input 
-                    type="number"
-                    value={contract.aportesFngrd} 
-                    onChange={e => setContract(prev => ({...prev, aportesFngrd: Number(e.target.value)}))}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
-                    placeholder="0"
-                  />
+            {showChanges && changes.length > 0 && (
+              <div className="mt-4 p-4 bg-white rounded-xl border border-indigo-100 animate-in slide-in-from-top duration-300">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                    <AlertCircle size={14} />
+                    Cambios detectados por la IA ({changes.length})
+                  </h4>
+                  <button 
+                    onClick={() => setShowChanges(false)}
+                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase"
+                  >
+                    Ocultar
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Aporte Local (Distrito)</label>
-                  <input 
-                    type="number"
-                    value={contract.aportesLocal} 
-                    onChange={e => setContract(prev => ({...prev, aportesLocal: Number(e.target.value)}))}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
-                    placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Otros Aportes</label>
-                  <input 
-                    type="number"
-                    value={contract.aportesOtros} 
-                    onChange={e => setContract(prev => ({...prev, aportesOtros: Number(e.target.value)}))}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              <p className="text-[9px] text-slate-500 italic font-medium">El valor total del contrato ({formatCurrency(contract.valor)}) debería idealmente coincidir con la suma de los aportes.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contratista</label>
-                <input 
-                  required
-                  value={contract.contratista} 
-                  onChange={e => setContract(prev => ({...prev, contratista: e.target.value}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">NIT / Identificación</label>
-                <input 
-                  required
-                  value={contract.nit} 
-                  onChange={e => setContract(prev => ({...prev, nit: e.target.value}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Objeto Contractual Detallado</label>
-              <textarea 
-                required
-                rows={4}
-                value={contract.objetoContractual} 
-                onChange={e => setContract(prev => ({...prev, objetoContractual: e.target.value}))}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all resize-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Plazo (Meses)</label>
-                <input 
-                  type="number"
-                  value={contract.plazoMeses} 
-                  onChange={e => setContract(prev => ({...prev, plazoMeses: Number(e.target.value)}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fecha Inicio</label>
-                <input 
-                  type="date"
-                  value={contract.fechaInicio} 
-                  onChange={e => setContract(prev => ({...prev, fechaInicio: e.target.value}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Supervisor</label>
-                <input 
-                  value={contract.supervisor} 
-                  onChange={e => setContract(prev => ({...prev, supervisor: e.target.value}))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                />
-              </div>
-            </div>
-
-            {contract.obligacionesPrincipales && contract.obligacionesPrincipales.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  <CheckCircle2 size={18} className="text-emerald-500" />
-                  Obligaciones Principales Extraídas
-                </h3>
-                <div className="grid grid-cols-1 gap-2">
-                  {contract.obligacionesPrincipales.map((ob, idx) => (
-                    <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-600 flex gap-3">
-                      <span className="font-bold text-indigo-600">{idx + 1}.</span>
-                      {ob}
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                  {changes.map((change, i) => (
+                    <div key={i} className="text-[11px] p-2 bg-slate-50 rounded-lg border border-slate-100">
+                      <span className="font-bold text-slate-700 uppercase mr-2">{change.field}:</span>
+                      <span className="text-rose-500 line-through mr-2">{String(change.old || 'Vacío')}</span>
+                      <span className="text-emerald-600 font-bold">→ {String(change.new)}</span>
                     </div>
                   ))}
                 </div>
+                <div className="mt-3 flex items-center gap-2 text-[10px] text-emerald-600 font-bold">
+                  <CheckCircle2 size={12} />
+                  <span>Los campos han sido actualizados en el formulario. Revisa y guarda para confirmar.</span>
+                </div>
               </div>
             )}
+          </div>
 
-            <div className="pt-6 flex justify-end gap-4 border-t border-slate-100">
-              <button 
-                type="button" 
-                onClick={onClose}
-                className="px-6 py-3 rounded-xl text-slate-600 font-semibold hover:bg-slate-100 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button 
-                type="submit"
-                disabled={isSubmitting}
-                className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
-              >
-                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                {isSubmitting ? 'Guardando...' : 'Confirmar y Guardar Contrato'}
-              </button>
+          <form id="edit-project-form" onSubmit={handleSubmit} className="space-y-6">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="col-span-2">
+                <label className="block text-sm font-bold text-slate-700 mb-1">Nombre del Proyecto</label>
+                <input 
+                  type="text" 
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Departamento</label>
+                <input 
+                  type="text" 
+                  name="departamento"
+                  value={formData.departamento}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Municipio</label>
+                <input 
+                  type="text" 
+                  name="municipio"
+                  value={formData.municipio}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Obra</label>
+                <input 
+                  type="text" 
+                  name="tipoObra"
+                  value={formData.tipoObra}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Convenio</label>
+                <select 
+                  name="convenioId"
+                  value={formData.convenioId || ''}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                >
+                  <option value="">Sin Convenio</option>
+                  {state.convenios.map(c => (
+                    <option key={c.id} value={c.id}>{c.numero} - {c.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Fases</label>
+                <div className="space-y-2">
+                  {(formData.fases || []).map((fase, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={fase.nombre}
+                        onChange={(e) => {
+                          const newFases = [...(formData.fases || [])];
+                          newFases[index].nombre = e.target.value;
+                          setFormData(prev => ({ ...prev, fases: newFases }));
+                        }}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newFases = (formData.fases || []).filter((_, i) => i !== index);
+                          setFormData(prev => ({ ...prev, fases: newFases }));
+                        }}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newFases = [...(formData.fases || []), { id: Math.random().toString(36).substr(2, 9), nombre: '' }];
+                      setFormData(prev => ({ ...prev, fases: newFases }));
+                    }}
+                    className="text-sm text-indigo-600 hover:text-indigo-800 font-bold"
+                  >
+                    + Agregar Fase
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Beneficiarios</label>
+                <input 
+                  type="text" 
+                  name="beneficiarios"
+                  value={formData.beneficiarios}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder="Ej: 1500 familias"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Empleos Generados</label>
+                <input 
+                  type="number" 
+                  name="empleosGenerados"
+                  value={formData.empleosGenerados || ''}
+                  onChange={handleChange}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder="Ej: 150"
+                />
+              </div>
+
+              {presupuestoData && (
+                <div className="col-span-2 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">Presupuesto y Aportes</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Aporte FNGRD</label>
+                      <input 
+                        type="number" 
+                        name="aportesFngrd"
+                        value={presupuestoData.aportesFngrd || ''}
+                        onChange={handlePresupuestoChange}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Aporte Distrito</label>
+                      <input 
+                        type="number" 
+                        name="aportesMunicipio"
+                        value={presupuestoData.aportesMunicipio || ''}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setPresupuestoData(prev => prev ? { ...prev, aportesMunicipio: val, aportesLocal: val } : prev);
+                        }}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-emerald-600"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Otros Aportes</label>
+                      <input 
+                        type="number" 
+                        name="aportesOtros"
+                        value={presupuestoData.aportesOtros || ''}
+                        onChange={handlePresupuestoChange}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-amber-600"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="bg-slate-900 p-2 rounded-xl flex flex-col justify-center text-center">
+                      <label className="block text-[8px] font-black text-slate-500 uppercase mb-0.5">Total</label>
+                      <p className="text-sm font-black text-white truncate">
+                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(presupuestoData.valorTotal || 0)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Profesionales Asignados */}
+              <div className="col-span-2 border-t border-slate-200 pt-4 mt-2">
+                <h3 className="text-md font-bold text-slate-800 mb-4">Responsables Asignados (Planta OPS)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Responsable OPS</label>
+                    <select
+                      name="responsableOpsId"
+                      value={formData.responsableOpsId || ''}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="">Seleccionar responsable...</option>
+                      {state.professionals.map(p => (
+                        <option key={p.id} value={p.id}>{p.nombre} - {p.profesion}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Apoyo Técnico</label>
+                    <select
+                      name="apoyoTecnicoId"
+                      value={formData.apoyoTecnicoId || ''}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="">Seleccionar apoyo técnico...</option>
+                      {state.professionals.map(p => (
+                        <option key={p.id} value={p.id}>{p.nombre} - {p.profesion}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Apoyo Financiero</label>
+                    <select
+                      name="apoyoFinancieroId"
+                      value={formData.apoyoFinancieroId || ''}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="">Seleccionar apoyo financiero...</option>
+                      {state.professionals.map(p => (
+                        <option key={p.id} value={p.id}>{p.nombre} - {p.profesion}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Apoyo Jurídico</label>
+                    <select
+                      name="apoyoJuridicoId"
+                      value={formData.apoyoJuridicoId || ''}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="">Seleccionar apoyo jurídico...</option>
+                      {state.professionals.map(p => (
+                        <option key={p.id} value={p.id}>{p.nombre} - {p.profesion}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-bold text-slate-700 mb-1">Objetivo General</label>
+                <textarea 
+                  name="objetivoGeneral"
+                  value={formData.objetivoGeneral}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-bold text-slate-700 mb-1">Alcance</label>
+                <textarea 
+                  name="alcance"
+                  value={formData.alcance}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              
+              <div className="col-span-2">
+                <label className="block text-sm font-bold text-slate-700 mb-1">Justificación</label>
+                <textarea 
+                  name="justificacion"
+                  value={formData.justificacion}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
             </div>
+            
           </form>
         </div>
-      </div>
 
-      <ConfirmationModal
-        isOpen={showDuplicateModal}
-        onClose={() => setShowDuplicateModal(false)}
-        onConfirm={confirmSubmit}
-        title="Contrato Duplicado Detectado"
-        message="Ya existe un contrato con este número. ¿Deseas crearlo de todas formas?"
-        confirmLabel="Sí, crear duplicado"
-        cancelLabel="No, cancelar"
-      />
+        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+          <button 
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+          >
+            Cancelar
+          </button>
+          <button 
+            type="submit"
+            form="edit-project-form"
+            className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-2"
+          >
+            <Save size={16} />
+            Guardar Cambios
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
