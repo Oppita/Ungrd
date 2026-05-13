@@ -928,10 +928,18 @@ const SurveyBuilder: React.FC<{
   });
 
   const [questions, setQuestions] = useState<SurveyQuestion[]>(initialSurvey?.questions || [
-    { id: 'q-poverty-1', text: '¿Cuál es el ingreso mensual aproximado de su hogar?', type: 'select', options: ['Menos de 1 Salario Mínimo', '1 - 2 Salarios Mínimos', 'Más de 2 Salarios Mínimos'], required: true, category: 'Condiciones Socioeconómicas' },
-    { id: 'q-poverty-2', text: '¿En el último mes, han tenido dificultades para acceder a tres comidas diarias?', type: 'boolean', required: true, category: 'Condiciones Socioeconómicas' },
-    { id: 'q-occup-1', text: '¿Cuánto tiempo lleva residiendo en este predio?', type: 'number', required: true, category: 'Ocupación del Territorio' },
-    { id: 'q-risk-1', text: '¿Su vivienda se ha inundado en los últimos 2 años?', type: 'boolean', required: true, category: 'Exposición al Riesgo' }
+    { id: 'q-cons-1', text: '¿Otorga consentimiento informado?', type: 'boolean', options: ['Sí, otorgo consentimiento — continuar', 'No otorgo consentimiento — detener el instrumento'], required: true, category: 'Identificación territorial' },
+    { id: 'q-org-1', text: 'Datos de la organización: Nombre', type: 'text', required: true, category: 'Organización' },
+    { id: 'q-org-2', text: 'Año de conformación', type: 'number', required: false, category: 'Organización' },
+    { id: 'q-org-3', text: 'Personería jurídica', type: 'boolean', options: ['Sí', 'No'], required: false, category: 'Organización' },
+    { id: 'q-pop-1', text: 'Composición de la población vinculada a la organización', type: 'matrix', rows: ['Infancia', 'Jóvenes', 'Adultos', 'TOTAL'], columns: ['Mujeres', 'Hombres', 'Otros', 'Total'], required: true, category: 'Organización' },
+    { id: 'q-pop-2', text: 'Número de personas con discapacidad', type: 'number', required: true, category: 'Organización', tags: ['Sector Igualdad y Equidad (ICBF) + Salud'] },
+    { id: 'q-eth-1', text: '13. Pertenencia étnica y poblacional', type: 'multiple', options: ['Campesinado', 'Comunidad indígena', 'Comunidad afrocolombiana, negra, raizal o palenquera', 'Pueblo Rrom (gitano)', 'Pescadores artesanales', 'Productores agropecuarios', 'Comerciantes', 'Población migrante extranjera', 'Población víctima de desplazamiento forzado', 'Población reasentada'], required: true, category: 'Población', tags: ['Enfoque diferencial transversal'] },
+    { id: 'q-geo-1', text: '14. Tipo de área geográfica donde se asienta la comunidad', type: 'multiple', options: ['Marino-costero', 'Ciénagas, humedales o playones', 'Áreas planas — playones de río', 'Laderas de pendiente moderada', 'Colinas suaves', 'Llanura aluvial', 'Zona urbana consolidada', 'Borde periurbano'], required: true, category: 'Territorio', tags: ['Sector Ambiente + Vivienda + UNGRD-SRR'] },
+    { id: 'q-pol-1', text: '24. Zonas afectadas (polígonos)', type: 'geopolygon', required: false, category: 'Afectación' },
+    { id: 'q-dyn-1', text: '17. Relación entre actividades productivas y dinámicas naturales', type: 'matrix', rows: ['Periodos normales de lluvia / verano', 'Inundaciones anuales en zonas de río', 'Crecientes rápidas de arroyos', 'Ascensos/descensos en ciénagas', 'Vientos y dinámica costera'], columns: ['Aplica', 'Beneficia', 'Habitable', 'Observación'], required: true, category: 'Afectación', tags: ['Sector Ambiente (POMCAS)'] },
+    { id: 'q-aud-1', text: '20. ¿Qué actividades, prácticas y formas de vida deben mantenerse en el territorio para vivir en armonía con las dinámicas de la naturaleza?', type: 'audio', required: false, category: 'Saberes' },
+    { id: 'q-dam-1', text: '29. Inventario cuantitativo de daños', type: 'matrix', rows: ['Predios inundados (predios)', 'Viviendas destruidas totalmente (viviendas)', 'Cultivos perdidos (hectáreas)', 'Animales perdidos (cabezas)', 'Pérdida de vidas humanas (personas)'], columns: ['Aplica', 'Cantidad'], required: true, category: 'Afectación', tags: ['Sector Vivienda + Agricultura + Salud'] }
   ]);
 
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
@@ -1187,6 +1195,11 @@ const SurveyBuilder: React.FC<{
                                 <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase border border-indigo-100">{q.category}</span>
                                 <span className="text-[9px] font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-md uppercase border border-slate-200">{q.type}</span>
                                 {q.required && <span className="text-[9px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-md uppercase border border-rose-100">Obligatoria</span>}
+                                {q.tags?.map(tag => (
+                                  <span key={tag} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md uppercase border border-emerald-100 flex items-center gap-1">
+                                    <Globe size={10} /> {tag}
+                                  </span>
+                                ))}
                                 {q.id.startsWith('q-poverty') && <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md uppercase border border-amber-100 flex items-center gap-1"><AlertTriangle size={10} /> Variable Crítica</span>}
                              </div>
                              <p className="font-black text-slate-800 text-lg mb-1">{q.text || <span className="text-slate-300 italic">Pregunta sin texto...</span>}</p>
@@ -1285,10 +1298,13 @@ const SurveyBuilder: React.FC<{
                                              className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800"
                                            >
                                               <option value="text">Texto (Abierta)</option>
-                                              <option value="number">Numérica (Escala 1-10)</option>
-                                              <option value="boolean">Booleana (Sí/No)</option>
+                                              <option value="number">Numérica (Cantidad / Escala)</option>
+                                              <option value="boolean">Booleana (Sí/No o Condición)</option>
                                               <option value="select">Selección Única</option>
                                               <option value="multiple">Selección Múltiple</option>
+                                              <option value="matrix">Matriz / Tabla de Datos</option>
+                                              <option value="geopolygon">Polígono Geográfico</option>
+                                              <option value="audio">Audio (Respuesta Abierta Hablada)</option>
                                            </select>
                                         </div>
                                         <div>
@@ -1350,6 +1366,49 @@ const SurveyBuilder: React.FC<{
                                           </div>
                                        </div>
                                      )}
+
+                                     {q.type === 'matrix' && (
+                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                          <div>
+                                            <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Filas (Separadas por Coma)</label>
+                                            <textarea 
+                                              value={q.rows?.join(', ') || ''}
+                                              onChange={(e) => {
+                                                const rows = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                                                setQuestions(questions.map(item => item.id === q.id ? {...item, rows} : item));
+                                              }}
+                                              className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800 resize-none h-24"
+                                              placeholder="Fila 1, Fila 2"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Columnas (Separadas por Coma)</label>
+                                            <textarea 
+                                              value={q.columns?.join(', ') || ''}
+                                              onChange={(e) => {
+                                                const columns = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                                                setQuestions(questions.map(item => item.id === q.id ? {...item, columns} : item));
+                                              }}
+                                              className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800 resize-none h-24"
+                                              placeholder="Columna 1, Columna 2"
+                                            />
+                                          </div>
+                                       </div>
+                                     )}
+
+                                     <div>
+                                        <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Etiquetas PRT / Metadatos (Separadas por Coma)</label>
+                                        <input 
+                                          type="text" 
+                                          value={q.tags?.join(', ') || ''}
+                                          onChange={(e) => {
+                                            const tags = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                                            setQuestions(questions.map(item => item.id === q.id ? {...item, tags} : item));
+                                          }}
+                                          className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3 text-sm font-medium text-slate-700"
+                                          placeholder="Sector Ambiente, Sector Vivienda, etc..."
+                                        />
+                                     </div>
 
                                      <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[32px]">
                                         <div className="flex items-center gap-3">
@@ -2080,6 +2139,99 @@ const SurveyTaker: React.FC<{
                                    )}
                                 </div>
                               )}
+
+                              {q.type === 'matrix' && (
+                                <div className="overflow-x-auto border border-slate-100 rounded-xl bg-slate-50 p-2">
+                                  <table className="w-full text-left border-collapse text-[10px]">
+                                    <thead>
+                                      <tr className="border-b border-slate-200">
+                                        <th className="p-1 font-black text-slate-400">Var</th>
+                                        {q.columns?.map(col => (
+                                          <th key={col} className="p-1 font-black text-slate-400 text-center">{col}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {q.rows?.map(row => (
+                                        <tr key={row} className="border-b border-white hover:bg-white/50">
+                                          <td className="p-1 font-bold text-slate-700 truncate max-w-[80px]" title={row}>{row}</td>
+                                          {q.columns?.map(col => (
+                                            <td key={col} className="p-1 text-center align-middle">
+                                              {col.toLowerCase().includes('aplica') || col.toLowerCase().includes('sí/no') ? (
+                                                <input 
+                                                  type="checkbox" 
+                                                  checked={(currentAnswer && currentAnswer[row] && currentAnswer[row][col]) || false}
+                                                  onChange={(e) => {
+                                                    const currentMat = currentAnswer || {};
+                                                    const currentRow = currentMat[row] || {};
+                                                    updateAnswer(q.id, {
+                                                      ...currentMat,
+                                                      [row]: { ...currentRow, [col]: e.target.checked }
+                                                    }, rIdx);
+                                                  }}
+                                                  className="w-3 h-3 rounded-sm border-slate-300"
+                                                />
+                                              ) : (
+                                                <input 
+                                                  type={col.toLowerCase().includes('cantidad') || col.toLowerCase().includes('número') || col.toLowerCase().includes('total') ? 'number' : 'text'}
+                                                  value={(currentAnswer && currentAnswer[row] && currentAnswer[row][col]) || ''}
+                                                  onChange={(e) => {
+                                                    const currentMat = currentAnswer || {};
+                                                    const currentRow = currentMat[row] || {};
+                                                    updateAnswer(q.id, {
+                                                      ...currentMat,
+                                                      [row]: { ...currentRow, [col]: e.target.value }
+                                                    }, rIdx);
+                                                  }}
+                                                  className="w-[40px] bg-white border border-slate-200 rounded px-1 py-0.5 text-[9px] outline-none text-center"
+                                                />
+                                              )}
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+
+                              {q.type === 'audio' && (
+                                <div className="flex gap-2 items-center">
+                                  {currentAnswer ? (
+                                    <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg w-full">
+                                      <Play size={10} className="text-emerald-500" />
+                                      <span className="text-[9px] font-bold text-emerald-700 flex-1">Audio guardado</span>
+                                      <button onClick={() => updateAnswer(q.id, null, rIdx)} className="text-emerald-400 hover:text-emerald-600"><X size={12}/></button>
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      onClick={() => updateAnswer(q.id, { type: 'audio', url: 'blob:fake' }, rIdx)}
+                                      className="flex justify-center w-full px-3 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors"
+                                    >
+                                      <Mic size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {q.type === 'geopolygon' && (
+                                <div className="flex gap-2 items-center">
+                                  {currentAnswer ? (
+                                    <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg w-full">
+                                      <MapPin size={10} className="text-emerald-500" />
+                                      <span className="text-[9px] font-bold text-emerald-700 flex-1">Polígono</span>
+                                      <button onClick={() => updateAnswer(q.id, null, rIdx)} className="text-emerald-400 hover:text-emerald-600"><X size={12}/></button>
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      onClick={() => updateAnswer(q.id, { type: 'polygon', area: '1ha' }, rIdx)}
+                                      className="flex justify-center w-full px-3 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors"
+                                    >
+                                      <Map size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -2155,6 +2307,164 @@ const SurveyTaker: React.FC<{
                             {opt}
                           </button>
                         ))}
+                      </div>
+                    )}
+
+                    {q.type === 'matrix' && (
+                      <div className="overflow-x-auto border-2 border-slate-100 rounded-2xl bg-white shadow-sm">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b-2 border-slate-100">
+                              <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">Variable / Condición</th>
+                              {q.columns?.map(col => (
+                                <th key={col} className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-center">{col}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {q.rows?.map((row, rIdx) => (
+                              <tr key={row} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4 text-sm font-bold text-slate-700 min-w-[200px]">{row}</td>
+                                {q.columns?.map((col, cIdx) => (
+                                  <td key={col} className="p-2 text-center align-middle">
+                                    {col.toLowerCase().includes('aplica') || col.toLowerCase().includes('sí/no') ? (
+                                      <input 
+                                        type="checkbox" 
+                                        checked={(answers[q.id] && answers[q.id][row] && answers[q.id][row][col]) || false}
+                                        onChange={(e) => {
+                                          const currentMat = answers[q.id] || {};
+                                          const currentRow = currentMat[row] || {};
+                                          updateAnswer(q.id, {
+                                            ...currentMat,
+                                            [row]: { ...currentRow, [col]: e.target.checked }
+                                          });
+                                        }}
+                                        className="w-6 h-6 rounded-md border-2 border-slate-200 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                      />
+                                    ) : (
+                                      <input 
+                                        type={col.toLowerCase().includes('cantidad') || col.toLowerCase().includes('número') || col.toLowerCase().includes('total') ? 'number' : 'text'}
+                                        value={(answers[q.id] && answers[q.id][row] && answers[q.id][row][col]) || ''}
+                                        onChange={(e) => {
+                                          const currentMat = answers[q.id] || {};
+                                          const currentRow = currentMat[row] || {};
+                                          updateAnswer(q.id, {
+                                            ...currentMat,
+                                            [row]: { ...currentRow, [col]: e.target.value }
+                                          });
+                                        }}
+                                        className="w-full bg-slate-100/50 border-2 border-transparent focus:bg-white focus:border-indigo-200 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 outline-none transition-all placeholder:text-slate-300"
+                                        placeholder="..."
+                                      />
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {q.type === 'audio' && (
+                      <div className="flex flex-col gap-4 items-start p-6 bg-slate-50 rounded-3xl border-2 border-slate-100">
+                         {answers[q.id] ? (
+                           <div className="flex items-center gap-4 w-full bg-white p-4 rounded-2xl shadow-sm border border-emerald-100">
+                             <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 shrink-0">
+                               <Play size={20} className="ml-1" />
+                             </div>
+                             <div className="flex-1">
+                               <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                 <div className="h-full bg-emerald-400 w-1/3 rounded-full"></div>
+                               </div>
+                               <div className="flex justify-between mt-2">
+                                 <span className="text-[10px] font-bold text-slate-400">0:00</span>
+                                 <span className="text-[10px] font-bold text-slate-400 text-right">Grabación adjunta (simulada)</span>
+                               </div>
+                             </div>
+                             <button
+                               onClick={() => updateAnswer(q.id, null)}
+                               className="w-10 h-10 shrink-0 flex items-center justify-center text-rose-400 hover:bg-rose-50 rounded-xl transition-colors"
+                               title="Eliminar Audio"
+                             >
+                                <Trash2 size={16} />
+                             </button>
+                           </div>
+                         ) : (
+                           <button 
+                             onClick={() => {
+                               // Simulate audio recording completion
+                               updateAnswer(q.id, {
+                                 type: 'audio',
+                                 url: 'blob:simulated-audio-1234',
+                                 duration: 124,
+                                 transcription: 'Audio pendiente de carga...'
+                               });
+                             }}
+                             className="w-full py-8 border-2 border-dashed border-indigo-200 rounded-2xl flex flex-col items-center justify-center gap-3 text-indigo-500 hover:bg-indigo-50 transition-all group"
+                           >
+                              <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shadow-indigo-100">
+                                <Mic size={28} />
+                              </div>
+                              <div>
+                                <h4 className="font-black uppercase tracking-widest text-sm text-slate-700">Comenzar Grabación</h4>
+                                <p className="text-xs text-slate-400 font-medium mt-1">Máx. 3 minutos. Presione para iniciar.</p>
+                              </div>
+                           </button>
+                         )}
+                      </div>
+                    )}
+
+                    {q.type === 'geopolygon' && (
+                      <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-3xl space-y-4">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h4 className="font-bold text-slate-700">Herramienta Cartográfica</h4>
+                            <p className="text-xs text-slate-400 font-medium">Trace el polígono aproximado del área en el dispositivo</p>
+                          </div>
+                          {answers[q.id] && (
+                            <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                              <CheckCircle2 size={12} />
+                              Área Capturada
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="w-full aspect-[21/9] bg-slate-200 rounded-2xl relative overflow-hidden border-2 border-slate-300">
+                           {/* Placeholder map layer */}
+                           <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at center, #64748b 2px, transparent 2px)', backgroundSize: '16px 16px' }}></div>
+                           
+                           {answers[q.id] ? (
+                             <div className="absolute inset-0 flex items-center justify-center">
+                               {/* Simulated polygon overlay */}
+                               <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                  <polygon points="20,80 40,30 70,40 80,90 40,95" fill="rgba(99, 102, 241, 0.4)" stroke="#4f46e5" strokeWidth="2" strokeDasharray="4 2" />
+                               </svg>
+                               <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-slate-100 flex gap-2">
+                                  <button onClick={() => updateAnswer(q.id, null)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 rounded-lg" title="Borrar">
+                                    <Trash2 size={16} />
+                                  </button>
+                               </div>
+                             </div>
+                           ) : (
+                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                                <Map size={48} className="text-slate-400" />
+                                <button 
+                                  onClick={() => {
+                                    updateAnswer(q.id, {
+                                      type: 'polygon',
+                                      area: '14.5 ha',
+                                      points: [[-74.0, 4.5], [-74.1, 4.6], [-74.05, 4.7]]
+                                    });
+                                  }}
+                                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                                >
+                                  <Plus size={16} />
+                                  Trazar Polígono
+                                </button>
+                             </div>
+                           )}
+                        </div>
                       </div>
                     )}
                   </>
