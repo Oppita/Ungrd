@@ -110,8 +110,18 @@ const generateContentWithProvider = async (
         })
       });
       
+      const contentType = response.headers.get('content-type');
       if (!response.ok) {
-        throw new Error(await response.text());
+        const errorText = await response.text();
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.error || errorJson.message || errorText);
+          } catch (e) {
+            throw new Error(errorText);
+          }
+        }
+        throw new Error(`Groq Server Error (${response.status}): ${errorText.substring(0, 100)}`);
       }
       
       const data = await response.json();
@@ -142,12 +152,21 @@ const generateContentWithProvider = async (
         })
       });
       
+      const contentType = response.headers.get('content-type');
       if (!response.ok) {
         const errorText = await response.text();
         if (errorText.includes('402') || errorText.includes('credits')) {
           throw new Error("CREDITS_EXHAUSTED: No hay créditos disponibles en OpenRouter.");
         }
-        throw new Error(errorText);
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.error || errorJson.message || errorText);
+          } catch (e) {
+            throw new Error(errorText);
+          }
+        }
+        throw new Error(`OpenRouter Server Error (${response.status}): ${errorText.substring(0, 100)}`);
       }
       
       const data = await response.json();
@@ -166,11 +185,28 @@ const generateContentWithProvider = async (
         })
       });
       
+      const contentType = response.headers.get('content-type');
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText);
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.error || errorJson.message || errorText);
+          } catch (e) {
+            throw new Error(errorText);
+          }
+        }
+        throw new Error(`Server Error (${response.status}): ${errorText.substring(0, 100)}`);
       }
       
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        if (text.trim().startsWith('<!doctype html') || text.trim().startsWith('<html')) {
+          throw new Error('SERVER_CONFIGURATION_ERROR: El servidor devolvió una página HTML en lugar de JSON. Esto suele suceder si la ruta de la API (/api/gemini) no está correctamente mapeada o si el servidor se está reiniciando.');
+        }
+        throw new Error(`Unexpected response type: ${contentType}`);
+      }
+
       const data = await response.json();
       return data.content;
     }
