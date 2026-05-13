@@ -2197,7 +2197,7 @@ export const FinancialExecutionModule: React.FC<
                         </label>
                         <textarea
                           className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm h-20"
-                          value={previewDoc.descripcion}
+                          value={previewDoc.descripcion ?? ""}
                           onChange={(e) =>
                             setPreviewDoc({
                               ...previewDoc,
