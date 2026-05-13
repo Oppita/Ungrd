@@ -446,7 +446,7 @@ export const ActivitiesManager: React.FC = () => {
                 <textarea
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
                   rows={3}
-                  value={formData.description}
+                  value={formData.description ?? ""}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   placeholder="Detalles de la actividad..."
                 />
