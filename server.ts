@@ -2,58 +2,34 @@ import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
 import { createRequire } from 'module';
-import { GoogleGenAI, Type } from '@google/genai';
-import path from 'path';
-import fs from 'fs';
-import OpenAI from 'openai';
-import { createServer as createViteServer } from 'vite';
-
 const require = createRequire(import.meta.url);
 const pdf = require('pdf-parse');
+import { GoogleGenAI } from '@google/genai';
+import path from 'path';
+import fs from 'fs';
 
 const app = express();
-
-// Increase payload limits for large PDFs and base64
-app.use(express.json({ limit: '60mb' }));
-app.use(express.urlencoded({ limit: '60mb', extended: true }));
-
-// Log all API requests
-app.use('/api', (req, res, next) => {
-  console.log(`[API ${req.method}] ${req.url}`, {
-    hasBody: !!req.body && Object.keys(req.body).length > 0,
-    contentType: req.headers['content-type']
-  });
-  next();
-});
-
-// Ensure uploads directory exists
-const uploadsDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
 const upload = multer({ dest: 'uploads/' });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Crear directorio de uploads si no existe
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads', { recursive: true });
+}
 
-// Middleware for logging requests
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // API Proxy for Groq
-app.post('/api/groq', async (req, res) => {
-  try {
-    const { messages, model } = req.body;
-    
-    if (!process.env.GROQ_API_KEY) {
-      return res.status(500).json({ error: 'GROQ_API_KEY is not configured' });
-    }
+import OpenAI from 'openai';
 
+app.post('/api/groq', async (req, res) => {
+  const { messages, model } = req.body;
+  
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ error: 'GROQ_API_KEY is not configured' });
+  }
+
+  try {
     const openai = new OpenAI({
       apiKey: process.env.GROQ_API_KEY,
       baseURL: 'https://api.groq.com/openai/v1',
@@ -74,16 +50,16 @@ app.post('/api/groq', async (req, res) => {
 
 // API Proxy for OpenRouter
 app.post('/api/openrouter', async (req, res) => {
-  try {
-    const { messages, model, config } = req.body;
-    
-    if (!process.env.OPENROUTER_API_KEY) {
-      return res.status(500).json({ error: 'OPENROUTER_API_KEY is not configured' });
-    }
+  const { messages, model, config } = req.body;
+  
+  if (!process.env.OPENROUTER_API_KEY) {
+    return res.status(500).json({ error: 'OPENROUTER_API_KEY is not configured' });
+  }
 
+  try {
     const completionParams: any = {
       messages,
-      model: model || 'google/gemini-2.0-flash-001',
+      model: model || 'gemini-3-flash-preview',
       provider: {
         require_parameters: true,
         data_collection: "allow",
@@ -106,7 +82,7 @@ app.post('/api/openrouter', async (req, res) => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://ungrd-app.com',
+        'HTTP-Referer': 'https://ungrd.onrender.com',
         'X-Title': 'UNGRD App',
         'Content-Type': 'application/json'
       },
@@ -119,14 +95,12 @@ app.post('/api/openrouter', async (req, res) => {
       let errorMsg = errorText;
       try {
         const parsed = JSON.parse(errorText);
-        if (parsed.error && parsed.error.message) {
+        if (parsed.error?.message) {
           errorMsg = parsed.error.message;
         } else if (parsed.error) {
           errorMsg = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
         }
-      } catch (e) {
-        // Ignore
-      }
+      } catch (e) {}
       return res.status(response.status).json({ error: errorMsg });
     }
 
@@ -134,6 +108,7 @@ app.post('/api/openrouter', async (req, res) => {
     const content = completion.choices?.[0]?.message?.content;
 
     if (content == null) {
+      console.error('OpenRouter returned null content:', completion);
       return res.status(500).json({ error: 'El modelo no devolvió ningún contenido.' });
     }
 
@@ -148,16 +123,26 @@ app.post('/api/openrouter', async (req, res) => {
 let ai: GoogleGenAI | null = null;
 function getAiClient() {
   if (!ai) {
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-    const isPlaceholder = (k: string | undefined) => 
+    const geminiKey = process.env.GEMINI_API_KEY || '';
+    const genericKey = process.env.API_KEY || '';
+    
+    const isPlaceholder = (k: string) => 
       !k || k === 'MY_GEMINI_API_KEY' || k === '' || k.includes('YOUR_API_KEY');
 
-    if (isPlaceholder(geminiKey)) {
-      console.warn('GEMINI_API_KEY is not set or is a placeholder.');
+    let apiKey = '';
+    if (!isPlaceholder(geminiKey)) {
+      apiKey = geminiKey;
+    } else if (!isPlaceholder(genericKey)) {
+      apiKey = genericKey;
+    }
+
+    if (!apiKey) {
+      console.warn('⚠️ GEMINI_API_KEY no configurada. Gemini desactivado.');
       return null;
     }
 
-    const cleanKey = geminiKey.trim().replace(/^["']|["']$/g, '');
+    const cleanKey = apiKey.trim().replace(/^["']|["']$/g, '');
+    console.log(`Inicializando cliente Gemini con key: ${cleanKey.substring(0, 4)}... (len: ${cleanKey.length})`);
     ai = new GoogleGenAI({ apiKey: cleanKey });
   }
   return ai;
@@ -174,58 +159,90 @@ app.get('/api/providers', (req, res) => {
   });
 });
 
-app.post('/api/gemini', async (req, res) => {
-  try {
-    const { prompt, model, config, extraParts } = req.body;
-    
-    const aiClient = getAiClient();
-    if (!aiClient) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY_MISSING' });
-    }
+app.get('/api/debug-env', (req, res) => {
+  res.json({
+    geminiKeyConfigured: !!process.env.GEMINI_API_KEY,
+    geminiKeyLength: process.env.GEMINI_API_KEY?.length || 0,
+    groqKeyConfigured: !!process.env.GROQ_API_KEY,
+    openRouterKeyConfigured: !!process.env.OPENROUTER_API_KEY,
+    nodeEnv: process.env.NODE_ENV,
+    port: process.env.PORT || 10000,
+  });
+});
 
-    const targetModel = model || 'gemini-1.5-flash';
+// ✅ FIX: targetModel declarado FUERA del try para que sea accesible en catch
+app.post('/api/gemini', async (req, res) => {
+  const { prompt, model, config, extraParts } = req.body;
+  
+  const aiClient = getAiClient();
+  if (!aiClient) {
+    return res.status(500).json({ 
+      error: 'API_KEY_INVALID: No se configuró GEMINI_API_KEY en las variables de entorno de Render.' 
+    });
+  }
+
+  // ✅ DECLARADO FUERA DEL TRY — accesible en catch
+  const targetModel = model || 'gemini-1.5-flash';
+
+  try {
     const contents: any[] = [{ parts: [{ text: prompt }] }];
     if (extraParts && Array.isArray(extraParts)) {
       contents[0].parts.push(...extraParts);
     }
 
-    console.log(`[AI] Calling Gemini: ${targetModel}`);
+    console.log(`Llamando modelo Gemini: ${targetModel}`);
     const response = await aiClient.models.generateContent({
       model: targetModel,
-      contents: [{ parts: [{ text: prompt }] }],
-      config: config
+      contents: contents,
+      config: config,
     });
 
-    if (extraParts && Array.isArray(extraParts)) {
-      // If the SDK supports multiple parts in contents, we might need to adjust
-      // But based on diagnostic, let's keep it simple first or try to follow the structure
-    }
+    console.log('Respuesta Gemini recibida. Longitud:', response.text?.length || 0);
+    res.json({ content: response.text || "" });
 
-    const content = response.text || "";
-    console.log(`[AI] Gemini success. Length: ${content.length}`);
-    res.json({ content });
-  } catch (error: any) {
-    console.error('[AI] Gemini error:', error);
-    const errorMessage = error?.message || 'Failed to call Gemini API';
-    res.status(500).json({ error: errorMessage });
+  } catch (err: any) {
+    const errorMessage = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+    console.error(`Error en modelo ${targetModel}:`, errorMessage);
+    
+    // Retry con modelo alternativo si el principal falla por sobrecarga
+    if (
+      (targetModel === 'gemini-1.5-flash' || !model) && 
+      (errorMessage.includes('503') || errorMessage.includes('UNAVAILABLE') || 
+       errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED'))
+    ) {
+      console.warn(`Modelo ${targetModel} sobrecargado. Intentando con gemini-1.5-pro...`);
+      try {
+        const fallbackResponse = await aiClient.models.generateContent({
+          model: 'gemini-1.5-pro',
+          contents: [{ parts: [{ text: prompt }] }],
+          config: config,
+        });
+        return res.json({ content: fallbackResponse.text || "" });
+      } catch (fallbackErr: any) {
+        console.error('Fallback también falló:', fallbackErr.message);
+      }
+    }
+    
+    res.status(err?.status || 500).json({ error: errorMessage });
   }
 });
 
 app.post('/api/process-pot', upload.single('pot'), async (req: any, res: any) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+  if (!req.file) return res.status(400).send('No file uploaded.');
 
+  try {
     const dataBuffer = fs.readFileSync(req.file.path);
     const data = await pdf(dataBuffer);
     const text = data.text.substring(0, 30000);
 
-    // Clean up file immediately
-    try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+    fs.unlinkSync(req.file.path);
 
     const aiClient = getAiClient();
-    if (!aiClient) return res.status(500).json({ error: 'Gemini API not configured' });
+    if (!aiClient) {
+      return res.status(500).json({ error: 'Gemini API not configured' });
+    }
 
-    const prompt = `Extrae la siguiente información del texto del POT y responde en formato JSON:
+    const prompt = `Extrae la siguiente información del texto del Plan de Ordenamiento Territorial (POT) y responde en formato JSON:
     {
       "landUseZones": [{"name": "string", "type": "string", "restrictions": ["string"]}],
       "riskZones": [{"name": "string", "level": "string"}]
@@ -233,39 +250,65 @@ app.post('/api/process-pot', upload.single('pot'), async (req: any, res: any) =>
     
     Texto:\n\n${text}`;
 
-    const response = await aiClient.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      config: { responseMimeType: 'application/json' }
-    });
+    let response;
+    let retries = 3;
+    let delay = 2000;
+    
+    while (retries > 0) {
+      try {
+        response = await aiClient.models.generateContent({
+          model: 'gemini-1.5-flash',
+          contents: [{ parts: [{ text: prompt }] }],
+          config: { responseMimeType: 'application/json' }
+        });
+        break;
+      } catch (err: any) {
+        const errorMessage = err?.message || JSON.stringify(err);
+        const isRetryable = errorMessage.includes('429') || 
+          errorMessage.includes('RESOURCE_EXHAUSTED') || 
+          errorMessage.includes('503') || 
+          errorMessage.includes('UNAVAILABLE');
+        
+        if (isRetryable && retries > 1) {
+          console.warn(`Gemini sobrecargado en process-pot, reintentando... (${retries - 1} restantes)`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2;
+          retries--;
+        } else {
+          throw err;
+        }
+      }
+    }
 
-    res.json(JSON.parse(response.text || '{}'));
-  } catch (error: any) {
-    console.error('Process POT error:', error);
-    res.status(500).json({ error: error?.message || 'Error processing PDF.' });
+    if (!response) throw new Error("Fallo tras reintentos");
+
+    const result = JSON.parse(response.text || '{}');
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error procesando PDF.');
   }
 });
 
 app.post('/api/extract-pdf-text', upload.single('file'), async (req: any, res: any) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+  if (!req.file) return res.status(400).send('No file uploaded.');
 
+  try {
     const dataBuffer = fs.readFileSync(req.file.path);
     const data = await pdf(dataBuffer);
-    const text = data.text;
-
-    try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
-    res.json({ text });
-  } catch (error: any) {
-    console.error('Extract PDF error:', error);
-    res.status(500).json({ error: error?.message || 'Error extracting text from PDF.' });
+    fs.unlinkSync(req.file.path);
+    res.json({ text: data.text });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error extrayendo texto del PDF.');
   }
 });
 
+// Vite / Static setup
+import { createServer as createViteServer } from 'vite';
+
 async function startServer() {
-  const isProd = process.env.NODE_ENV === 'production';
-  
-  if (!isProd) {
+  if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -274,23 +317,22 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      const indexPath = path.join(distPath, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(404).send('Build not found. Run npm run build.');
-      }
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  const port = 3000;
+  // ✅ Render usa PORT env var (10000 por defecto)
+  const port = parseInt(process.env.PORT || '10000', 10);
   app.listen(port, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${port} [${isProd ? 'PROD' : 'DEV'}]`);
+    console.log(`🚀 Server running on port ${port}`);
+    console.log(`📁 Uploads directory: ${path.join(process.cwd(), 'uploads')}`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 Supabase URL: ${process.env.VITE_SUPABASE_URL ? '✅ Configurado' : '❌ No configurado'}`);
+    console.log(`🤖 Gemini: ${process.env.GEMINI_API_KEY ? '✅ Configurado' : '❌ No configurado'}`);
+    console.log(`🤖 Groq: ${process.env.GROQ_API_KEY ? '✅ Configurado' : '❌ No configurado'}`);
+    console.log(`🤖 OpenRouter: ${process.env.OPENROUTER_API_KEY ? '✅ Configurado' : '❌ No configurado'}`);
   });
 }
 
-startServer().catch(err => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+startServer();
