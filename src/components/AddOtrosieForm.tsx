@@ -29,6 +29,10 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
     justificacionTecnica: '',
     justificacionJuridica: '',
     valorAdicional: 0,
+    aporteDistrito: 0,
+    aporteGobernacion: 0,
+    aporteMunicipio: 0,
+    aporteFondo: 0,
     aportesFngrd: 0,
     aportesLocal: 0,
     aportesOtros: 0,
@@ -50,32 +54,43 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
     descripcion: '',
     fecha: new Date().toISOString().split('T')[0],
     valor: 0,
+    aporteDistrito: 0,
+    aporteGobernacion: 0,
+    aporteMunicipio: 0,
+    aporteFondo: 0,
     aportesFngrd: 0,
     aportesLocal: 0,
     aportesOtros: 0,
   });
 
-  // Dynamic value calculation for Otrosie
   React.useEffect(() => {
     const total = (Number(otrosie.aportesFngrd) || 0) + 
+                  (Number(otrosie.aporteDistrito) || 0) +
+                  (Number(otrosie.aporteGobernacion) || 0) +
+                  (Number(otrosie.aporteMunicipio) || 0) +
+                  (Number(otrosie.aporteFondo) || 0) +
                   (Number(otrosie.aportesLocal) || 0) + 
                   (Number(otrosie.aportesOtros) || 0);
     
     if (total > 0 && total !== otrosie.valorAdicional) {
       setOtrosie(prev => ({ ...prev, valorAdicional: total }));
     }
-  }, [otrosie.aportesFngrd, otrosie.aportesLocal, otrosie.aportesOtros]);
+  }, [otrosie.aportesFngrd, otrosie.aporteDistrito, otrosie.aporteGobernacion, otrosie.aporteMunicipio, otrosie.aporteFondo, otrosie.aportesLocal, otrosie.aportesOtros]);
 
   // Dynamic value calculation for Afectacion
   React.useEffect(() => {
     const total = (Number(afectacion.aportesFngrd) || 0) + 
+                  (Number(afectacion.aporteDistrito) || 0) +
+                  (Number(afectacion.aporteGobernacion) || 0) +
+                  (Number(afectacion.aporteMunicipio) || 0) +
+                  (Number(afectacion.aporteFondo) || 0) +
                   (Number(afectacion.aportesLocal) || 0) + 
                   (Number(afectacion.aportesOtros) || 0);
     
     if (total > 0 && total !== afectacion.valor) {
       setAfectacion(prev => ({ ...prev, valor: total }));
     }
-  }, [afectacion.aportesFngrd, afectacion.aportesLocal, afectacion.aportesOtros]);
+  }, [afectacion.aportesFngrd, afectacion.aporteDistrito, afectacion.aporteGobernacion, afectacion.aporteMunicipio, afectacion.aporteFondo, afectacion.aportesLocal, afectacion.aportesOtros]);
 
   const [actaInicio, setActaInicio] = useState<Partial<ActaInicioData>>({
     numero: '',
@@ -152,6 +167,10 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
           "justificacionTecnica": "string",
           "justificacionJuridica": "string",
           "valorAdicional": number,
+          "aporteDistrito": number,
+          "aporteGobernacion": number,
+          "aporteMunicipio": number,
+          "aporteFondo": number,
           "aportesFngrd": number,
           "aportesLocal": number,
           "aportesOtros": number,
@@ -193,6 +212,10 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
           "numero": "string",
           "tipo": "Adición" | "Reducción" | "Liberación" | "Pago" | "Otro",
           "valor": number,
+          "aporteDistrito": number,
+          "aporteGobernacion": number,
+          "aporteMunicipio": number,
+          "aporteFondo": number,
           "aportesFngrd": number,
           "aportesLocal": number,
           "aportesOtros": number,
@@ -751,7 +774,7 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
               <span className="text-indigo-700 font-semibold mb-2 block">O ingresar texto manualmente</span>
               <textarea 
                 rows={4} 
-                value={manualText} 
+                value={manualText ?? ""} 
                 onChange={e => setManualText(e.target.value)} 
                 className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                 placeholder={`Pegue aquí el texto del ${formType}...`}
@@ -787,7 +810,7 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Número de Otrosí</span>
-                    <input value={otrosie.numero} onChange={e => setOtrosie(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <input value={otrosie.numero ?? ""} onChange={e => setOtrosie(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Fecha de Firma</span>
@@ -797,26 +820,38 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                 <div className="space-y-4">
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Valor Adicional (COP)</span>
-                    <input type="number" value={otrosie.valorAdicional} onChange={e => setOtrosie(prev => ({...prev, valorAdicional: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600" />
+                    <input type="number" value={otrosie.valorAdicional ?? 0} onChange={e => setOtrosie(prev => ({...prev, valorAdicional: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600" />
                   </label>
-                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <label className="block">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte FNGRD</span>
-                      <input type="number" value={otrosie.aportesFngrd || ''} onChange={e => setOtrosie(prev => ({...prev, aportesFngrd: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
-                    </label>
-                    <label className="block">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Local</span>
-                      <input type="number" value={otrosie.aportesLocal || ''} onChange={e => setOtrosie(prev => ({...prev, aportesLocal: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
-                    </label>
-                    <label className="block">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Otros</span>
-                      <input type="number" value={otrosie.aportesOtros || ''} onChange={e => setOtrosie(prev => ({...prev, aportesOtros: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
-                    </label>
-                  </div>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <label className="block">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte FNGRD</span>
+                <input type="number" value={otrosie.aportesFngrd ?? ""} onChange={e => setOtrosie(prev => ({...prev, aportesFngrd: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Distrito</span>
+                <input type="number" value={otrosie.aporteDistrito ?? ""} onChange={e => setOtrosie(prev => ({...prev, aporteDistrito: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs font-bold text-blue-600" />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Gob.</span>
+                <input type="number" value={otrosie.aporteGobernacion ?? ""} onChange={e => setOtrosie(prev => ({...prev, aporteGobernacion: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Mun.</span>
+                <input type="number" value={otrosie.aporteMunicipio ?? ""} onChange={e => setOtrosie(prev => ({...prev, aporteMunicipio: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Fondo</span>
+                <input type="number" value={otrosie.aporteFondo ?? ""} onChange={e => setOtrosie(prev => ({...prev, aporteFondo: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Otros</span>
+                <input type="number" value={otrosie.aportesOtros ?? ""} onChange={e => setOtrosie(prev => ({...prev, aportesOtros: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+              </label>
+            </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="block">
                       <span className="text-sm font-semibold text-slate-700">Inicio Prórroga</span>
-                      <input type="date" value={otrosie.fechaInicioProrroga || ''} onChange={(e) => {
+                      <input type="date" value={otrosie.fechaInicioProrroga ?? ""} onChange={(e) => {
                         const d1 = e.target.value;
                         const d2 = otrosie.fechaFinProrroga || '';
                         let p = otrosie.plazoAdicionalMeses;
@@ -830,7 +865,7 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                     </label>
                     <label className="block">
                       <span className="text-sm font-semibold text-slate-700">Fin Prórroga</span>
-                      <input type="date" value={otrosie.fechaFinProrroga || ''} onChange={(e) => {
+                      <input type="date" value={otrosie.fechaFinProrroga ?? ""} onChange={(e) => {
                         const d2 = e.target.value;
                         const d1 = otrosie.fechaInicioProrroga || '';
                         let p = otrosie.plazoAdicionalMeses;
@@ -845,21 +880,21 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                   </div>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Prórroga Manual (Meses)</span>
-                    <input type="number" step="0.1" value={otrosie.plazoAdicionalMeses} onChange={e => setOtrosie(prev => ({...prev, plazoAdicionalMeses: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <input type="number" step="0.1" value={otrosie.plazoAdicionalMeses ?? 0} onChange={e => setOtrosie(prev => ({...prev, plazoAdicionalMeses: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">NIT Entidad</span>
-                    <input value={otrosie.nitEntidad} onChange={e => setOtrosie(prev => ({...prev, nitEntidad: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <input value={otrosie.nitEntidad ?? ""} onChange={e => setOtrosie(prev => ({...prev, nitEntidad: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">NIT Contratista</span>
-                    <input value={otrosie.nitContratista} onChange={e => setOtrosie(prev => ({...prev, nitContratista: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <input value={otrosie.nitContratista ?? ""} onChange={e => setOtrosie(prev => ({...prev, nitContratista: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                 </div>
               </div>
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">Objeto de la Modificación</span>
-                <textarea rows={3} value={otrosie.objeto} onChange={e => setOtrosie(prev => ({...prev, objeto: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <textarea rows={3} value={otrosie.objeto ?? ""} onChange={e => setOtrosie(prev => ({...prev, objeto: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
               </label>
             </div>
           )}
@@ -876,7 +911,7 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Número de Documento</span>
-                    <input value={afectacion.numero} onChange={e => setAfectacion(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <input value={afectacion.numero ?? ""} onChange={e => setAfectacion(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Tipo de Afectación</span>
@@ -892,20 +927,32 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                 <div className="space-y-4">
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Valor (COP)</span>
-                    <input type="number" value={afectacion.valor} onChange={e => setAfectacion(prev => ({...prev, valor: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600" />
+                    <input type="number" value={afectacion.valor ?? 0} onChange={e => setAfectacion(prev => ({...prev, valor: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600" />
                   </label>
-                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <label className="block">
                       <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte FNGRD</span>
-                      <input type="number" value={afectacion.aportesFngrd || ''} onChange={e => setAfectacion(prev => ({...prev, aportesFngrd: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+                      <input type="number" value={afectacion.aportesFngrd ?? ""} onChange={e => setAfectacion(prev => ({...prev, aportesFngrd: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
                     </label>
                     <label className="block">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Local</span>
-                      <input type="number" value={afectacion.aportesLocal || ''} onChange={e => setAfectacion(prev => ({...prev, aportesLocal: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Distrito</span>
+                      <input type="number" value={afectacion.aporteDistrito ?? ""} onChange={e => setAfectacion(prev => ({...prev, aporteDistrito: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs font-bold text-blue-600" />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Gob.</span>
+                      <input type="number" value={afectacion.aporteGobernacion ?? ""} onChange={e => setAfectacion(prev => ({...prev, aporteGobernacion: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Mun.</span>
+                      <input type="number" value={afectacion.aporteMunicipio ?? ""} onChange={e => setAfectacion(prev => ({...prev, aporteMunicipio: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Aporte Fondo</span>
+                      <input type="number" value={afectacion.aporteFondo ?? ""} onChange={e => setAfectacion(prev => ({...prev, aporteFondo: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
                     </label>
                     <label className="block">
                       <span className="text-[10px] font-bold text-slate-500 uppercase">Otros</span>
-                      <input type="number" value={afectacion.aportesOtros || ''} onChange={e => setAfectacion(prev => ({...prev, aportesOtros: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
+                      <input type="number" value={afectacion.aportesOtros ?? ""} onChange={e => setAfectacion(prev => ({...prev, aportesOtros: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-2 rounded-lg text-xs" />
                     </label>
                   </div>
                   <label className="block">
@@ -916,7 +963,7 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
               </div>
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">Descripción / Justificación</span>
-                <textarea rows={3} value={afectacion.descripcion} onChange={e => setAfectacion(prev => ({...prev, descripcion: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <textarea rows={3} value={afectacion.descripcion ?? ""} onChange={e => setAfectacion(prev => ({...prev, descripcion: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
               </label>
             </div>
           )}
@@ -933,7 +980,7 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Número de Acta</span>
-                    <input value={actaInicio.numero} onChange={e => setActaInicio(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <input value={actaInicio.numero ?? ""} onChange={e => setActaInicio(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Fecha Suscripción</span>
@@ -954,16 +1001,16 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <label className="block">
                   <span className="text-sm font-semibold text-slate-700">Valor Contrato</span>
-                  <input type="number" value={actaInicio.valorContrato} onChange={e => setActaInicio(prev => ({...prev, valorContrato: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                  <input type="number" value={actaInicio.valorContrato ?? 0} onChange={e => setActaInicio(prev => ({...prev, valorContrato: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                 </label>
                 <label className="block">
                   <span className="text-sm font-semibold text-slate-700">Valor Anticipo</span>
-                  <input type="number" value={actaInicio.valorAnticipo} onChange={e => setActaInicio(prev => ({...prev, valorAnticipo: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                  <input type="number" value={actaInicio.valorAnticipo ?? 0} onChange={e => setActaInicio(prev => ({...prev, valorAnticipo: Number(e.target.value)}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                 </label>
               </div>
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">Objeto</span>
-                <textarea rows={2} value={actaInicio.objeto} onChange={e => setActaInicio(prev => ({...prev, objeto: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <textarea rows={2} value={actaInicio.objeto ?? ""} onChange={e => setActaInicio(prev => ({...prev, objeto: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
               </label>
             </div>
           )}
@@ -979,7 +1026,7 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Número de Acta</span>
-                    <input value={actaComite.numero} onChange={e => setActaComite(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <input value={actaComite.numero ?? ""} onChange={e => setActaComite(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                 </div>
                 <div className="space-y-4">
@@ -989,13 +1036,13 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Tema Central</span>
-                    <input value={actaComite.temaCentral} onChange={e => setActaComite(prev => ({...prev, temaCentral: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <input value={actaComite.temaCentral ?? ""} onChange={e => setActaComite(prev => ({...prev, temaCentral: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                 </div>
               </div>
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">Decisiones (separadas por nueva línea)</span>
-                <textarea rows={3} value={actaComite.decisiones?.join('\n') || ''} onChange={e => setActaComite(prev => ({...prev, decisiones: e.target.value.split('\n').filter(d => d.trim())}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <textarea rows={3} value={actaComite.decisiones?.join('\n') ?? ""} onChange={e => setActaComite(prev => ({...prev, decisiones: e.target.value.split('\n').filter(d => d.trim())}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
               </label>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1074,7 +1121,7 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-slate-700">Número de Suspensión</span>
-                    <input value={suspension.numero} onChange={e => setSuspension(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    <input value={suspension.numero ?? ""} onChange={e => setSuspension(prev => ({...prev, numero: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </label>
                 </div>
                 <div className="space-y-4">
@@ -1090,11 +1137,11 @@ export const AddOtrosieForm: React.FC<AddOtrosieFormProps> = ({ contracts, onClo
               </div>
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">Motivo</span>
-                <input value={suspension.motivo} onChange={e => setSuspension(prev => ({...prev, motivo: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <input value={suspension.motivo ?? ""} onChange={e => setSuspension(prev => ({...prev, motivo: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
               </label>
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">Justificación</span>
-                <textarea rows={4} value={suspension.justificacion} onChange={e => setSuspension(prev => ({...prev, justificacion: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <textarea rows={4} value={suspension.justificacion ?? ""} onChange={e => setSuspension(prev => ({...prev, justificacion: e.target.value}))} className="w-full mt-1 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
               </label>
             </div>
           )}
