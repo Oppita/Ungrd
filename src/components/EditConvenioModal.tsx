@@ -26,17 +26,13 @@ export const EditConvenioModal: React.FC<EditConvenioModalProps> = ({ convenio: 
   // Dynamic value calculation
   useEffect(() => {
     const total = (Number(convenio.aportesFngrd) || 0) + 
-                  (Number(convenio.aporteDistrito) || 0) +
-                  (Number(convenio.aporteGobernacion) || 0) +
-                  (Number(convenio.aporteMunicipio) || 0) +
-                  (Number(convenio.aporteFondo) || 0) +
                   (Number(convenio.aportesLocal) || 0) + 
                   (Number(convenio.aportesOtros) || 0);
     
     if (total > 0 && total !== convenio.valorTotal) {
       setConvenio(prev => ({ ...prev, valorTotal: total }));
     }
-  }, [convenio.aportesFngrd, convenio.aporteDistrito, convenio.aporteGobernacion, convenio.aporteMunicipio, convenio.aporteFondo, convenio.aportesLocal, convenio.aportesOtros]);
+  }, [convenio.aportesFngrd, convenio.aportesLocal, convenio.aportesOtros]);
 
   const addFase = () => {
     const newFase: Fase = { id: `fase-${Date.now()}`, nombre: '' };
@@ -67,10 +63,6 @@ export const EditConvenioModal: React.FC<EditConvenioModalProps> = ({ convenio: 
           objeto: extracted.objetoConvenio || prev.objeto,
           partes: extracted.partesConvenio || prev.partes,
           valorTotal: extracted.valorTotalProyecto || prev.valorTotal,
-          aporteDistrito: extracted.aporteDistrito || prev.aporteDistrito,
-          aporteGobernacion: extracted.aporteGobernacion || prev.aporteGobernacion,
-          aporteMunicipio: extracted.aporteMunicipio || prev.aporteMunicipio,
-          aporteFondo: extracted.aporteFondo || prev.aporteFondo,
           valorAportadoFondo: extracted.aporteFngrdObraInterventoria || prev.valorAportadoFondo,
           valorAportadoContrapartida: extracted.aporteMunicipioGobernacionObraInterventoria || prev.valorAportadoContrapartida,
           fechaInicio: extracted.actaInicioConvenio || prev.fechaInicio,
@@ -161,7 +153,7 @@ export const EditConvenioModal: React.FC<EditConvenioModalProps> = ({ convenio: 
                 <label className="block text-sm font-bold text-slate-700 mb-1">Número de Convenio *</label>
                 <input 
                   type="text" 
-                  value={convenio.numero || ''} 
+                  value={convenio.numero} 
                   onChange={e => setConvenio({...convenio, numero: e.target.value})}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
                   required
@@ -171,7 +163,7 @@ export const EditConvenioModal: React.FC<EditConvenioModalProps> = ({ convenio: 
                 <label className="block text-sm font-bold text-slate-700 mb-1">Nombre / Título *</label>
                 <input 
                   type="text" 
-                  value={convenio.nombre || ''} 
+                  value={convenio.nombre} 
                   onChange={e => setConvenio({...convenio, nombre: e.target.value})}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
                   required
@@ -181,7 +173,7 @@ export const EditConvenioModal: React.FC<EditConvenioModalProps> = ({ convenio: 
               <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-slate-700 mb-1">Objeto del Convenio</label>
                 <textarea 
-                  value={convenio.objeto || ''} 
+                  value={convenio.objeto} 
                   onChange={e => setConvenio({...convenio, objeto: e.target.value})}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none min-h-[80px]"
                 />
@@ -191,7 +183,7 @@ export const EditConvenioModal: React.FC<EditConvenioModalProps> = ({ convenio: 
                 <label className="block text-sm font-bold text-slate-700 mb-1">Partes Involucradas</label>
                 <input 
                   type="text" 
-                  value={convenio.partes || ''} 
+                  value={convenio.partes} 
                   onChange={e => setConvenio({...convenio, partes: e.target.value})}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
                 />
@@ -200,7 +192,7 @@ export const EditConvenioModal: React.FC<EditConvenioModalProps> = ({ convenio: 
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Estado</label>
                 <select 
-                  value={convenio.estado || 'Activo'} 
+                  value={convenio.estado} 
                   onChange={e => setConvenio({...convenio, estado: e.target.value as any})}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
                 >
@@ -217,58 +209,25 @@ export const EditConvenioModal: React.FC<EditConvenioModalProps> = ({ convenio: 
                  <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">Composición Financiera Desglosada</h3>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div>
-                  <label className="block text-xs font-black text-slate-500 uppercase mb-2">Aporte FNGRD</label>
+                  <label className="block text-xs font-black text-indigo-600 uppercase mb-2">Aporte FNGRD</label>
                   <input 
                     type="number" 
                     value={convenio.aportesFngrd || ''} 
                     onChange={e => setConvenio({...convenio, aportesFngrd: Number(e.target.value)})}
-                    className="w-full p-3 bg-white border border-slate-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-black text-slate-700"
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-indigo-600 uppercase mb-2">Aporte Distrito</label>
-                  <input 
-                    type="number" 
-                    value={convenio.aporteDistrito || ''} 
-                    onChange={e => setConvenio({...convenio, aporteDistrito: Number(e.target.value)})}
                     className="w-full p-3 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-black text-indigo-700"
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-indigo-600 uppercase mb-2">Aporte Gobernación</label>
+                  <label className="block text-xs font-black text-emerald-600 uppercase mb-2">Aporte Local (Distrito)</label>
                   <input 
                     type="number" 
-                    value={convenio.aporteGobernacion || ''} 
-                    onChange={e => setConvenio({...convenio, aporteGobernacion: Number(e.target.value)})}
-                    className="w-full p-3 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-black text-indigo-700"
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-indigo-600 uppercase mb-2">Aporte Municipio</label>
-                  <input 
-                    type="number" 
-                    value={convenio.aporteMunicipio || ''} 
-                    onChange={e => setConvenio({...convenio, aporteMunicipio: Number(e.target.value)})}
-                    className="w-full p-3 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-black text-indigo-700"
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-indigo-600 uppercase mb-2">Aporte Fondo</label>
-                  <input 
-                    type="number" 
-                    value={convenio.aporteFondo || ''} 
-                    onChange={e => setConvenio({...convenio, aporteFondo: Number(e.target.value)})}
-                    className="w-full p-3 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-black text-indigo-700"
+                    value={convenio.aportesLocal || ''} 
+                    onChange={e => setConvenio({...convenio, aportesLocal: Number(e.target.value)})}
+                    className="w-full p-3 bg-white border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-black text-emerald-700"
                     placeholder="0"
                   />
                 </div>
@@ -315,7 +274,7 @@ export const EditConvenioModal: React.FC<EditConvenioModalProps> = ({ convenio: 
                   <div key={fase.id} className="flex gap-2 items-center bg-slate-50 p-3 rounded-2xl border border-slate-100 group transition-all hover:bg-white hover:border-indigo-100 shadow-sm first:border-indigo-600 first:border-l-4">
                     <input 
                       type="text" 
-                      value={fase.nombre || ''}
+                      value={fase.nombre}
                       onChange={(e) => updateFase(fase.id, e.target.value)}
                       className="flex-1 bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-700"
                       placeholder="Nombre de la fase..."
