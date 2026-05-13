@@ -26,13 +26,17 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
   useEffect(() => {
     const total = (Number(formData.aportesFngrd) || 0) + 
                   (Number(formData.aportesLocal) || 0) + 
+                  (Number(formData.aporteDistrito) || 0) +
+                  (Number(formData.aporteGobernacion) || 0) +
+                  (Number(formData.aporteMunicipio) || 0) +
+                  (Number(formData.aporteFondo) || 0) +
                   (Number(formData.aportesOtros) || 0);
     
     // Only update if the sum of aportes is greater than 0
     if (total > 0 && total !== formData.valor) {
       setFormData(prev => ({ ...prev, valor: total }));
     }
-  }, [formData.aportesFngrd, formData.aportesLocal, formData.aportesOtros]);
+  }, [formData.aportesFngrd, formData.aportesLocal, formData.aporteDistrito, formData.aporteGobernacion, formData.aporteMunicipio, formData.aporteFondo, formData.aportesOtros]);
 
   const calculatePlazo = (inicio: string, fin: string) => {
     if (!inicio || !fin) return formData.plazoMeses;
@@ -186,7 +190,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
           <form id="edit-contract-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-1">
               <label className="block text-sm font-bold text-slate-700 mb-1">Número de Contrato</label>
-              <input type="text" value={formData.numero} onChange={e => setFormData({...formData, numero: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+              <input type="text" value={formData.numero ?? ""} onChange={e => setFormData({...formData, numero: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -201,7 +205,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
 
             <div className="md:col-span-2">
               <label className="block text-sm font-bold text-slate-700 mb-1">Objeto Contractual</label>
-              <textarea value={formData.objetoContractual} onChange={e => setFormData({...formData, objetoContractual: e.target.value})} rows={3} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+              <textarea value={formData.objetoContractual ?? ""} onChange={e => setFormData({...formData, objetoContractual: e.target.value})} rows={3} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
             </div>
 
             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -220,7 +224,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Tipo</label>
-                <select value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                <select value={formData.tipo ?? ""} onChange={e => setFormData({...formData, tipo: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
                   <option value="Obra">Obra</option>
                   <option value="Interventoría">Interventoría</option>
                   <option value="Consultoría">Consultoría</option>
@@ -228,33 +232,45 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
               </div>
             </div>
 
-            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor Total</label>
-                <input type="number" value={formData.valor} onChange={e => setFormData({...formData, valor: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600" required />
+            <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="lg:col-span-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Valor Total</label>
+                <input type="number" value={formData.valor ?? ""} onChange={e => setFormData({...formData, valor: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600" required />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Aporte FNGRD</label>
-                <input type="number" value={formData.aportesFngrd || ''} onChange={e => setFormData({...formData, aportesFngrd: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
+              <div className="lg:col-span-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Aporte FNGRD</label>
+                <input type="number" value={formData.aportesFngrd || ''} onChange={e => setFormData({...formData, aportesFngrd: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Aporte Local (Distrito)</label>
-                <input type="number" value={formData.aportesLocal || ''} onChange={e => setFormData({...formData, aportesLocal: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
+              <div className="lg:col-span-1 border-l border-slate-200 pl-2">
+                <label className="block text-[10px] font-bold text-blue-600 uppercase mb-1">Aporte Distrito</label>
+                <input type="number" value={formData.aporteDistrito || ''} onChange={e => setFormData({...formData, aporteDistrito: Number(e.target.value)})} className="w-full border border-blue-200 bg-blue-50/30 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-700" />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Otros Aportes</label>
-                <input type="number" value={formData.aportesOtros || ''} onChange={e => setFormData({...formData, aportesOtros: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
+              <div className="lg:col-span-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Aporte Gob.</label>
+                <input type="number" value={formData.aporteGobernacion || ''} onChange={e => setFormData({...formData, aporteGobernacion: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
+              </div>
+              <div className="lg:col-span-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Aporte Mun.</label>
+                <input type="number" value={formData.aporteMunicipio || ''} onChange={e => setFormData({...formData, aporteMunicipio: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
+              </div>
+              <div className="lg:col-span-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Aporte Fondo</label>
+                <input type="number" value={formData.aporteFondo || ''} onChange={e => setFormData({...formData, aporteFondo: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
+              </div>
+              <div className="lg:col-span-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Otros Aportes</label>
+                <input type="number" value={formData.aportesOtros || ''} onChange={e => setFormData({...formData, aportesOtros: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Plazo (Meses)</label>
-                <input type="number" value={formData.plazoMeses} onChange={e => setFormData({...formData, plazoMeses: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+                <input type="number" value={formData.plazoMeses ?? ""} onChange={e => setFormData({...formData, plazoMeses: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Estado</label>
-                <select value={formData.estado} onChange={e => setFormData({...formData, estado: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium text-indigo-600">
+                <select value={formData.estado ?? ""} onChange={e => setFormData({...formData, estado: e.target.value as any})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium text-indigo-600">
                   <option value="En ejecución">En ejecución</option>
                   <option value="En liquidación">En liquidación</option>
                   <option value="Liquidado">Liquidado</option>
@@ -265,11 +281,11 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Contratista</label>
-                <input type="text" value={formData.contratista} onChange={e => setFormData({...formData, contratista: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+                <input type="text" value={formData.contratista ?? ""} onChange={e => setFormData({...formData, contratista: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">NIT Contratista</label>
-                <input type="text" value={formData.nit} onChange={e => setFormData({...formData, nit: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+                <input type="text" value={formData.nit ?? ""} onChange={e => setFormData({...formData, nit: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
               </div>
             </div>
 
