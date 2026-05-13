@@ -16,10 +16,6 @@ export interface ProjectCalculatedState {
   aportesFngrd: number;
   aportesLocal: number;
   aportesOtros: number;
-  aporteDistrito: number;
-  aporteGobernacion: number;
-  aporteMunicipio: number;
-  aporteFondo: number;
 }
 
 export interface ContractCalculatedState {
@@ -249,22 +245,6 @@ export const calculateProjectTotals = (
   const finalAportesLocal = aportesLocalInit + aportesLocalAdicional + relevantAfectaciones.reduce((sum, a) => sum + (a.aportesLocal || 0), 0);
   const finalAportesOtros = aportesOtrosInit + aportesOtrosAdicional + relevantAfectaciones.reduce((sum, a) => sum + (a.aportesOtros || 0), 0);
 
-  // New detailed fund breakdown
-  const aporteDistritoInit = Number(convenio?.aporteDistrito || project.matrix?.aporteDistrito || 0);
-  const aporteGobernacionInit = Number(convenio?.aporteGobernacion || project.matrix?.aporteGobernacion || 0);
-  const aporteMunicipioInit = Number(convenio?.aporteMunicipio || project.matrix?.aporteMunicipio || 0);
-  const aporteFondoInit = Number(convenio?.aporteFondo || project.matrix?.aporteFondo || 0);
-
-  const aporteDistritoAdicional = convenioOtrosies.reduce((sum, o) => sum + (Number(o.aporteDistrito) || 0), 0);
-  const aporteGobernacionAdicional = convenioOtrosies.reduce((sum, o) => sum + (Number(o.aporteGobernacion) || 0), 0);
-  const aporteMunicipioAdicional = convenioOtrosies.reduce((sum, o) => sum + (Number(o.aporteMunicipio) || 0), 0);
-  const aporteFondoAdicional = convenioOtrosies.reduce((sum, o) => sum + (Number(o.aporteFondo) || 0), 0);
-
-  const finalAporteDistrito = aporteDistritoInit + aporteDistritoAdicional;
-  const finalAporteGobernacion = aporteGobernacionInit + aporteGobernacionAdicional;
-  const finalAporteMunicipio = aporteMunicipioInit + aporteMunicipioAdicional;
-  const finalAporteFondo = aporteFondoInit + aporteFondoAdicional;
-
   return {
     valorOriginal,
     valorAdicional: adiciones + valorAdicionalConvenioOtrosies - reducciones,
@@ -279,10 +259,6 @@ export const calculateProjectTotals = (
     fechaFinCalculada,
     aportesFngrd: finalAportesFngrd,
     aportesLocal: finalAportesLocal,
-    aportesOtros: finalAportesOtros,
-    aporteDistrito: finalAporteDistrito,
-    aporteGobernacion: finalAporteGobernacion,
-    aporteMunicipio: finalAporteMunicipio,
-    aporteFondo: finalAporteFondo
+    aportesOtros: finalAportesOtros
   };
 };
