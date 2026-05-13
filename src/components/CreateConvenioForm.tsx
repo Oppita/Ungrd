@@ -22,6 +22,10 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
     valorTotal: 0,
     valorAportadoFondo: 0,
     valorAportadoContrapartida: 0,
+    aporteDistrito: 0,
+    aporteGobernacion: 0,
+    aporteMunicipio: 0,
+    aporteFondo: 0,
     aportesFngrd: 0,
     aportesLocal: 0,
     aportesOtros: 0,
@@ -41,13 +45,17 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
   // Dynamic value calculation
   useEffect(() => {
     const total = (Number(convenio.aportesFngrd) || 0) + 
+                  (Number(convenio.aporteDistrito) || 0) +
+                  (Number(convenio.aporteGobernacion) || 0) +
+                  (Number(convenio.aporteMunicipio) || 0) +
+                  (Number(convenio.aporteFondo) || 0) +
                   (Number(convenio.aportesLocal) || 0) + 
                   (Number(convenio.aportesOtros) || 0);
     
     if (total !== convenio.valorTotal) {
       setConvenio(prev => ({ ...prev, valorTotal: total }));
     }
-  }, [convenio.aportesFngrd, convenio.aportesLocal, convenio.aportesOtros]);
+  }, [convenio.aportesFngrd, convenio.aporteDistrito, convenio.aporteGobernacion, convenio.aporteMunicipio, convenio.aporteFondo, convenio.aportesLocal, convenio.aportesOtros]);
 
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,6 +96,10 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
           valorTotal: extracted.valorTotalProyecto || prev.valorTotal,
           valorAportadoFondo: extracted.aporteFngrdObraInterventoria || prev.valorAportadoFondo,
           valorAportadoContrapartida: extracted.aporteMunicipioGobernacionObraInterventoria || prev.valorAportadoContrapartida,
+          aporteDistrito: extracted.aporteDistrito || prev.aporteDistrito,
+          aporteGobernacion: extracted.aporteGobernacion || prev.aporteGobernacion,
+          aporteMunicipio: extracted.aporteMunicipio || prev.aporteMunicipio,
+          aporteFondo: extracted.aporteFondo || prev.aporteFondo,
           fechaInicio: extracted.actaInicioConvenio || prev.fechaInicio,
           fechaFin: extracted.fechaFinalizacionConvenio || prev.fechaFin,
         }));
@@ -139,6 +151,10 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
             valorTotal: robustExtracted.valorTotal || prev.valorTotal,
             valorAportadoFondo: extracted.aporteFngrdObraInterventoria || prev.valorAportadoFondo,
             valorAportadoContrapartida: extracted.aporteMunicipioGobernacionObraInterventoria || prev.valorAportadoContrapartida,
+            aporteDistrito: extracted.aporteDistrito || prev.aporteDistrito,
+            aporteGobernacion: extracted.aporteGobernacion || prev.aporteGobernacion,
+            aporteMunicipio: extracted.aporteMunicipio || prev.aporteMunicipio,
+            aporteFondo: extracted.aporteFondo || prev.aporteFondo,
             fechaInicio: robustExtracted.fechaInicio || prev.fechaInicio,
             fechaFin: robustExtracted.fechaFin || prev.fechaFin,
             metadata: {
@@ -211,6 +227,10 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
         valorTotal: Number(convenio.valorTotal),
         valorAportadoFondo: Number(convenio.valorAportadoFondo || 0),
         valorAportadoContrapartida: Number(convenio.valorAportadoContrapartida || 0),
+        aporteDistrito: Number(convenio.aporteDistrito || 0),
+        aporteGobernacion: Number(convenio.aporteGobernacion || 0),
+        aporteMunicipio: Number(convenio.aporteMunicipio || 0),
+        aporteFondo: Number(convenio.aporteFondo || 0),
         aportesFngrd: Number(convenio.aportesFngrd || 0),
         aportesLocal: Number(convenio.aportesLocal || 0),
         aportesOtros: Number(convenio.aportesOtros || 0),
@@ -280,7 +300,7 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
             <label className="block text-sm font-bold text-slate-700 mb-1">Número de Convenio *</label>
             <input 
               type="text" 
-              value={convenio.numero} 
+              value={convenio.numero || ''} 
               onChange={e => setConvenio({...convenio, numero: e.target.value})}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
               placeholder="Ej. 9677-PPAL001-2023"
@@ -291,7 +311,7 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
             <label className="block text-sm font-bold text-slate-700 mb-1">Nombre / Título *</label>
             <input 
               type="text" 
-              value={convenio.nombre} 
+              value={convenio.nombre || ''} 
               onChange={e => setConvenio({...convenio, nombre: e.target.value})}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
               placeholder="Nombre descriptivo del convenio"
@@ -302,7 +322,7 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
           <div className="md:col-span-2">
             <label className="block text-sm font-bold text-slate-700 mb-1">Objeto del Convenio</label>
             <textarea 
-              value={convenio.objeto} 
+              value={convenio.objeto || ''} 
               onChange={e => setConvenio({...convenio, objeto: e.target.value})}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none min-h-[100px]"
               placeholder="Descripción detallada del objeto..."
@@ -313,7 +333,7 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
             <label className="block text-sm font-bold text-slate-700 mb-1">Partes Involucradas</label>
             <input 
               type="text" 
-              value={convenio.partes} 
+              value={convenio.partes || ''} 
               onChange={e => setConvenio({...convenio, partes: e.target.value})}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
               placeholder="Ej. UNGRD, Municipio de Cartagena"
@@ -353,7 +373,7 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Composición Financiera Dinámica</h3>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <label className="block text-xs font-black text-indigo-600 uppercase mb-2">Aporte FNGRD (COP)</label>
               <input 
@@ -366,18 +386,51 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
             </div>
 
             <div>
-              <label className="block text-xs font-black text-emerald-600 uppercase mb-2">Aporte Local (Entidad)</label>
+              <label className="block text-xs font-black text-blue-600 uppercase mb-2">Aporte Distrito</label>
               <input 
                 type="number" 
-                value={convenio.aportesLocal || ''} 
-                onChange={e => setConvenio({...convenio, aportesLocal: Number(e.target.value)})}
+                value={convenio.aporteDistrito || ''} 
+                onChange={e => setConvenio({...convenio, aporteDistrito: Number(e.target.value)})}
+                className="w-full p-3 bg-white border border-blue-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-black text-blue-700"
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black text-emerald-600 uppercase mb-2">Aporte Gobernación</label>
+              <input 
+                type="number" 
+                value={convenio.aporteGobernacion || ''} 
+                onChange={e => setConvenio({...convenio, aporteGobernacion: Number(e.target.value)})}
                 className="w-full p-3 bg-white border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-black text-emerald-700"
                 placeholder="0"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-black text-amber-600 uppercase mb-2">Otros Aportes</label>
+              <label className="block text-xs font-black text-teal-600 uppercase mb-2">Aporte Municipio</label>
+              <input 
+                type="number" 
+                value={convenio.aporteMunicipio || ''} 
+                onChange={e => setConvenio({...convenio, aporteMunicipio: Number(e.target.value)})}
+                className="w-full p-3 bg-white border border-teal-100 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none font-black text-teal-700"
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black text-slate-600 uppercase mb-2">Otros Fondos</label>
+              <input 
+                type="number" 
+                value={convenio.aporteFondo || ''} 
+                onChange={e => setConvenio({...convenio, aporteFondo: Number(e.target.value)})}
+                className="w-full p-3 bg-white border border-slate-100 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none font-black text-slate-700"
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black text-amber-600 uppercase mb-2">Otros Aportes (Gral)</label>
               <input 
                 type="number" 
                 value={convenio.aportesOtros || ''} 
@@ -387,11 +440,16 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
               />
             </div>
 
-            <div className="bg-slate-900 p-3 rounded-2xl flex flex-col justify-center">
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Total Calculado</label>
-              <p className="text-lg font-black text-white truncate">
-                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(convenio.valorTotal || 0)}
-              </p>
+            <div className="md:col-span-2 lg:col-span-3 bg-slate-900 p-4 rounded-2xl flex items-center justify-between">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Total Calculado</label>
+                <p className="text-2xl font-black text-white">
+                  {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(convenio.valorTotal || 0)}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-black text-slate-500 uppercase">Suma de aportes registrados</span>
+              </div>
             </div>
           </div>
         </div>
@@ -419,7 +477,7 @@ export const CreateConvenioForm: React.FC<CreateConvenioFormProps> = ({ onSave, 
               <div key={fase.id} className="flex gap-2 items-center bg-slate-50 p-2 rounded-xl border border-slate-100 group">
                 <input 
                   type="text" 
-                  value={fase.nombre}
+                  value={fase.nombre || ''}
                   onChange={(e) => updateFase(fase.id, e.target.value)}
                   className="flex-1 bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-700"
                   placeholder="Nombre de la fase (Ej: Obra Etapa 1)"
