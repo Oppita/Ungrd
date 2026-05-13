@@ -659,7 +659,7 @@ export const VigenciaModule: React.FC = () => {
                           type="text" 
                           placeholder="Ej: 2025"
                           className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                          value={newVigencia.anio ?? ""}
+                          value={newVigencia.anio ?? ''}
                           onChange={e => setNewVigencia({...newVigencia, anio: e.target.value})}
                         />
                       </div>
@@ -670,7 +670,7 @@ export const VigenciaModule: React.FC = () => {
                           type="number" 
                           placeholder="Valor total"
                           className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                          value={newVigencia.presupuesto ?? ""}
+                          value={newVigencia.presupuesto ?? ''}
                           onChange={e => setNewVigencia({...newVigencia, presupuesto: e.target.value})}
                         />
                       </div>
@@ -681,7 +681,7 @@ export const VigenciaModule: React.FC = () => {
                         type="text" 
                         placeholder="Ej: Vigencia Fiscal 2025"
                         className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={newVigencia.descripcion ?? ""}
+                        value={newVigencia.descripcion ?? ''}
                         onChange={e => setNewVigencia({...newVigencia, descripcion: e.target.value})}
                       />
                     </div>
@@ -722,7 +722,7 @@ export const VigenciaModule: React.FC = () => {
                               required
                               type="text" 
                               className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                              value={editVigenciaData.anio ?? ""}
+                              value={editVigenciaData.anio ?? ''}
                               onChange={e => setEditVigenciaData({...editVigenciaData, anio: e.target.value})}
                             />
                           </div>
@@ -732,7 +732,7 @@ export const VigenciaModule: React.FC = () => {
                               required
                               type="number" 
                               className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                              value={editVigenciaData.presupuestoAsignado ?? ""}
+                              value={editVigenciaData.presupuestoAsignado ?? ''}
                               onChange={e => setEditVigenciaData({...editVigenciaData, presupuestoAsignado: Number(e.target.value)})}
                             />
                           </div>
@@ -743,7 +743,7 @@ export const VigenciaModule: React.FC = () => {
                             <input 
                               type="text" 
                               className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                              value={editVigenciaData.descripcion ?? ""}
+                              value={editVigenciaData.descripcion || ''}
                               onChange={e => setEditVigenciaData({...editVigenciaData, descripcion: e.target.value})}
                             />
                           </div>
@@ -874,7 +874,7 @@ export const VigenciaModule: React.FC = () => {
                       required
                       type="text" 
                       className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={newLinea.nombre ?? ""}
+                      value={newLinea.nombre ?? ''}
                       onChange={e => setNewLinea({...newLinea, nombre: e.target.value})}
                     />
                   </div>
@@ -884,7 +884,7 @@ export const VigenciaModule: React.FC = () => {
                       required
                       type="text" 
                       className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={newLinea.codigo ?? ""}
+                      value={newLinea.codigo ?? ''}
                       onChange={e => setNewLinea({...newLinea, codigo: e.target.value})}
                     />
                   </div>
@@ -892,7 +892,7 @@ export const VigenciaModule: React.FC = () => {
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descripción</label>
                     <textarea 
                       className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={newLinea.descripcion ?? ""}
+                      value={newLinea.descripcion ?? ''}
                       onChange={e => setNewLinea({...newLinea, descripcion: e.target.value})}
                     />
                   </div>
@@ -969,15 +969,15 @@ export const VigenciaModule: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">N° Convenio</label>
-                      <input required type="text" placeholder="Número" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.numero ?? ""} onChange={e => setNewConvenio({...newConvenio, numero: e.target.value})} />
+                      <input required type="text" placeholder="Número" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.numero ?? ''} onChange={e => setNewConvenio({...newConvenio, numero: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Nombre / Título</label>
-                      <input required type="text" placeholder="Nombre" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.nombre ?? ""} onChange={e => setNewConvenio({...newConvenio, nombre: e.target.value})} />
+                      <input required type="text" placeholder="Nombre" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.nombre ?? ''} onChange={e => setNewConvenio({...newConvenio, nombre: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Tipo de Convenio</label>
-                      <select className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.tipo ?? ""} onChange={e => setNewConvenio({...newConvenio, tipo: e.target.value as any})}>
+                      <select className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.tipo ?? ''} onChange={e => setNewConvenio({...newConvenio, tipo: e.target.value as any})}>
                         <option value="específico">Específico</option>
                         <option value="marco">Marco</option>
                         <option value="interadministrativo">Interadministrativo</option>
@@ -985,19 +985,19 @@ export const VigenciaModule: React.FC = () => {
                     </div>
                     <div className="space-y-1 md:col-span-2 lg:col-span-3">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Partes del Convenio</label>
-                      <input required type="text" placeholder="Ej: UNGRD - Gobernación de..." className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.partes ?? ""} onChange={e => setNewConvenio({...newConvenio, partes: e.target.value})} />
+                      <input required type="text" placeholder="Ej: UNGRD - Gobernación de..." className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.partes ?? ''} onChange={e => setNewConvenio({...newConvenio, partes: e.target.value})} />
                     </div>
                     <div className="space-y-1 md:col-span-2 lg:col-span-3">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Objeto del Convenio</label>
-                      <textarea required placeholder="Objeto" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.objeto ?? ""} onChange={e => setNewConvenio({...newConvenio, objeto: e.target.value})} />
+                      <textarea required placeholder="Objeto" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.objeto ?? ''} onChange={e => setNewConvenio({...newConvenio, objeto: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Plazo Inicial (Meses)</label>
-                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.plazoInicialMesesConvenio ?? ""} onChange={e => setNewConvenio({...newConvenio, plazoInicialMesesConvenio: Number(e.target.value)})} />
+                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.plazoInicialMesesConvenio ?? ''} onChange={e => setNewConvenio({...newConvenio, plazoInicialMesesConvenio: Number(e.target.value)})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Tiempo Total Ejecución (Meses)</label>
-                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.tiempoTotalEjecucionMeses ?? ""} onChange={e => setNewConvenio({...newConvenio, tiempoTotalEjecucionMeses: Number(e.target.value)})} />
+                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.tiempoTotalEjecucionMeses ?? ''} onChange={e => setNewConvenio({...newConvenio, tiempoTotalEjecucionMeses: Number(e.target.value)})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Acta de Inicio (Fecha)</label>
@@ -1009,7 +1009,7 @@ export const VigenciaModule: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Estado</label>
-                      <select className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.estado ?? ""} onChange={e => setNewConvenio({...newConvenio, estado: e.target.value as any})}>
+                      <select className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.estado ?? ''} onChange={e => setNewConvenio({...newConvenio, estado: e.target.value as any})}>
                         <option value="Activo">Activo</option>
                         <option value="En liquidación">En liquidación</option>
                         <option value="Liquidado">Liquidado</option>
@@ -1023,11 +1023,11 @@ export const VigenciaModule: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="space-y-1 md:col-span-2 lg:col-span-3">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Afectación Presupuestal</label>
-                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.afectacionPresupuestal ?? ""} onChange={e => setNewConvenio({...newConvenio, afectacionPresupuestal: e.target.value})} />
+                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.afectacionPresupuestal ?? ''} onChange={e => setNewConvenio({...newConvenio, afectacionPresupuestal: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">N° CDP Convenio</label>
-                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.cdpConvenio ?? ""} onChange={e => setNewConvenio({...newConvenio, cdpConvenio: e.target.value, cdp: e.target.value})} />
+                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.cdpConvenio ?? ''} onChange={e => setNewConvenio({...newConvenio, cdpConvenio: e.target.value, cdp: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Fecha CDP Convenio</label>
@@ -1035,7 +1035,7 @@ export const VigenciaModule: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">N° RC Convenio</label>
-                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.rcConvenio ?? ""} onChange={e => setNewConvenio({...newConvenio, rcConvenio: e.target.value, rp: e.target.value})} />
+                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.rcConvenio ?? ''} onChange={e => setNewConvenio({...newConvenio, rcConvenio: e.target.value, rp: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Fecha RC Convenio</label>
@@ -1043,27 +1043,27 @@ export const VigenciaModule: React.FC = () => {
                     </div>
                     <div className="space-y-1 md:col-span-2 lg:col-span-2">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Afectaciones Presupuestales Adiciones</label>
-                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.afectacionesPresupuestalesAdiciones ?? ""} onChange={e => setNewConvenio({...newConvenio, afectacionesPresupuestalesAdiciones: e.target.value})} />
+                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.afectacionesPresupuestalesAdiciones ?? ''} onChange={e => setNewConvenio({...newConvenio, afectacionesPresupuestalesAdiciones: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Aporte Municipio/Gobernación</label>
-                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.aporteMunicipioGobernacionObraInterventoria ?? ""} onChange={e => setNewConvenio({...newConvenio, aporteMunicipioGobernacionObraInterventoria: Number(e.target.value), valorAportadoContrapartida: e.target.value})} />
+                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.aporteMunicipioGobernacionObraInterventoria ?? ''} onChange={e => setNewConvenio({...newConvenio, aporteMunicipioGobernacionObraInterventoria: Number(e.target.value), valorAportadoContrapartida: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Aporte FNGRD</label>
-                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.aporteFngrdObraInterventoria ?? ""} onChange={e => setNewConvenio({...newConvenio, aporteFngrdObraInterventoria: Number(e.target.value), valorAportadoFondo: e.target.value})} />
+                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.aporteFngrdObraInterventoria ?? ''} onChange={e => setNewConvenio({...newConvenio, aporteFngrdObraInterventoria: Number(e.target.value), valorAportadoFondo: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Valor Total Proyecto</label>
-                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.valorTotalProyecto ?? ""} onChange={e => setNewConvenio({...newConvenio, valorTotalProyecto: Number(e.target.value), valorTotal: e.target.value})} />
+                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.valorTotalProyecto ?? ''} onChange={e => setNewConvenio({...newConvenio, valorTotalProyecto: Number(e.target.value), valorTotal: e.target.value})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Personas Beneficiadas</label>
-                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.personasBeneficiadas ?? ""} onChange={e => setNewConvenio({...newConvenio, personasBeneficiadas: Number(e.target.value)})} />
+                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.personasBeneficiadas ?? ''} onChange={e => setNewConvenio({...newConvenio, personasBeneficiadas: Number(e.target.value)})} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Empleos Generados</label>
-                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.empleosGenerados ?? ""} onChange={e => setNewConvenio({...newConvenio, empleosGenerados: Number(e.target.value)})} />
+                      <input type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.empleosGenerados ?? ''} onChange={e => setNewConvenio({...newConvenio, empleosGenerados: Number(e.target.value)})} />
                     </div>
                   </div>
                 </div>
@@ -1074,7 +1074,7 @@ export const VigenciaModule: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">N° CDP Obra</label>
-                        <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.cdpObra ?? ""} onChange={e => setNewConvenio({...newConvenio, cdpObra: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.cdpObra ?? ''} onChange={e => setNewConvenio({...newConvenio, cdpObra: e.target.value})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Fecha CDP Obra</label>
@@ -1082,7 +1082,7 @@ export const VigenciaModule: React.FC = () => {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">N° RC Obra</label>
-                        <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.rcObra ?? ""} onChange={e => setNewConvenio({...newConvenio, rcObra: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.rcObra ?? ''} onChange={e => setNewConvenio({...newConvenio, rcObra: e.target.value})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Fecha RC Obra</label>
@@ -1096,7 +1096,7 @@ export const VigenciaModule: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">N° CDP Interv.</label>
-                        <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.cdpInterventoria ?? ""} onChange={e => setNewConvenio({...newConvenio, cdpInterventoria: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.cdpInterventoria ?? ''} onChange={e => setNewConvenio({...newConvenio, cdpInterventoria: e.target.value})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Fecha CDP Interv.</label>
@@ -1104,7 +1104,7 @@ export const VigenciaModule: React.FC = () => {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">N° RC Interv.</label>
-                        <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.rcInterventoria ?? ""} onChange={e => setNewConvenio({...newConvenio, rcInterventoria: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={newConvenio.rcInterventoria ?? ''} onChange={e => setNewConvenio({...newConvenio, rcInterventoria: e.target.value})} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Fecha RC Interv.</label>
@@ -1262,39 +1262,39 @@ export const VigenciaModule: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Número de Convenio</label>
-                        <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.numero ?? ""} onChange={e => setEditConvenioData({...editConvenioData, numero: e.target.value})} />
+                          <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.numero ?? ''} onChange={e => setEditConvenioData({...editConvenioData, numero: e.target.value})} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Nombre del Convenio</label>
-                        <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.nombre ?? ""} onChange={e => setEditConvenioData({...editConvenioData, nombre: e.target.value})} />
+                          <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.nombre ?? ''} onChange={e => setEditConvenioData({...editConvenioData, nombre: e.target.value})} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Valor Total</label>
-                        <input required type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.valorTotal ?? ""} onChange={e => setEditConvenioData({...editConvenioData, valorTotal: Number(e.target.value)})} />
+                          <input required type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.valorTotal ?? ''} onChange={e => setEditConvenioData({...editConvenioData, valorTotal: Number(e.target.value)})} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Aporte Fondo</label>
-                        <input required type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.valorAportadoFondo ?? ""} onChange={e => setEditConvenioData({...editConvenioData, valorAportadoFondo: Number(e.target.value)})} />
+                          <input required type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.valorAportadoFondo ?? ''} onChange={e => setEditConvenioData({...editConvenioData, valorAportadoFondo: Number(e.target.value)})} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Aporte Contrapartida</label>
-                        <input required type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.valorAportadoContrapartida ?? ""} onChange={e => setEditConvenioData({...editConvenioData, valorAportadoContrapartida: Number(e.target.value)})} />
+                          <input required type="number" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.valorAportadoContrapartida ?? ''} onChange={e => setEditConvenioData({...editConvenioData, valorAportadoContrapartida: Number(e.target.value)})} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Partes</label>
-                        <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.partes ?? ""} onChange={e => setEditConvenioData({...editConvenioData, partes: e.target.value})} />
+                          <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.partes ?? ''} onChange={e => setEditConvenioData({...editConvenioData, partes: e.target.value})} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">CDP</label>
-                        <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.cdp ?? ""} onChange={e => setEditConvenioData({...editConvenioData, cdp: e.target.value})} />
+                          <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.cdp ?? ''} onChange={e => setEditConvenioData({...editConvenioData, cdp: e.target.value})} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">RP</label>
-                        <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.rp ?? ""} onChange={e => setEditConvenioData({...editConvenioData, rp: e.target.value})} />
+                          <input required type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" value={editConvenioData.rp ?? ''} onChange={e => setEditConvenioData({...editConvenioData, rp: e.target.value})} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Estado</label>
-                          <select className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white" value={editConvenioData.estado ?? ""} onChange={e => setEditConvenioData({...editConvenioData, estado: e.target.value as any})}>
+                          <select className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white" value={editConvenioData.estado ?? ''} onChange={e => setEditConvenioData({...editConvenioData, estado: e.target.value as any})}>
                             <option value="Activo">Activo</option>
                             <option value="En liquidación">En liquidación</option>
                             <option value="Liquidado">Liquidado</option>
@@ -1310,7 +1310,7 @@ export const VigenciaModule: React.FC = () => {
                         </div>
                         <div className="md:col-span-2 lg:col-span-3 space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Objeto</label>
-                          <textarea required rows={3} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none resize-none" value={editConvenioData.objeto ?? ""} onChange={e => setEditConvenioData({...editConvenioData, objeto: e.target.value})} />
+                          <textarea required rows={3} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none resize-none" value={editConvenioData.objeto ?? ''} onChange={e => setEditConvenioData({...editConvenioData, objeto: e.target.value})} />
                         </div>
                       </div>
                       <div className="flex justify-end gap-2">
