@@ -171,7 +171,7 @@ export const ActividadesProyecto: React.FC<ActividadesProyectoProps> = ({ projec
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Descripción / Temas a tratar</label>
               <textarea 
-                value={newActivity.description ?? ""}
+                value={newActivity.description}
                 onChange={(e) => setNewActivity({...newActivity, description: e.target.value})}
                 className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                 rows={2}
