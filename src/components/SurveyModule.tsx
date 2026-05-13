@@ -988,7 +988,7 @@ const SurveyBuilder: React.FC<{
                   <div>
                     <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Objetivo General</label>
                     <textarea 
-                      value={techSheet.generalObjective ?? ""}
+                      value={techSheet.generalObjective}
                       onChange={(e) => setTechSheet({...techSheet, generalObjective: e.target.value})}
                       rows={3}
                       className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-medium text-slate-700"
