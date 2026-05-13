@@ -73,7 +73,6 @@ function App() {
     getProjectData,
     addProject,
     addContract,
-    updateProjectData,
     addFinancialDocument,
     addPago,
     addAvance,
@@ -563,9 +562,8 @@ function App() {
     field: string,
     value: any,
   ) => {
-    updateProjectData(projectId, section, field, value);
-    // Persist changes
-    saveToSupabase();
+    // In a real app, this would call a dispatch or an API
+    console.log("Update project:", projectId, section, field, value);
   };
 
   const handleGenerateReport = (projectId: string) => {
