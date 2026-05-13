@@ -1898,10 +1898,11 @@ export interface SurveyQuestion {
   id: string;
   text: string;
   description?: string;
-  type: 'text' | 'number' | 'select' | 'boolean' | 'multiple' | 'matrix' | 'audio' | 'geopolygon';
+  type: 'text' | 'number' | 'select' | 'boolean' | 'multiple' | 'matrix' | 'audio' | 'geopolygon' | 'composite';
   options?: string[];
   rows?: string[];
   columns?: string[];
+  subQuestions?: SurveyQuestion[];
   required: boolean;
   category: string;
   placeholder?: string;
