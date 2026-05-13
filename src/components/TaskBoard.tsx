@@ -161,7 +161,7 @@ export function TaskBoard() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                 <textarea
                   rows={3}
-                  value={newTask.description}
+                  value={newTask.description ?? ""}
                   onChange={e => setNewTask({...newTask, description: e.target.value})}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
