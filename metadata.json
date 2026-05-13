@@ -1,6 +1,5 @@
 {
   "name": "Matriz Inteligente de Proyectos",
   "description": "Sistema inteligente tipo dashboard para la gestión y seguimiento de proyectos, contratos, finanzas, alertas y cumplimiento ambiental.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": []
 }
