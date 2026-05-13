@@ -276,7 +276,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
               <div className="flex flex-col gap-2">
                 <textarea 
                   rows={6} 
-                  value={manualText ?? ""} 
+                  value={manualText} 
                   onChange={e => setManualText(e.target.value)} 
                   className="w-full h-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   placeholder="O pegue aquí el texto del contrato para análisis manual..."
@@ -299,7 +299,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Número de Contrato</label>
                 <input 
                   required
-                  value={contract.numero ?? ""} 
+                  value={contract.numero} 
                   onChange={e => setContract(prev => ({...prev, numero: e.target.value}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                   placeholder="Ej: 2024-001"
@@ -308,7 +308,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fase</label>
                 <select 
-                  value={contract.faseId ?? ""} 
+                  value={contract.faseId || ''} 
                   onChange={e => setContract(prev => ({...prev, faseId: e.target.value}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
                 >
@@ -338,7 +338,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
                 <input 
                   type="number"
                   required
-                  value={contract.valor ?? 0} 
+                  value={contract.valor} 
                   onChange={e => setContract(prev => ({...prev, valor: Number(e.target.value)}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono text-indigo-600 font-bold"
                 />
@@ -376,7 +376,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vigencia</label>
                 <select 
-                  value={contract.vigencia || ''} 
+                  value={contract.vigencia} 
                   onChange={e => setContract(prev => ({...prev, vigencia: e.target.value}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
                 >
@@ -389,7 +389,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Línea de Inversión</label>
                 <select 
-                  value={contract.lineaInversion || ''} 
+                  value={contract.lineaInversion} 
                   onChange={e => setContract(prev => ({...prev, lineaInversion: e.target.value}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
                 >
@@ -438,7 +438,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Estado Actual</label>
                 <select 
-                  value={contract.estado || 'Activo'} 
+                  value={contract.estado} 
                   onChange={e => setContract(prev => ({...prev, estado: e.target.value as any}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all appearance-none bg-white font-bold text-slate-700"
                 >
@@ -461,7 +461,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Aporte FNGRD (COP)</label>
                   <input 
                     type="number"
-                    value={contract.aportesFngrd || 0} 
+                    value={contract.aportesFngrd} 
                     onChange={e => setContract(prev => ({...prev, aportesFngrd: Number(e.target.value)}))}
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
                     placeholder="0"
@@ -471,7 +471,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Aporte Local (Distrito)</label>
                   <input 
                     type="number"
-                    value={contract.aportesLocal || 0} 
+                    value={contract.aportesLocal} 
                     onChange={e => setContract(prev => ({...prev, aportesLocal: Number(e.target.value)}))}
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
                     placeholder="0"
@@ -481,7 +481,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Otros Aportes</label>
                   <input 
                     type="number"
-                    value={contract.aportesOtros || 0} 
+                    value={contract.aportesOtros} 
                     onChange={e => setContract(prev => ({...prev, aportesOtros: Number(e.target.value)}))}
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
                     placeholder="0"
@@ -496,7 +496,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contratista</label>
                 <input 
                   required
-                  value={contract.contratista ?? ""} 
+                  value={contract.contratista} 
                   onChange={e => setContract(prev => ({...prev, contratista: e.target.value}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 />
@@ -505,7 +505,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">NIT / Identificación</label>
                 <input 
                   required
-                  value={contract.nit ?? ""} 
+                  value={contract.nit} 
                   onChange={e => setContract(prev => ({...prev, nit: e.target.value}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 />
@@ -517,7 +517,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
               <textarea 
                 required
                 rows={4}
-                value={contract.objetoContractual ?? ""} 
+                value={contract.objetoContractual} 
                 onChange={e => setContract(prev => ({...prev, objetoContractual: e.target.value}))}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all resize-none"
               />
@@ -528,7 +528,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Plazo (Meses)</label>
                 <input 
                   type="number"
-                  value={contract.plazoMeses ?? 0} 
+                  value={contract.plazoMeses} 
                   onChange={e => setContract(prev => ({...prev, plazoMeses: Number(e.target.value)}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 />
@@ -537,7 +537,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fecha Inicio</label>
                 <input 
                   type="date"
-                  value={contract.fechaInicio || ''} 
+                  value={contract.fechaInicio} 
                   onChange={e => setContract(prev => ({...prev, fechaInicio: e.target.value}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 />
@@ -545,7 +545,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ projectId, onC
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Supervisor</label>
                 <input 
-                  value={contract.supervisor || ''} 
+                  value={contract.supervisor} 
                   onChange={e => setContract(prev => ({...prev, supervisor: e.target.value}))}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 />
