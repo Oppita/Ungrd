@@ -119,11 +119,8 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
 
   if (uploadError || !successfulBucket) {
     console.error('Error uploading to Supabase Storage after trying all bucket names:', uploadError);
-    let errorMessage = uploadError?.message || 'Error desconocido';
-    if (errorMessage === 'Failed to fetch' || errorMessage.includes('fetch')) {
-      errorMessage = `🚨 Bloqueo CORS en Supabase Storage: Agrega 'https://${window.location.hostname}' en tu lista de 'Site URL / Redirect URLs' en la consola de Supabase.`;
-    }
-    throw new Error(errorMessage || `No se pudo encontrar o crear un bucket de almacenamiento (Storage) en Supabase para el bucket: ${bucketNamesToTry[0]}. Por favor, crea un bucket Público llamado "documents-srr" en Supabase -> Storage.`);
+    // Remove the base64 fallback because it ruins Local Storage and causes Supabase timeouts
+    throw uploadError || new Error(`No se pudo encontrar o crear un bucket de almacenamiento (Storage) en Supabase para el bucket: ${bucketNamesToTry[0]}. Por favor, crea un bucket Público llamado "documents-srr" en Supabase -> Storage.`);
   }
 
   // Get the public URL from the successful bucket
