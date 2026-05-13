@@ -836,7 +836,7 @@ export const DocumentRepository: React.FC = () => {
                 <label className="block text-xs font-black text-slate-400 uppercase mb-1">Descripción</label>
                 <textarea 
                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 h-24"
-                  value={newDoc.descripcion ?? ""}
+                  value={newDoc.descripcion}
                   onChange={e => setNewDoc({...newDoc, descripcion: e.target.value})}
                 />
               </div>
