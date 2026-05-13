@@ -790,11 +790,11 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                                         setIsUploadingDoc(report.id);
                                         const file = e.target.files[0];
                                         try {
-                                          const folderPath = `Informes/${data.nombre}`;
+                                          const folderPath = `Informes/${data.project.nombre}`;
                                           const publicUrl = await uploadDocumentToStorage(file, folderPath);
                                           await addDocument({
                                             id: `DOC-${Date.now()}`,
-                                            projectId: data.id,
+                                            projectId: data.project.id,
                                             reportId: report.id,
                                             titulo: `Informe Interventoría Semana ${report.semana}`,
                                             tipo: 'Informe',
@@ -815,10 +815,10 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                                             folderPath,
                                             estado: 'Aprobado'
                                           });
-                                          showAlert('Documento subido correctamente', 'success');
+                                          showAlert('Documento subido correctamente');
                                         } catch (error) {
                                           console.error('Upload Error:', error);
-                                          showAlert('Error al subir el documento', 'error');
+                                          showAlert('Error al subir el documento');
                                         } finally {
                                           setIsUploadingDoc(null);
                                         }
