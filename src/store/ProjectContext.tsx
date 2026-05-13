@@ -123,6 +123,7 @@ interface ProjectContextType {
   importFromJSON: (file: File) => void;
   exportToJSON: () => void;
   addSurvey: (survey: Survey) => void;
+  updateSurvey: (survey: Survey) => void;
   deleteSurvey: (surveyId: string) => void;
   addSurveyResponse: (response: SurveyResponse) => void;
   addSurveyAnalysis: (analysis: SurveyAnalysis) => void;
@@ -1811,6 +1812,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const updateSurvey = (survey: Survey) => {
+    setState(prevState => {
+      const newState = {
+        ...prevState,
+        surveys: prevState.surveys.map(s => s.id === survey.id ? survey : s)
+      };
+      return recalculateAll(newState);
+    });
+  };
+
   const addSurveyResponse = (response: SurveyResponse) => {
     setState(prevState => {
       const newState = {
@@ -3172,6 +3183,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       importFromJSON,
       exportToJSON,
       addSurvey,
+      updateSurvey,
       deleteSurvey,
       addSurveyResponse,
       addSurveyAnalysis,
