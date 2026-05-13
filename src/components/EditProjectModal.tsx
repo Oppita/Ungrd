@@ -237,7 +237,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
                 <input 
                   type="text" 
                   name="nombre"
-                  value={formData.nombre ?? ""}
+                  value={formData.nombre}
                   onChange={handleChange}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   required
@@ -249,7 +249,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
                 <input 
                   type="text" 
                   name="departamento"
-                  value={formData.departamento ?? ""}
+                  value={formData.departamento}
                   onChange={handleChange}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   required
@@ -261,7 +261,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
                 <input 
                   type="text" 
                   name="municipio"
-                  value={formData.municipio ?? ""}
+                  value={formData.municipio}
                   onChange={handleChange}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   required
@@ -273,7 +273,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
                 <input 
                   type="text" 
                   name="tipoObra"
-                  value={formData.tipoObra ?? ""}
+                  value={formData.tipoObra}
                   onChange={handleChange}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   required
@@ -340,7 +340,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
                 <input 
                   type="text" 
                   name="beneficiarios"
-                  value={formData.beneficiarios ?? ""}
+                  value={formData.beneficiarios}
                   onChange={handleChange}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   placeholder="Ej: 1500 familias"
@@ -476,7 +476,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
                 <label className="block text-sm font-bold text-slate-700 mb-1">Objetivo General</label>
                 <textarea 
                   name="objetivoGeneral"
-                  value={formData.objetivoGeneral ?? ""}
+                  value={formData.objetivoGeneral}
                   onChange={handleChange}
                   rows={2}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -487,7 +487,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
                 <label className="block text-sm font-bold text-slate-700 mb-1">Alcance</label>
                 <textarea 
                   name="alcance"
-                  value={formData.alcance ?? ""}
+                  value={formData.alcance}
                   onChange={handleChange}
                   rows={2}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -498,7 +498,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, pre
                 <label className="block text-sm font-bold text-slate-700 mb-1">Justificación</label>
                 <textarea 
                   name="justificacion"
-                  value={formData.justificacion ?? ""}
+                  value={formData.justificacion}
                   onChange={handleChange}
                   rows={2}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
