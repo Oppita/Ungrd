@@ -843,7 +843,7 @@ export const ActasYSuspensionesTab = ({ projectId }: { projectId: string }) => {
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Decisiones (Una por línea)</label>
                 <textarea
-                  value={editingActa.decisiones.join('\n')}
+                  value={editingActa.decisiones?.join('\n') ?? ""}
                   onChange={(e) => setEditingActa({ ...editingActa, decisiones: e.target.value.split('\n').filter(d => d.trim() !== '') })}
                   className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 h-32 resize-none font-medium text-sm"
                 />
