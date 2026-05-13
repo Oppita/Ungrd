@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { InterventoriaReport, ProjectData, Project } from '../types';
-import { Plus, FileText, Calendar, User, Activity, DollarSign, Image as ImageIcon, CheckCircle2, Upload, Loader2, AlertTriangle, TrendingUp, TrendingDown, FileSearch, X, Eye, Trash2 } from 'lucide-react';
+import { Plus, FileText, Calendar, User, Activity, DollarSign, Image as ImageIcon, CheckCircle2, Upload, Loader2, AlertTriangle, TrendingUp, TrendingDown, FileSearch, X, Eye } from 'lucide-react';
 import { Type } from '@google/genai';
 import { extractDataFromPDF } from '../services/pdfExtractorService';
 import { uploadDocumentToStorage } from '../lib/storage';
@@ -8,8 +8,6 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { analyzeProjectReports } from '../utils/reportAnalysis';
 import { useProject } from '../store/ProjectContext';
 import { AIProviderSelector } from './AIProviderSelector';
-import { extractWeeklyReportData } from '../services/geminiService';
-import { showAlert } from '../utils/alert';
 import { reconciliationService } from '../services/reconciliationService';
 
 interface InterventoriaReportsTabProps {
@@ -18,11 +16,9 @@ interface InterventoriaReportsTabProps {
 }
 
 export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = ({ data, onUpdateProject }) => {
-  const { state, addInterventoriaReport, addDocument, updateProject, deleteInterventoriaReport } = useProject();
+  const { state, addInterventoriaReport, addDocument, updateProject } = useProject();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
-  const [showPasteModal, setShowPasteModal] = useState(false);
-  const [pastedText, setPastedText] = useState('');
   const [uploadedFile, setUploadedFile] = useState<{ name: string; file: File } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const reports = data.interventoriaReports || [];
@@ -59,24 +55,23 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    const isNumeric = name.includes('Pct') || name.includes('valor') || name === 'semana';
     setFormData(prev => ({
       ...prev,
-      [name]: isNumeric ? (value === '' ? '' : Number(value)) : value
+      [name]: name.includes('Pct') || name.includes('valor') || name === 'semana' ? Number(value) : value
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submit triggered for report", formData);
 
     // PROMPT 534: Bloquea ejecución si no hay póliza aprobada
     const contractId = formData.contractId;
-    const contractPolicies = (state.polizas || []).filter(p => p.id_contrato === contractId);
+    const contractPolicies = state.polizas.filter(p => p.id_contrato === contractId);
     const hasApprovedPolicy = contractPolicies.some(p => p.interventoria_valida && p.estado === 'Vigente');
 
-    if (!hasApprovedPolicy && contractId) {
-      showAlert("ADVERTENCIA DE SEGURIDAD: Este contrato no cuenta con una póliza de seguros VIGENTE y APROBADA por interventoría. Se registrará el informe, pero se recomienda revisión.");
+    if (!hasApprovedPolicy) {
+      alert("BLOQUEO DE SEGURIDAD: No se puede registrar avance de obra para este contrato porque no cuenta con una póliza de seguros VIGENTE y APROBADA por interventoría.");
+      return;
     }
 
     setIsSubmitting(true);
@@ -89,7 +84,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
         fotografias: formData.fotografias || []
       } as InterventoriaReport;
 
-      await addInterventoriaReport(newReport);
+      addInterventoriaReport(newReport);
 
       // Conciliar avance físico del proyecto usando el historial
       const currentProject = data.project;
@@ -100,8 +95,8 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
         'Informe'
       );
 
-      if (updatedProject.avanceFisico !== currentProject.avanceFisico || (updatedProject.historialAvances?.length !== currentProject.historialAvances?.length)) {
-        await updateProject(updatedProject);
+      if (updatedProject.avanceFisico !== currentProject.avanceFisico || updatedProject.historialAvances?.length !== currentProject.historialAvances?.length) {
+        updateProject(updatedProject);
       }
 
       if (uploadedFile) {
@@ -155,7 +150,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
       });
     } catch (error) {
       console.error("Error submitting report:", error);
-      showAlert("Hubo un error al guardar el informe.");
+      alert("Hubo un error al guardar el informe.");
     } finally {
       setIsSubmitting(false);
     }
@@ -177,67 +172,39 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
     setIsExtracting(true);
     setUploadedFile({ name: file.name, file });
     try {
-      const extractedData = await extractWeeklyReportData('', file);
+      const prompt = "Extract the following fields from this Interventoría report. Be extremely precise with percentages and financial values.";
+      const responseSchema = {
+          type: Type.OBJECT,
+          properties: {
+            semana: { type: Type.NUMBER, description: "Número de la semana del informe" },
+            fechaInicio: { type: Type.STRING, description: "Fecha de inicio del periodo (YYYY-MM-DD)" },
+            fechaFin: { type: Type.STRING, description: "Fecha de fin del periodo (YYYY-MM-DD)" },
+            interventorResponsable: { type: Type.STRING, description: "Nombre del interventor o responsable" },
+            obraProgramadaPct: { type: Type.NUMBER, description: "Porcentaje de obra programada (0-100)" },
+            obraEjecutadaPct: { type: Type.NUMBER, description: "Porcentaje de obra ejecutada (0-100)" },
+            valorProgramado: { type: Type.NUMBER, description: "Valor financiero programado en COP" },
+            valorEjecutado: { type: Type.NUMBER, description: "Valor financiero ejecutado en COP" },
+            valorPagado: { type: Type.NUMBER, description: "Valor de pagos de actividades o facturas pagadas en COP" },
+            actividadesEjecutadas: { type: Type.STRING, description: "Resumen de actividades ejecutadas" },
+            actividadesProximas: { type: Type.STRING, description: "Resumen de actividades próximas a ejecutar" },
+            sisoAmbiental: { type: Type.STRING, description: "Resumen de gestión SISO y ambiental" },
+            observaciones: { type: Type.STRING, description: "Observaciones generales de interventoría" },
+          }
+        };
       
-      let detectedContractId = formData.contractId;
-      if (extractedData.numeroContrato) {
-        const matchingContract = data.contracts?.find(c => 
-          c.numero.toLowerCase().includes(String(extractedData.numeroContrato).toLowerCase()) || 
-          String(extractedData.numeroContrato).toLowerCase().includes(c.numero.toLowerCase())
-        );
-        if (matchingContract) {
-          detectedContractId = matchingContract.id;
-        }
-      }
-
+      const extractedData = await extractDataFromPDF(file, prompt, responseSchema);
       setFormData(prev => ({
         ...prev,
-        ...extractedData,
-        contractId: detectedContractId || prev.contractId
+        ...extractedData
       }));
-      showAlert('Información extraída correctamente del PDF.');
     } catch (error) {
       console.error(error);
-      showAlert(error instanceof Error ? error.message : 'Error al procesar el PDF');
+      alert(error instanceof Error ? error.message : 'Error al procesar el PDF');
     } finally {
       setIsExtracting(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    }
-  };
-
-  const handleTextPaste = async () => {
-    if (!pastedText.trim()) return;
-    setIsExtracting(true);
-    try {
-      const extractedData = await extractWeeklyReportData(pastedText);
-      
-      let detectedContractId = formData.contractId;
-      if (extractedData.numeroContrato) {
-        const matchingContract = data.contracts?.find(c => 
-          c.numero.toLowerCase().includes(String(extractedData.numeroContrato).toLowerCase()) || 
-          String(extractedData.numeroContrato).toLowerCase().includes(c.numero.toLowerCase())
-        );
-        if (matchingContract) {
-          detectedContractId = matchingContract.id;
-        }
-      }
-
-      setFormData(prev => ({
-        ...prev,
-        ...extractedData,
-        contractId: detectedContractId || prev.contractId
-      }));
-      
-      showAlert('Información extraída correctamente del texto.');
-      setShowPasteModal(false);
-      setPastedText('');
-    } catch (error) {
-      console.error(error);
-      showAlert(error instanceof Error ? error.message : 'Error al procesar el texto');
-    } finally {
-      setIsExtracting(false);
     }
   };
 
@@ -263,14 +230,6 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
             </div>
             <div className="flex items-center gap-3">
               <AIProviderSelector />
-              <button
-                type="button"
-                onClick={() => setShowPasteModal(true)}
-                className="flex items-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors"
-              >
-                <FileText size={18} />
-                <span className="font-medium text-sm">Pegar Informe</span>
-              </button>
               <input 
                 type="file" 
                 accept="application/pdf" 
@@ -289,26 +248,12 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                 ) : (
                   <Upload size={18} className="text-indigo-600" />
                 )}
-                <span className="font-medium text-sm">{isExtracting ? 'Extrayendo...' : 'Importar PDF'}</span>
+                <span className="font-medium">{isExtracting ? 'Extrayendo...' : 'Importar desde PDF'}</span>
               </button>
             </div>
           </div>
           
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              const requiredFields = ['semana', 'fechaInicio', 'fechaFin', 'interventorResponsable', 'obraProgramadaPct', 'obraEjecutadaPct', 'valorProgramado', 'valorEjecutado', 'actividadesEjecutadas', 'actividadesProximas'];
-              for(const field of requiredFields) {
-                if(formData[field as keyof typeof formData] === '' || formData[field as keyof typeof formData] === undefined) {
-                  showAlert(`El campo ${field} es obligatorio.`);
-                  return;
-                }
-              }
-              handleSubmit(e);
-            }} 
-            noValidate 
-            className="p-6 space-y-8"
-          >
+          <form onSubmit={handleSubmit} className="p-6 space-y-8">
             {/* Información general */}
             <section>
               <h4 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -322,7 +267,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                     type="number"
                     name="semana"
                     required
-                    value={formData.semana ?? ""}
+                    value={formData.semana}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                   />
@@ -333,7 +278,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                     type="date"
                     name="fechaInicio"
                     required
-                    value={formData.fechaInicio ?? ""}
+                    value={formData.fechaInicio}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                   />
@@ -344,7 +289,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                     type="date"
                     name="fechaFin"
                     required
-                    value={formData.fechaFin ?? ""}
+                    value={formData.fechaFin}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                   />
@@ -355,7 +300,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                     type="text"
                     name="interventorResponsable"
                     required
-                    value={formData.interventorResponsable ?? ""}
+                    value={formData.interventorResponsable}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                   />
@@ -381,7 +326,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                           name="obraProgramadaPct"
                           min="0" max="100" step="0.01"
                           required
-                          value={formData.obraProgramadaPct ?? ""}
+                          value={formData.obraProgramadaPct}
                           onChange={handleInputChange}
                           className="w-full pl-3 pr-8 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                         />
@@ -396,7 +341,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                           name="obraEjecutadaPct"
                           min="0" max="100" step="0.01"
                           required
-                          value={formData.obraEjecutadaPct ?? ""}
+                          value={formData.obraEjecutadaPct}
                           onChange={handleInputChange}
                           className="w-full pl-3 pr-8 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                         />
@@ -417,7 +362,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                           type="number"
                           name="valorProgramado"
                           required
-                          value={formData.valorProgramado ?? ""}
+                          value={formData.valorProgramado}
                           onChange={handleInputChange}
                           className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                         />
@@ -431,7 +376,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                           type="number"
                           name="valorEjecutado"
                           required
-                          value={formData.valorEjecutado ?? ""}
+                          value={formData.valorEjecutado}
                           onChange={handleInputChange}
                           className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                         />
@@ -465,6 +410,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                 <label className="block text-sm font-medium text-slate-700 mb-1">Seleccione el Contrato</label>
                 <select
                   name="contractId"
+                  required
                   value={formData.contractId}
                   onChange={handleInputChange as any}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
@@ -490,7 +436,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                     name="actividadesEjecutadas"
                     rows={3}
                     required
-                    value={formData.actividadesEjecutadas ?? ""}
+                    value={formData.actividadesEjecutadas}
                     onChange={handleInputChange}
                     placeholder="Describa las actividades realizadas..."
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y"
@@ -502,7 +448,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                     name="actividadesProximas"
                     rows={3}
                     required
-                    value={formData.actividadesProximas ?? ""}
+                    value={formData.actividadesProximas}
                     onChange={handleInputChange}
                     placeholder="Describa las actividades programadas para la siguiente semana..."
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y"
@@ -513,7 +459,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                   <textarea
                     name="sisoAmbiental"
                     rows={2}
-                    value={formData.sisoAmbiental ?? ""}
+                    value={formData.sisoAmbiental}
                     onChange={handleInputChange}
                     placeholder="Novedades en seguridad industrial, salud ocupacional y medio ambiente..."
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y"
@@ -524,7 +470,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                   <textarea
                     name="observaciones"
                     rows={3}
-                    value={formData.observaciones ?? ""}
+                    value={formData.observaciones}
                     onChange={handleInputChange}
                     placeholder="Alertas, recomendaciones o comentarios adicionales..."
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y"
@@ -665,122 +611,114 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
               </div>
 
               {/* Lista de Informes */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="space-y-4">
                 {sortedReportsDesc.map((report) => {
                   const desviacionFisica = report.obraProgramadaPct - report.obraEjecutadaPct;
                   const desviacionFinanciera = report.valorProgramado - report.valorEjecutado;
                   const hayRetraso = desviacionFisica > 0;
                   const haySobrecostos = report.valorEjecutado > report.valorProgramado;
-                  
-                  const cardBorderColor = 
-                    hayRetraso ? 'border-rose-400 ring-2 ring-rose-500/20' :
-                    haySobrecostos ? 'border-amber-400 ring-2 ring-amber-500/20' :
-                    'border-emerald-300 ring-2 ring-emerald-500/10';
-
-                  const reportDocument = state.documentos?.find(d => d.reportId === report.id && d.tipo === 'Informe');
-                  const documentUrl = reportDocument?.versiones?.[0]?.url;
 
                   return (
-                    <div 
-                      key={report.id} 
-                      onClick={() => setSelectedReport({ report, type: 'summary' })}
-                      className={`bg-white rounded-2xl border shadow-sm overflow-hidden hover:shadow-xl transition-all cursor-pointer group transform hover:-translate-y-1 ${cardBorderColor}`}
-                    >
-                      <div className="p-6 border-b border-slate-100 relative">
-                        {hayRetraso && (
-                          <div className="absolute top-0 right-0 bg-rose-600 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest flex items-center gap-1">
-                            <TrendingDown size={10} /> En Retraso
-                          </div>
-                        )}
-                        {!hayRetraso && haySobrecostos && (
-                          <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest flex items-center gap-1">
-                            <AlertTriangle size={10} /> Sobrecostos
-                          </div>
-                        )}
-                        {!hayRetraso && !haySobrecostos && (
-                          <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest flex items-center gap-1">
-                            <CheckCircle2 size={10} /> Al Día
-                          </div>
-                        )}
-
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="font-bold text-lg text-slate-800">Semana {report.semana}</h3>
-                            <p className="text-indigo-600 font-medium text-sm flex items-center gap-1.5 mt-1">
-                              <Calendar size={14} />
+                    <div key={report.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-start bg-slate-50/50 gap-4">
+                        <div>
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="text-lg font-bold text-slate-900">Semana {report.semana}</h3>
+                            <span className="text-xs font-medium px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-full">
                               {report.fechaInicio} al {report.fechaFin}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-500 flex items-center gap-1.5 mb-3">
+                            <User size={14} />
+                            {report.interventorResponsable}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {hayRetraso ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-50 text-red-700 text-xs font-medium border border-red-100">
+                                <TrendingDown size={14} />
+                                En Retraso
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-100">
+                                <TrendingUp size={14} />
+                                Al Día
+                              </span>
+                            )}
+                            {haySobrecostos ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-medium border border-amber-100">
+                                <AlertTriangle size={14} />
+                                Sobrecostos
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-100">
+                                <CheckCircle2 size={14} />
+                                Presupuesto OK
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-6 md:text-right">
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Avance Físico</p>
+                            <div className="flex items-center md:justify-end gap-2 mb-1">
+                              <span className="text-lg font-bold text-slate-900">{report.obraEjecutadaPct}%</span>
+                              <span className="text-sm text-slate-400">/ {report.obraProgramadaPct}% prog.</span>
+                            </div>
+                            <p className={`text-xs font-medium ${hayRetraso ? 'text-red-600' : 'text-emerald-600'}`}>
+                              Desviación: {desviacionFisica > 0 ? '-' : '+'}{Math.abs(desviacionFisica).toFixed(2)}%
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Avance Financiero</p>
+                            <div className="flex items-center md:justify-end gap-2 mb-1">
+                              <span className="text-lg font-bold text-slate-900">{formatCurrency(report.valorEjecutado)}</span>
+                            </div>
+                            <p className={`text-xs font-medium ${haySobrecostos ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              Desviación: {desviacionFinanciera < 0 ? '-' : '+'}{formatCurrency(Math.abs(desviacionFinanciera))}
                             </p>
                           </div>
                         </div>
-
-                        <div className="space-y-3 text-sm">
-                          <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                            <span className="text-slate-500 flex items-center gap-1"><User size={14}/>Resp:</span>
-                            <span className="font-medium text-slate-700 truncate max-w-[150px]" title={report.interventorResponsable}>{report.interventorResponsable}</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4 mt-2">
-                            <div>
-                               <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Avance Físico</p>
-                               <div className="flex items-end gap-2">
-                                 <span className="text-lg font-bold text-slate-900">{report.obraEjecutadaPct}%</span>
-                               </div>
-                               <p className={`text-[10px] font-medium mt-1 ${hayRetraso ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                 Prog: {report.obraProgramadaPct}%
-                               </p>
-                            </div>
-                            <div className="text-right">
-                               <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Financiero</p>
-                               <div className="flex items-end justify-end gap-2">
-                                 <span className="text-lg font-bold text-slate-900 whitespace-nowrap">{formatCurrency(report.valorEjecutado)}</span>
-                               </div>
-                               <p className={`text-[10px] font-medium mt-1 ${haySobrecostos ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                 Prog: {formatCurrency(report.valorProgramado)}
-                               </p>
-                            </div>
-                          </div>
-                        </div>
                       </div>
-
-                      <div className="p-6 bg-slate-50 space-y-4">
+                      
+                      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Actividades</p>
-                          <p className="text-xs text-slate-700 line-clamp-2" title={report.actividadesEjecutadas}>
-                            {report.actividadesEjecutadas || 'Sin detalles registrados'}
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Actividades Ejecutadas</h4>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            {report.actividadesEjecutadas}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Actividades Próximas</h4>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            {report.actividadesProximas}
                           </p>
                         </div>
                         
-                        <div className="flex items-center justify-end pt-4 border-t border-slate-200">
-                           <div className="flex gap-2">
-                              {documentUrl && (
-                                <a 
-                                  href={documentUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="p-2 text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all"
-                                  title="Ver Documento Original"
-                                >
-                                  <Eye size={18} />
-                                </a>
-                              )}
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  try {
-                                    if(window.confirm && window.confirm('¿Está seguro de eliminar este informe?')) {
-                                      deleteInterventoriaReport(report.id);
-                                    }
-                                  } catch(err) {
-                                      deleteInterventoriaReport(report.id);
-                                  }
-                                }}
-                                className="p-2 text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all"
-                                title="Eliminar Informe"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                           </div>
+                        {report.observaciones && (
+                          <div className="md:col-span-2">
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Observaciones</h4>
+                            <p className="text-sm text-amber-800 whitespace-pre-wrap bg-amber-50 p-3 rounded-lg border border-amber-100">
+                              {report.observaciones}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="md:col-span-2 flex items-center justify-end pt-4 border-t border-slate-100 gap-3">
+                          <button 
+                            onClick={() => setSelectedReport({ report, type: 'summary' })}
+                            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                          >
+                            <FileSearch size={16} />
+                            Resumen Ejecutivo
+                          </button>
+                          <button 
+                            onClick={() => setSelectedReport({ report, type: 'full' })}
+                            className="text-slate-600 hover:text-slate-800 text-sm font-medium flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                          >
+                            <FileText size={16} />
+                            Informe Institucional
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -789,61 +727,6 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
               </div>
             </>
           )}
-        </div>
-      )}
-
-      {/* Paste Modal */}
-      {showPasteModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95">
-            <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
-              <h3 className="text-xl font-black flex items-center gap-2 uppercase tracking-tight">
-                <FileText size={24} className="text-indigo-400" />
-                Detección Inteligente de Informe
-              </h3>
-              <button onClick={() => setShowPasteModal(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors">
-                <X size={24} />
-              </button>
-            </div>
-            <div className="p-8 space-y-6">
-              <p className="text-sm text-slate-600 font-medium">
-                Pegue el contenido del informe semanal (texto extraído de Word, PDF o correo) para que el <span className="font-bold text-slate-900">Motor de Análisis SRR</span> sincronice los avances, fechas y actividades automáticamente.
-              </p>
-              <textarea
-                value={pastedText}
-                onChange={(e) => setPastedText(e.target.value)}
-                className="w-full h-80 p-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500/20 outline-none font-mono text-xs leading-relaxed"
-                placeholder="Pegue el texto aquí..."
-              />
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowPasteModal(false)}
-                  className="px-6 py-2.5 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-slate-600 transition-colors"
-                >
-                  Descartar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleTextPaste}
-                  disabled={isExtracting || !pastedText.trim()}
-                  className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg disabled:opacity-50"
-                >
-                  {isExtracting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Analizando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={16} />
-                      Extraer con IA SRR
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
