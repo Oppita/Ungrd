@@ -1630,7 +1630,7 @@ export const EventosDashboard: React.FC = () => {
                     type="text" 
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
                     placeholder="Ej. Fenómeno de La Niña 2024-2025"
-                    value={newEvent.nombre ?? ""}
+                    value={newEvent.nombre}
                     onChange={(e) => setNewEvent({ ...newEvent, nombre: e.target.value })}
                   />
                 </div>
@@ -1639,7 +1639,7 @@ export const EventosDashboard: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Evento</label>
                   <select 
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                    value={newEvent.tipo ?? ""}
+                    value={newEvent.tipo}
                     onChange={(e) => setNewEvent({ ...newEvent, tipo: e.target.value as any })}
                   >
                     <option value="Inundación">Inundación</option>
@@ -1656,7 +1656,7 @@ export const EventosDashboard: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Estado Inicial</label>
                   <select 
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                    value={newEvent.estado ?? ""}
+                    value={newEvent.estado}
                     onChange={(e) => setNewEvent({ ...newEvent, estado: e.target.value as any })}
                   >
                     <option value="Activo">Activo</option>
@@ -1711,7 +1711,7 @@ export const EventosDashboard: React.FC = () => {
                     type="text" 
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="Ej. Quibdó, Lloró, Bagadó (Separados por coma)"
-                    value={newEvent.municipiosStr ?? ""}
+                    value={newEvent.municipiosStr}
                     onChange={(e) => setNewEvent({ ...newEvent, municipiosStr: e.target.value })}
                   />
                 </div>
@@ -1741,7 +1741,7 @@ export const EventosDashboard: React.FC = () => {
                   <textarea 
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none"
                     placeholder="Detalles del evento, declaratorias asociadas, impacto inicial..."
-                    value={newEvent.descripcion ?? ""}
+                    value={newEvent.descripcion}
                     onChange={(e) => setNewEvent({ ...newEvent, descripcion: e.target.value })}
                   />
                 </div>
