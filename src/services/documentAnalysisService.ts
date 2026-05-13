@@ -72,9 +72,9 @@ export async function analyzeDocumentWithRigor(
   );
 
   try {
-    // Extract JSON from the markdown response
-    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0].replace(/```json|```/g, '') : text;
+    // Extract JSON from the response using robust regex
+    const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    const jsonStr = match ? match[0] : text;
     const data = JSON.parse(jsonStr);
 
     return {
@@ -104,6 +104,10 @@ export const EXTRACTION_PROMPTS = {
           "justificacionTecnica": "string",
           "justificacionJuridica": "string",
           "valorAdicional": number,
+          "aporteDistrito": number,
+          "aporteGobernacion": number,
+          "aporteMunicipio": number,
+          "aporteFondo": number,
           "plazoAdicionalMeses": number,
           "nitEntidad": "string",
           "nitContratista": "string",
@@ -141,5 +145,30 @@ export const EXTRACTION_PROMPTS = {
             "valorRc": number,
             "fechaRc": "YYYY-MM-DD",
             "contrato": "string (Número de contrato si existe)"
+          }`,
+  ACTA_COMITE: `Analiza el acta de comité de obra/interventoría. Extrae:
+          {
+            "numero": "string",
+            "fecha": "YYYY-MM-DD",
+            "temasTratados": ["string"],
+            "compromisos": [{"responsable": "string", "tarea": "string", "fechaEntrega": "string"}],
+            "afectacionesGeneradas": [{"tipo": "string", "descripcion": "string", "valorEstimado": number}]
+          }`,
+  SUSPENSION: `Analiza el documento de suspensión de contrato/obra. Extrae:
+          {
+            "fechaInicio": "YYYY-MM-DD",
+            "fechaFinEstimada": "YYYY-MM-DD",
+            "motivo": "string",
+            "impactosIdentificados": ["string"]
           }`
 };
+
+export async function parseActaComite(file: File, projectId: string): Promise<any> {
+  const result = await analyzeDocumentWithRigor(file, EXTRACTION_PROMPTS.ACTA_COMITE);
+  return { ...result.data, projectId, id: `ACTA-${Date.now()}` };
+}
+
+export async function parseSuspension(file: File, projectId: string): Promise<any> {
+  const result = await analyzeDocumentWithRigor(file, EXTRACTION_PROMPTS.SUSPENSION);
+  return { ...result.data, projectId, id: `SUSP-${Date.now()}` };
+}
