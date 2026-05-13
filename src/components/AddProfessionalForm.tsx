@@ -126,20 +126,20 @@ export const AddProfessionalForm: React.FC<AddProfessionalFormProps> = ({ onSave
             {/* ... form fields ... */}
             <div>
               <label className="block text-sm font-bold text-slate-700">Nombre</label>
-              <input type="text" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={prof.nombre ?? ""} onChange={e => setProf({...prof, nombre: e.target.value})} required />
+              <input type="text" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={prof.nombre} onChange={e => setProf({...prof, nombre: e.target.value})} required />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700">Profesión</label>
-              <input type="text" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={prof.profesion ?? ""} onChange={e => setProf({...prof, profesion: e.target.value})} required />
+              <input type="text" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={prof.profesion} onChange={e => setProf({...prof, profesion: e.target.value})} required />
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-bold text-slate-700">Años de Experiencia</label>
-                <input type="number" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={prof.experienciaAnios ?? ""} onChange={e => setProf({...prof, experienciaAnios: Number(e.target.value)})} required />
+                <input type="number" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={prof.experienciaAnios} onChange={e => setProf({...prof, experienciaAnios: Number(e.target.value)})} required />
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700">Salario Mensual</label>
-                <input type="number" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={prof.salarioMensual ?? ""} onChange={e => setProf({...prof, salarioMensual: Number(e.target.value)})} required />
+                <input type="number" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={prof.salarioMensual} onChange={e => setProf({...prof, salarioMensual: Number(e.target.value)})} required />
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700">Gastos Repr.</label>
@@ -275,7 +275,7 @@ export const AddProfessionalForm: React.FC<AddProfessionalFormProps> = ({ onSave
                 Pegue aquí el texto de la hoja de vida para que la IA extraiga los campos automáticamente.
               </p>
               <textarea
-                value={pastedText ?? ""}
+                value={pastedText}
                 onChange={(e) => setPastedText(e.target.value)}
                 className="w-full h-64 p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 outline-none font-mono text-sm"
                 placeholder="Pegue el contenido aquí..."
