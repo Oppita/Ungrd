@@ -372,12 +372,12 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onSave, on
               <Clipboard size={16} />
               Pegar Texto del Proyecto
             </label>
-              <textarea 
-                className="w-full h-24 bg-white border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="Pega aquí el texto del convenio, CDP o descripción..."
-                value={rawText ?? ""}
-                onChange={(e) => setRawText(e.target.value)}
-              />
+            <textarea 
+              className="w-full h-24 bg-white border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder="Pega aquí el texto del convenio, CDP o descripción..."
+              value={rawText}
+              onChange={(e) => setRawText(e.target.value)}
+            />
             <div className="flex gap-2 mt-2">
               <AIProviderSelector className="flex-1" />
               <button 
@@ -697,12 +697,12 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onSave, on
       
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Justificación</label>
-        <textarea className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={project.justificacion ?? ""} onChange={(e) => setProject(prev => ({ ...prev, justificacion: e.target.value }))} />
+        <textarea className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={project.justificacion} onChange={(e) => setProject(prev => ({ ...prev, justificacion: e.target.value }))} />
       </div>
 
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Objetivo General</label>
-        <textarea className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={project.objetivoGeneral ?? ""} onChange={(e) => setProject(prev => ({ ...prev, objetivoGeneral: e.target.value }))} />
+        <textarea className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={project.objetivoGeneral} onChange={(e) => setProject(prev => ({ ...prev, objetivoGeneral: e.target.value }))} />
       </div>
 
       {/* OPS Assignment Section */}
