@@ -119,7 +119,7 @@ export const AgendaPMU: React.FC<{ eventId?: string; projectId?: string }> = ({ 
               <label className="block text-sm font-medium text-slate-700 mb-1">Título de la Actividad *</label>
               <input 
                 type="text" 
-                value={newActivity.title}
+                value={newActivity.title ?? ""}
                 onChange={(e) => setNewActivity({...newActivity, title: e.target.value})}
                 className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
                 placeholder="Ej. PMU Seguimiento Frente Frío"
@@ -128,7 +128,7 @@ export const AgendaPMU: React.FC<{ eventId?: string; projectId?: string }> = ({ 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Tipo *</label>
               <select 
-                value={newActivity.type}
+                value={newActivity.type ?? ""}
                 onChange={(e) => setNewActivity({...newActivity, type: e.target.value as any})}
                 className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
               >
@@ -144,7 +144,7 @@ export const AgendaPMU: React.FC<{ eventId?: string; projectId?: string }> = ({ 
               <label className="block text-sm font-medium text-slate-700 mb-1">Fecha *</label>
               <input 
                 type="date" 
-                value={newActivity.date}
+                value={newActivity.date ?? ""}
                 onChange={(e) => setNewActivity({...newActivity, date: e.target.value})}
                 className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
               />
@@ -154,7 +154,7 @@ export const AgendaPMU: React.FC<{ eventId?: string; projectId?: string }> = ({ 
               <input 
                 type="number" 
                 min="0.5" step="0.5"
-                value={newActivity.durationHours}
+                value={newActivity.durationHours ?? ""}
                 onChange={(e) => setNewActivity({...newActivity, durationHours: parseFloat(e.target.value)})}
                 className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
               />
@@ -248,7 +248,7 @@ export const AgendaPMU: React.FC<{ eventId?: string; projectId?: string }> = ({ 
             <div className="lg:col-span-3">
               <label className="block text-sm font-medium text-slate-700 mb-1">Descripción / Temas a tratar *</label>
               <textarea 
-                value={newActivity.description}
+                value={newActivity.description ?? ""}
                 onChange={(e) => setNewActivity({...newActivity, description: e.target.value})}
                 className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
                 rows={3}
