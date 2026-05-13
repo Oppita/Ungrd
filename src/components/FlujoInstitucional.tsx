@@ -1293,7 +1293,7 @@ const FlujoInstitucional: React.FC<FlujoInstitucionalProps> = ({ initialSelected
                 <label className="block text-sm font-bold text-slate-700 mb-2">Necesidad Identificada (ej: protección costera)</label>
                 <textarea 
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 h-24"
-                  value={newRequest.necesidad}
+                  value={newRequest.necesidad ?? ""}
                   onChange={(e) => setNewRequest({...newRequest, necesidad: e.target.value})}
                 />
               </div>
@@ -1301,7 +1301,7 @@ const FlujoInstitucional: React.FC<FlujoInstitucionalProps> = ({ initialSelected
                 <label className="block text-sm font-bold text-slate-700 mb-2">Descripción del Riesgo</label>
                 <textarea 
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 h-24"
-                  value={newRequest.descripcionRiesgo}
+                  value={newRequest.descripcionRiesgo ?? ""}
                   onChange={(e) => setNewRequest({...newRequest, descripcionRiesgo: e.target.value})}
                 />
               </div>
@@ -1483,7 +1483,7 @@ const FlujoInstitucional: React.FC<FlujoInstitucionalProps> = ({ initialSelected
                 <label className="block text-sm font-bold text-slate-700 mb-2">Objeto del Convenio</label>
                 <textarea 
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 h-24"
-                  value={newConvenio.objeto}
+                  value={newConvenio.objeto ?? ""}
                   onChange={(e) => setNewConvenio({...newConvenio, objeto: e.target.value})}
                   placeholder="Descripción del objeto del convenio..."
                 />
@@ -1646,7 +1646,7 @@ const FlujoInstitucional: React.FC<FlujoInstitucionalProps> = ({ initialSelected
                 <label className="block text-sm font-bold text-slate-700 mb-2">Observaciones</label>
                 <textarea 
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 h-24"
-                  value={newInforme.observaciones}
+                  value={newInforme.observaciones ?? ""}
                   onChange={(e) => setNewInforme({...newInforme, observaciones: e.target.value})}
                   placeholder="Observaciones del informe..."
                 />
@@ -1695,7 +1695,7 @@ const FlujoInstitucional: React.FC<FlujoInstitucionalProps> = ({ initialSelected
                 <label className="block text-sm font-bold text-slate-700 mb-2">Descripción</label>
                 <textarea 
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 h-24"
-                  value={newEvento.descripcion}
+                  value={newEvento.descripcion ?? ""}
                   onChange={(e) => setNewEvento({...newEvento, descripcion: e.target.value})}
                   placeholder="Descripción del evento contractual..."
                 />
