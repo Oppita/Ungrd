@@ -61,9 +61,10 @@ interface Indicator {
 }
 
 export const SurveyModule: React.FC<{ onExit?: () => void }> = ({ onExit }) => {
-  const { state, addSurvey, addSurveyResponse, addSurveyAnalysis, deleteSurvey, globalTechnicalSheet, updateGlobalTechnicalSheet } = useProject();
+  const { state, addSurvey, updateSurvey, addSurveyResponse, addSurveyAnalysis, deleteSurvey, globalTechnicalSheet, updateGlobalTechnicalSheet } = useProject();
   const [view, setView] = useState<'list' | 'create' | 'fill' | 'analysis'>('list');
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
+  const [editingSurveyId, setEditingSurveyId] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [showMethodology, setShowMethodology] = useState(false);
   const [isEditingTechnicalSheet, setIsEditingTechnicalSheet] = useState(false);
@@ -184,7 +185,8 @@ export const SurveyModule: React.FC<{ onExit?: () => void }> = ({ onExit }) => {
               responses={state.surveyResponses}
               departments={departments}
               getMunicipalities={getMunicipalities}
-              onCreate={() => setView('create')} 
+              onCreate={() => { setEditingSurveyId(null); setView('create'); }} 
+              onEdit={(s) => { setEditingSurveyId(s.id); setView('create'); }}
               onFill={(s) => { setSelectedSurvey(s); setView('fill'); }}
               onAnalyze={(s) => { setSelectedSurvey(s); setView('analysis'); }}
               onDelete={(s) => deleteSurvey(s.id)}
@@ -195,7 +197,15 @@ export const SurveyModule: React.FC<{ onExit?: () => void }> = ({ onExit }) => {
             <SurveyBuilder 
               departments={departments} 
               getMunicipalities={getMunicipalities}
-              onSave={(s) => { addSurvey(s); setView('list'); }}
+              initialSurvey={editingSurveyId ? state.surveys.find(s => s.id === editingSurveyId) : undefined}
+              onSave={(s) => {
+                if (editingSurveyId) {
+                  updateSurvey(s);
+                } else {
+                  addSurvey(s);
+                }
+                setView('list'); 
+              }}
             />
           )}
 
@@ -544,10 +554,11 @@ const SurveyList: React.FC<{
   departments: Departamento[],
   getMunicipalities: (id: string) => Municipio[],
   onCreate: () => void, 
+  onEdit: (s: Survey) => void,
   onFill: (s: Survey) => void,
   onAnalyze: (s: Survey) => void,
   onDelete: (s: Survey) => void
-}> = ({ surveys, responses, departments, getMunicipalities, onCreate, onFill, onAnalyze, onDelete }) => {
+}> = ({ surveys, responses, departments, getMunicipalities, onCreate, onEdit, onFill, onAnalyze, onDelete }) => {
   const [tab, setTab] = useState<'cards' | 'territory'>('cards');
 
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>('all');
@@ -825,7 +836,14 @@ const SurveyList: React.FC<{
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 pt-6 border-t border-slate-100">
+                    <div className="grid grid-cols-4 gap-3 pt-6 border-t border-slate-100">
+                      <button 
+                        onClick={() => onEdit(survey)}
+                        className="flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all"
+                        title="Editar Encuesta"
+                      >
+                        <Settings2 size={16} />
+                      </button>
                       <button 
                         onClick={() => onDelete(survey)}
                         className="flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-all"
@@ -866,16 +884,17 @@ const SurveyList: React.FC<{
 const SurveyBuilder: React.FC<{ 
   departments: Departamento[], 
   getMunicipalities: (id: string) => Municipio[],
+  initialSurvey?: Survey,
   onSave: (s: Survey) => void 
-}> = ({ departments, getMunicipalities, onSave }) => {
+}> = ({ departments, getMunicipalities, initialSurvey, onSave }) => {
   const [step, setStep] = useState<'ficha' | 'preguntas'>('ficha');
-  const [title, setTitle] = useState('Encuesta Modelo de Ocupación Frente Frío – Construcción Social del Riesgo');
-  const [description, setDescription] = useState('Caracterizar las dinámicas de ocupación del territorio, condiciones socioeconómicas y percepción del riesgo.');
-  const [isGroupSurvey, setIsGroupSurvey] = useState(false);
-  const [defaultGroupSize, setDefaultGroupSize] = useState(20);
+  const [title, setTitle] = useState(initialSurvey?.title || 'Encuesta Modelo de Ocupación Frente Frío – Construcción Social del Riesgo');
+  const [description, setDescription] = useState(initialSurvey?.description || 'Caracterizar las dinámicas de ocupación del territorio, condiciones socioeconómicas y percepción del riesgo.');
+  const [isGroupSurvey, setIsGroupSurvey] = useState(initialSurvey?.isGroupSurvey || false);
+  const [defaultGroupSize, setDefaultGroupSize] = useState(initialSurvey?.defaultGroupSize || 20);
   
   // Ficha Técnica default state based on DANE/Expert requirements
-  const [techSheet, setTechSheet] = useState<TechnicalSheet>({
+  const [techSheet, setTechSheet] = useState<TechnicalSheet>(initialSurvey?.technicalSheet || {
     operativeName: 'Encuesta Modelo de Ocupación del Territorio en Escenarios de Inundación – Frente Frío',
     generalObjective: 'Caracterizar las dinámicas de ocupación del territorio, condiciones socioeconómicas y percepción del riesgo en zonas afectadas.',
     specificObjectives: [
@@ -908,7 +927,7 @@ const SurveyBuilder: React.FC<{
     normativity2026: true
   });
 
-  const [questions, setQuestions] = useState<SurveyQuestion[]>([
+  const [questions, setQuestions] = useState<SurveyQuestion[]>(initialSurvey?.questions || [
     { id: 'q-poverty-1', text: '¿Cuál es el ingreso mensual aproximado de su hogar?', type: 'select', options: ['Menos de 1 Salario Mínimo', '1 - 2 Salarios Mínimos', 'Más de 2 Salarios Mínimos'], required: true, category: 'Condiciones Socioeconómicas' },
     { id: 'q-poverty-2', text: '¿En el último mes, han tenido dificultades para acceder a tres comidas diarias?', type: 'boolean', required: true, category: 'Condiciones Socioeconómicas' },
     { id: 'q-occup-1', text: '¿Cuánto tiempo lleva residiendo en este predio?', type: 'number', required: true, category: 'Ocupación del Territorio' },
@@ -923,13 +942,14 @@ const SurveyBuilder: React.FC<{
       return;
     }
     const newSurvey: Survey = {
-      id: crypto.randomUUID(),
+      ...(initialSurvey || {}),
+      id: initialSurvey?.id || crypto.randomUUID(),
       title,
       description,
-      departamentoId: 'global',
-      municipioId: 'nacional',
+      departamentoId: initialSurvey?.departamentoId || 'global',
+      municipioId: initialSurvey?.municipioId || 'nacional',
       questions,
-      createdAt: new Date().toISOString(),
+      createdAt: initialSurvey?.createdAt || new Date().toISOString(),
       technicalSheet: techSheet,
       isGroupSurvey,
       defaultGroupSize: isGroupSurvey ? defaultGroupSize : undefined
@@ -1285,20 +1305,49 @@ const SurveyBuilder: React.FC<{
                                         </div>
                                      </div>
 
-                                     {(q.type === 'select' || q.type === 'multiple') && (
+                                     {(q.type === 'select' || q.type === 'multiple' || q.type === 'boolean') && (
                                        <div>
-                                          <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Opciones de Respuesta (Separadas por Coma)</label>
-                                          <input 
-                                            type="text" 
-                                            value={q.options?.join(', ') || ''}
-                                            onChange={(e) => {
-                                              const opts = e.target.value.split(',').map(s => s.trim()).filter(s => s);
-                                              setQuestions(questions.map(item => item.id === q.id ? {...item, options: opts} : item));
-                                            }}
-                                            className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-bold text-slate-800"
-                                            placeholder="Opcion 1, Opcion 2, Opcion 3"
-                                          />
-                                          <p className="mt-2 text-[10px] text-slate-400 font-medium">* No olvides separar cada opción con una coma.</p>
+                                          <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Opciones de Respuesta</label>
+                                          <div className="space-y-2">
+                                            {(q.options?.length ? q.options : (q.type === 'boolean' ? ['Sí', 'No'] : [])).map((opt, i) => (
+                                              <div key={i} className="flex gap-2 relative group items-center">
+                                                <input 
+                                                  type="text"
+                                                  value={opt}
+                                                  onChange={(e) => {
+                                                    const newOpts = [...(q.options?.length ? q.options : (q.type === 'boolean' ? ['Sí', 'No'] : []))];
+                                                    newOpts[i] = e.target.value;
+                                                    setQuestions(questions.map(item => item.id === q.id ? {...item, options: newOpts} : item));
+                                                  }}
+                                                  className="w-full bg-slate-50 border-none rounded-xl px-6 py-4 font-bold text-slate-800"
+                                                  placeholder={`Opción ${i + 1}`}
+                                                />
+                                                {q.type !== 'boolean' && (
+                                                  <button 
+                                                    onClick={() => {
+                                                      const newOpts = (q.options || []).filter((_, idx) => idx !== i);
+                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, options: newOpts} : item));
+                                                    }}
+                                                    className="p-3 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                                    title="Eliminar opción"
+                                                  >
+                                                    <X size={16} />
+                                                  </button>
+                                                )}
+                                              </div>
+                                            ))}
+                                            {q.type !== 'boolean' && (
+                                              <button
+                                                onClick={() => {
+                                                  const newOpts = [...(q.options || []), `Opción ${(q.options?.length || 0) + 1}`];
+                                                  setQuestions(questions.map(item => item.id === q.id ? {...item, options: newOpts} : item));
+                                                }}
+                                                className="mt-2 flex items-center gap-2 text-[10px] font-black text-indigo-500 uppercase px-4 py-3 hover:bg-indigo-50 rounded-xl transition-all w-full justify-center border-2 border-dashed border-indigo-100"
+                                              >
+                                                <Plus size={14} /> Añadir Opción
+                                              </button>
+                                            )}
+                                          </div>
                                        </div>
                                      )}
 
@@ -1360,9 +1409,12 @@ const SurveyTaker: React.FC<{
   getMunicipalities: (id: string) => Municipio[],
   onSave: (r: SurveyResponse) => void 
 }> = ({ survey, departments, getMunicipalities, onSave }) => {
+  const [ungrdCode, setUngrdCode] = useState('UNGRD-PRT-' + Math.floor(Math.random()*10000).toString().padStart(4, '0'));
+  const [surveyCode] = useState('QST-' + crypto.randomUUID().substring(0, 6).toUpperCase());
   const [deptId, setDeptId] = useState('');
   const [muniId, setMuniId] = useState('');
-  const [zonaId, setZonaId] = useState('');
+  const [zonaId, setZonaId] = useState(''); // Could be used for DANE code or cuenca
+  const [tipoZona, setTipoZona] = useState('Urbana');
   const [zonaAfectacion, setZonaAfectacion] = useState('');
   const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null);
   const [capturingCoords, setCapturingCoords] = useState(false);
@@ -1542,13 +1594,58 @@ const SurveyTaker: React.FC<{
       </div>
 
       <div className="p-8 lg:p-12 space-y-10">
-        {/* Geographic Context (Mandatory for Surveyor) */}
+        {/* Geographic Context (Mandatory for Surveyor) - Block 1.1 */}
         <div className="space-y-6 bg-slate-50 p-8 rounded-[32px] border border-slate-100">
-          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-            <MapPin size={14} className="text-rose-500" />
-            Ubicación del Levantamiento
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4 mb-4">
+             <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+               <MapPin size={16} />
+               Bloque 1.1 — Identificación Territorial
+             </h3>
+             <div className="flex items-center gap-3">
+               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cód. Cuestionario:</span>
+               <span className="px-3 py-1 bg-slate-200 text-slate-600 rounded-lg text-xs font-black">{surveyCode}</span>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Código territorial UNGRD-PRT</label>
+              <input 
+                 type="text"
+                 value={ungrdCode}
+                 onChange={(e) => setUngrdCode(e.target.value)}
+                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+              />
+            </div>
+            <div className="flex flex-col justify-center">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1 flex justify-between">
+                Captura GPS Georreferenciada
+                {coordinates && (
+                  <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                    <MapPin size={10} />
+                    {coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)}
+                  </span>
+                )}
+              </label>
+              <button 
+                onClick={handleCaptureCoordinates}
+                disabled={capturingCoords}
+                className={`w-full py-3 rounded-2xl flex justify-center items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all shadow-sm border-2 ${
+                  coordinates 
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                  : capturingCoords 
+                    ? 'bg-slate-50 text-slate-400 border-slate-100 animate-pulse'
+                    : 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                }`}
+                title="Capturar Coordenadas GPS"
+              >
+                <MapPin size={16} className={capturingCoords ? 'animate-bounce' : ''} />
+                {capturingCoords ? 'Capturando...' : coordinates ? 'Coordenadas Guardadas' : '📍 Iniciar Captura de Punto GPS'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Departamento</label>
               <select 
@@ -1556,7 +1653,7 @@ const SurveyTaker: React.FC<{
                 onChange={(e) => setDeptId(e.target.value)}
                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all cursor-pointer"
               >
-                <option value="">Seleccionar departamento...</option>
+                <option value="">Seleccionar...</option>
                 {departments.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
               </select>
             </div>
@@ -1570,72 +1667,64 @@ const SurveyTaker: React.FC<{
                 }}
                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all cursor-pointer"
               >
-                <option value="">Seleccionar municipio...</option>
+                <option value="">Seleccionar...</option>
                 {municipalities.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
               </select>
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-black text-slate-500 uppercase mb-3 ml-1 flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Target size={14} className="text-rose-500" />
-                  Localización: Zona, Polígono o Ámbito de Afectación
-                </span>
-                {coordinates && (
-                  <span className="text-[9px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
-                    <MapPin size={8} />
-                    GPS Activo: {coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)}
-                  </span>
-                )}
-              </label>
-              <div className="flex gap-3">
-                <div className="relative flex-1 group">
-                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors">
-                     <Layers size={18} />
-                   </div>
-                   <input 
-                    type="text" 
-                    value={zonaAfectacion}
-                    onChange={(e) => setZonaAfectacion(e.target.value)}
-                    placeholder="Nombre de la zona, vereda o código de polígono..."
-                    className="w-full bg-white border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-4 font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all shadow-sm"
-                  />
-                </div>
-                <button 
-                  onClick={handleCaptureCoordinates}
-                  disabled={capturingCoords}
-                  className={`px-6 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all shadow-sm border-2 ${
-                    coordinates 
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                    : capturingCoords 
-                      ? 'bg-slate-50 text-slate-400 border-slate-100 animate-pulse'
-                      : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-200 hover:text-indigo-600'
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Código DANE Municipio</label>
+              <input 
+                 type="text"
+                 value={muniId}
+                 readOnly
+                 placeholder="Auto-generado"
+                 className="w-full bg-slate-100 border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-400 outline-none cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Corregimiento / Vereda / Barrio</label>
+              <input 
+                type="text" 
+                value={zonaAfectacion}
+                onChange={(e) => setZonaAfectacion(e.target.value)}
+                placeholder="Especifique el área..."
+                className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Cuenca / Sector Hidrográfico</label>
+              <input 
+                type="text" 
+                value={zonaId}
+                onChange={(e) => setZonaId(e.target.value)}
+                placeholder="Nombre de la cuenca..."
+                className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 mt-4">
+             <label className="block text-[10px] font-black text-slate-500 uppercase mb-3 ml-1 flex items-center gap-1.5">
+              <Layers size={14} className="text-indigo-400" />
+              Tipo de Zona
+            </label>
+            <div className="flex flex-wrap gap-3">
+               {['Urbana', 'Centro poblado', 'Rural', 'Rural dispersa'].map(ambito => (
+                 <button 
+                  key={ambito}
+                  onClick={() => setTipoZona(ambito)}
+                  className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm border-2 ${
+                    tipoZona === ambito 
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                      : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-100'
                   }`}
-                  title="Capturar Coordenadas GPS del Polígono"
-                >
-                  <MapPin size={20} className={capturingCoords ? 'animate-bounce' : ''} />
-                  {capturingCoords ? 'Capturando...' : coordinates ? 'Capturado' : 'GPS'}
-                </button>
-              </div>
-              <div className="mt-3 flex gap-4">
-                 <p className="text-[9px] text-slate-400 font-medium italic flex items-center gap-1.5 flex-1">
-                  <Info size={12} className="text-indigo-400" />
-                  El riesgo no es uniforme en el municipio; defina el sector crítico específicamente.
-                </p>
-                <div className="flex gap-2">
-                   {['Urbano', 'Rural', 'Expansión'].map(ambito => (
-                     <button 
-                      key={ambito}
-                      onClick={() => {
-                        const current = zonaAfectacion.split(' - ')[0];
-                        setZonaAfectacion(`${ambito} - ${current || ''}`);
-                      }}
-                      className="text-[8px] font-black uppercase tracking-tighter px-2 py-1 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors border border-slate-200/50"
-                     >
-                       {ambito}
-                     </button>
-                   ))}
-                </div>
-              </div>
+                 >
+                   {ambito}
+                 </button>
+               ))}
             </div>
           </div>
 
@@ -1947,7 +2036,7 @@ const SurveyTaker: React.FC<{
 
                               {q.type === 'boolean' && (
                                 <div className="flex gap-2">
-                                  {['Sí', 'No'].map(opt => (
+                                  {(q.options?.length ? q.options : ['Sí', 'No']).map(opt => (
                                     <button
                                       key={opt}
                                       onClick={() => updateAnswer(q.id, opt, rIdx)}
@@ -2023,12 +2112,12 @@ const SurveyTaker: React.FC<{
                     )}
 
                     {q.type === 'boolean' && (
-                      <div className="flex gap-4">
-                        {['Sí', 'No'].map(opt => (
+                      <div className="flex flex-wrap gap-4">
+                        {(q.options?.length ? q.options : ['Sí', 'No']).map(opt => (
                           <button
                             key={opt}
                             onClick={() => updateAnswer(q.id, opt)}
-                            className={`px-8 py-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${answers[q.id] === opt ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-200' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                            className={`flex-1 min-w-[200px] px-8 py-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${answers[q.id] === opt ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-200' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
                           >
                             {opt}
                           </button>
