@@ -1233,7 +1233,7 @@ export const EDANConsolidator: React.FC<EDANConsolidatorProps> = ({ initialData,
                 <div className="space-y-2 mb-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Descripción Detallada</label>
                   <textarea 
-                    value={formData.generalData?.descripcionEvento ?? ''}
+                    value={formData.generalData?.descripcionEvento || ''}
                     onChange={(e) => handleUpdateField('generalData', 'descripcionEvento', e.target.value)}
                     className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 h-32 resize-none"
                     placeholder="Describa el evento, zonas afectadas y contexto inicial..."
@@ -1420,7 +1420,7 @@ export const EDANConsolidator: React.FC<EDANConsolidatorProps> = ({ initialData,
                          <div className="mt-4 space-y-1">
                             <label className="text-[10px] font-black text-slate-400 uppercase">Necesidades Prioritarias de Salud</label>
                             <textarea 
-                               value={formData.infraestructuraPorSector?.salud?.necesidadesPrioritariasSalud ?? ''}
+                               value={formData.infraestructuraPorSector?.salud?.necesidadesPrioritariasSalud || ''}
                                onChange={(e) => handleUpdateDeepField(['infraestructuraPorSector', 'salud', 'necesidadesPrioritariasSalud'], e.target.value)}
                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none h-20"
                                placeholder="Medicamentos, equipos..."
