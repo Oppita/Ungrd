@@ -468,6 +468,9 @@ export interface ProjectMatrix {
   afectacionPresupuestal?: string;
   afectacionesPresupuestalesAdiciones?: string;
   aporteMunicipioGobernacionObraInterventoria?: number;
+  aporteDistrito?: number;
+  aporteGobernacion?: number;
+  aporteMunicipio?: number;
   aporteFngrdObraInterventoria?: number;
   valorTotalProyecto?: number;
   valorObraInterventoria?: number;
@@ -674,6 +677,10 @@ export interface Convenio {
   valorTotal: number;
   valorAportadoFondo: number;
   valorAportadoContrapartida: number;
+  aporteDistrito?: number;
+  aporteGobernacion?: number;
+  aporteMunicipio?: number;
+  aporteFondo?: number;
   aportesFngrd?: number;
   aportesLocal?: number;
   aportesOtros?: number;
@@ -829,6 +836,10 @@ export interface Contract {
   aportesFngrd?: number;
   aportesLocal?: number;
   aportesOtros?: number;
+  aporteDistrito?: number;
+  aporteGobernacion?: number;
+  aporteMunicipio?: number;
+  aporteFondo?: number;
   responsibleId?: string; // New field
   valorPagado?: number;
   avanceFisico?: number;
@@ -1178,6 +1189,11 @@ export interface Presupuesto {
   valorTotal: number;
   aportesFngrd: number;
   aportesMunicipio: number;
+  aporteDistrito?: number;
+  aporteGobernacion?: number;
+  aporteMunicipio?: number;
+  aporteFondo?: number;
+  aporteContrapartida?: number;
   aportesLocal?: number; // Alias for consistency
   aportesOtros?: number;
   pagosRealizados: number;
@@ -1221,6 +1237,10 @@ export interface Otrosie {
   justificacionTecnica: string;
   justificacionJuridica: string;
   valorAdicional: number;
+  aporteDistrito?: number;
+  aporteGobernacion?: number;
+  aporteMunicipio?: number;
+  aporteFondo?: number;
   aportesFngrd?: number;
   aportesLocal?: number;
   aportesOtros?: number;
@@ -1263,6 +1283,10 @@ export interface Afectacion {
   aportesFngrd?: number;
   aportesLocal?: number;
   aportesOtros?: number;
+  aporteDistrito?: number;
+  aporteGobernacion?: number;
+  aporteMunicipio?: number;
+  aporteFondo?: number;
   impacto?: 'Alto' | 'Medio' | 'Bajo';
   estado?: 'Abierta' | 'Cerrada';
   documentoUrl?: string;
