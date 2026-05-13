@@ -1,1999 +1,3096 @@
-export const TIPOS_EVENTO_GENERADOR = [
-  'Sismo',
-  'Inundación',
-  'Deslizamiento',
-  'Avalancha',
-  'Granizada',
-  'Tormenta Eléctrica',
-  'Tornado',
-  'Vendaval',
-  'Erupción Volcánica',
-  'Tsunami',
-  'Incendio Forestal',
-  'Incendio Urbano',
-  'Incidente con Materiales Peligrosos',
-  'Explosión',
-  'Voladura de Poliducto',
-  'Atentado Terrorista',
-  'Otro'
-] as const;
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ClipboardList, 
+  Plus, 
+  Search, 
+  MapPin, 
+  BrainCircuit, 
+  ChevronRight, 
+  FileText, 
+  Database, 
+  ArrowLeft,
+  Save,
+  CheckCircle2,
+  BarChart3,
+  Users,
+  AlertTriangle,
+  Lightbulb,
+  MessageSquare,
+  ShieldAlert,
+  HelpCircle,
+  X,
+  Type,
+  List,
+  CheckSquare,
+  LogOut,
+  ShieldCheck,
+  CalendarDays,
+  Target,
+  Layers,
+  ArrowUpRight,
+  Trash2,
+  FileSearch,
+  Settings2,
+  Info,
+  Filter,
+  Activity,
+  Calculator,
+  GanttChart,
+  BookOpen,
+  Globe,
+  Play,
+  Mic,
+  Map as MapIcon
+} from 'lucide-react';
+import { useProject } from '../store/ProjectContext';
+import { 
+  Survey, 
+  SurveyQuestion, 
+  SurveyResponse, 
+  SurveyAnalysis,
+  Departamento,
+  Municipio,
+  TechnicalSheet
+} from '../types';
+import { colombiaData } from '../data/colombiaData';
+import { aiProviderService } from '../services/aiProviderService';
+import { showAlert } from '../utils/alert';
 
-export type TipoEventoGenerador = typeof TIPOS_EVENTO_GENERADOR[number];
-
-export interface LiquidacionChecklist {
-  items: {
-    id: string;
-    nombre: string;
-    tipoDocumento: string;
-    obligatorio: boolean;
-  }[];
-}
-
-export interface DamageItem {
-  cantidad: number;
-  valorUnitario: number;
-  valorTotal: number;
-  asegurado?: boolean;
-  porcentajeCobertura?: number;
-  valorAsegurado?: number;
-}
-
-export interface DetailedDamageItem {
-  id: string;
-  nombre: string;
-  descripcion?: string;
-  ubicacion?: 'Urbano' | 'Rural';
-  valor: number;
-  cantidad?: number;
-  unidad?: string;
-  asegurado: boolean;
-  porcentajeCobertura: number;
-  valorAsegurado: number;
-  tipoAfectacion?: 'Destruida' | 'Grave' | 'Moderada' | 'Leve';
-  // Características detalladas (Individuales)
-  materialParedes?: string;
-  materialTecho?: string;
-  materialPiso?: string;
-  areaM2?: number;
-  numeroPersonas?: number;
-  numeroHogares?: number;
-  serviciosPublicosAfectados?: string[];
-  uso?: string;
-  capacidad?: string;
-  estadoEstructural?: string;
-}
-
-export interface DemographicDamage {
-  total: DamageItem;
-  ninos?: DamageItem;
-  ninas?: DamageItem;
-  adolescentesHombres?: DamageItem;
-  adolescentesMujeres?: DamageItem;
-  adultosHombres?: DamageItem;
-  adultosMujeres?: DamageItem;
-  adultosMayoresHombres?: DamageItem;
-  adultosMayoresMujeres?: DamageItem;
-  mujeresGestantesLactantes?: DamageItem;
-  personasDiscapacidad?: DamageItem;
-  etniaIndigena?: DamageItem;
-  etniaAfro?: DamageItem;
-  etniaRom?: DamageItem;
-  migrantes?: DamageItem;
-  desplazados?: DamageItem;
-}
-
-export interface SectorInfraestructura {
-  salud?: { 
-    [key: string]: any; 
-    centrosAfectados?: number; 
-    casosHipotermia?: number; 
-    casosInfeccionesAgudas?: number; 
-    ninosDesnutricion?: number; 
-    necesidadesPrioritariasSalud?: string;
-    listadoCentros?: DetailedDamageItem[];
-  };
-  educacionMedia?: { [key: string]: any; institucionesAfectadas?: number; estudiantesSinClases?: number }; 
-  educacionSuperior?: { [key: string]: any }; 
-  transporteVias?: { [key: string]: any };
-  transportePuentes?: { [key: string]: any };
-  transporteMuellesPuertos?: { [key: string]: any };
-  transporteAeropuertos?: { [key: string]: any };
-  turismo?: { [key: string]: any }; 
-  deportes?: { [key: string]: any }; 
-  cultura?: { [key: string]: any }; 
-  agricultura?: { 
-    [key: string]: any; 
-    hectareasAfectadas?: number; 
-    hectareasPerdidaTotal?: number; 
-    hectareasPerdidaParcial?: number; 
-    cultivosMasAfectados?: string; 
-    perdidasAgricolasEstimadas?: number 
-  }; 
-  pecuario?: {
-    [key: string]: any;
-    bovinosMuertos?: number;
-    ovinosMuertos?: number;
-    caprinosMuertos?: number;
-    avesMuertas?: number;
-    otrosMuertos?: number;
-  };
-  defensa?: { [key: string]: any }; 
-  trabajo?: { 
-    [key: string]: any; 
-    negociosCerrados?: number; 
-    jornalerosSinIngresos?: number; 
-    diasActividadEconomicaPerdidos?: number; 
-    mujeresJefasHogarPerdidaIngreso?: number 
-  }; 
-  icbf?: { hogaresCDI?: Record<string, DamageItem>; hogaresAfectados?: number };
-  energia?: { [key: string]: any; personasSinServicio?: number; diasEstimadosSinEnergia?: number };
-  aguaGas?: { [key: string]: any; personasSinAgua?: number; alcantarilladoStatus?: 'Funcional' | 'Parcial' | 'Falla' };
-  comunicaciones?: { [key: string]: any; status?: 'Funcional' | 'Parcial' | 'Falla' }; 
-  seguridadAlimentaria?: {
-    hogaresSinAccesoAlimentos?: number;
-    diasSinAcceso?: number;
-    fuentesAguaContaminadaRotas?: number;
-    hogaresRecibiendoAyudaAlimentaria?: number;
-    estadoSeguridadAlimentaria?: string;
-  };
-}
-
-export interface IndicadoresTerritorio {
-  poblacionTotal?: number;
-  totalViviendas?: number;
-  nbi?: number; // Indice Necesidades Basicas Insatisfechas
-  coeficienteGini?: number;
-}
-
-export interface MunicipalityInventory {
-  id: string;
-  eventId?: string; // Reference to the parent Macro-Event
-  name: string;
-  edanStatus: 'Completado' | 'Pendiente' | 'En Proceso';
-  runapeStatus: 'Configurado' | 'Desactualizado' | 'Sin Datos';
-  lastUpdate: string;
-  
-  indicadores?: IndicadoresTerritorio;
-
-  // FR-1703-SMD-09: Información General
-  generalData: {
-    diligenciador: string;
-    institucion: string;
-    cargo: string;
-    telefono: string;
-    celular: string;
-    tipoEvento: string[];
-    fecha: string;
-    hora: string;
-    evento: string;
-    descripcionEvento: string;
-    magnitud: string;
-    fechaEvento: string;
-    horaEvento: string;
-    sitioEvento: string;
-    sectoresAfectados: string;
-    eventosSecundarios: string;
-    coordinadorCMGRD: string;
-    alcaldeMunicipal: string;
-    fechaEvaluacion: string;
-    horaEvaluacion: string;
-  };
-
-  // FR-1900-SMD-04: Daños y Necesidades
-  poblacion: {
-    heridos: DemographicDamage;
-    muertos: DemographicDamage;
-    desaparecidos: DemographicDamage;
-    familiasAfectadas: DemographicDamage;
-    personasAfectadas: DemographicDamage;
-    enfermos: DemographicDamage;
-    evacuados: DemographicDamage;
-    albergados: DemographicDamage;
-    personasSinSustento?: DemographicDamage; // "Personas fallecidas que se queden sin transporte/sustento/trabajo"
-  };
-  
-  danosVivienda: {
-    destruidas: DamageItem; // perdida total
-    grave: DamageItem; // inhabitable
-    moderado: DamageItem; 
-    leve: DamageItem;
-    materialPredominante?: string;
-    techosAfectadosClima?: number; // nieve, granizo, vendaval
-    hogaresPropietarios?: number;
-    hogaresArrendatarios?: number;
-    hogaresJefaturaFemenina?: number;
-    listadoViviendas?: DetailedDamageItem[];
-    // fallbacks legados
-    averiadasUrbano?: DamageItem;
-    destruidasUrbano?: DamageItem;
-    averiadasRural?: DamageItem;
-    destruidasRural?: DamageItem;
-  };
-  infraestructuraPorSector?: SectorInfraestructura;
-  
-  // legacy fallbacks
-  infraestructura: Record<string, DamageItem>;
-  serviciosPublicos: Record<string, DamageItem>;
-  necesidades: Record<string, DamageItem>;
-  
-  costoTotalEstimado: number;
-  costosOperativos?: {
-    reunionesPMU?: {
-      id: string;
-      fecha: string;
-      tema: string;
-      participantes: string[];
-      costoEstimado?: number;
-    }[];
-    comisionesSugeridas?: {
-      id: string;
-      departamento: string;
-      municipios: string;
-      objeto: string;
-      numeroDias: number;
-      perfilesRequeridos: string[];
-      costoEstimado?: number;
-    }[];
-    maquinariaAmarilla?: {
-      id: string;
-      tipo: string;
-      horasSugeridas: number;
-      costoEstimado?: number;
-    }[];
-  };
-}
-
-export interface ScheduleTask {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  durationMonths: number;
-  progress: number;
-  status: 'Planificada' | 'Ejecutada' | 'En Progreso' | 'Retrasada';
-  isCritical: boolean;
-  dependencies: string[];
-  sourceDocumentIds: string[];
-}
-
-export interface ScheduleSubactivity {
-  id: string;
-  name: string;
-  tasks: ScheduleTask[];
-  progress: number;
-}
-
-export interface ScheduleActivity {
-  id: string;
-  name: string;
-  phase: 'Estudios' | 'Ejecución' | 'Cierre';
-  subactivities: ScheduleSubactivity[];
-  progress: number;
-}
-
-export type ProjectStatus = 
-  | 'Banco de proyectos' 
-  | 'En viabilidad' 
-  | 'En estructuración' 
-  | 'Aprobado' 
-  | 'En contratación' 
-  | 'En ejecución' 
-  | 'En seguimiento' 
-  | 'En liquidación' 
-  | 'Liquidado'
-  | 'Suspendido'
-  | 'Ejecución Directa'; // New state for skipping validation
-
-export interface ChecklistItem {
-  id: string;
+// --- Types Fix for components ---
+interface Indicator {
   label: string;
-  completed: boolean;
-  documentId?: string;
+  value: number;
+  color: string;
 }
 
-export interface BancoProyectosWorkflow {
-  pasoActual: number;
-  estado: 'Pendiente' | 'En Revisión' | 'Devuelto' | 'Viabilizado' | 'Archivado';
-  asignadoA?: string;
-  esSolicitud?: boolean;
-  esNuevo?: boolean;
-  registradoSNIGRD?: boolean;
-  esCompetenciaFNGRD?: boolean;
-  documentacionCompleta?: boolean;
-  cumpleRequisitosMinimos?: boolean;
-  viabilidadTecnica?: boolean;
-  recursosAprobados?: boolean;
-  observaciones?: string;
-  actividades?: Activity[];
-  requisitosGenerales?: Record<string, boolean>;
-  requisitosTecnicos?: Record<string, boolean>;
-  documentosRequisitos?: Record<string, string>;
-  historial: { paso: number; fecha: string; accion: string; usuario: string }[];
-}
+export const SurveyModule: React.FC<{ onExit?: () => void }> = ({ onExit }) => {
+  const { state, addSurvey, updateSurvey, addSurveyResponse, addSurveyAnalysis, deleteSurvey, globalTechnicalSheet, updateGlobalTechnicalSheet } = useProject();
+  const [view, setView] = useState<'list' | 'create' | 'fill' | 'analysis'>('list');
+  const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
+  const [editingSurveyId, setEditingSurveyId] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [showMethodology, setShowMethodology] = useState(false);
+  const [isEditingTechnicalSheet, setIsEditingTechnicalSheet] = useState(false);
+  const [tempTechnicalSheet, setTempTechnicalSheet] = useState<TechnicalSheet | null>(null);
 
-export interface ProjectLifecycle {
-  bancoProyectos?: BancoProyectosWorkflow;
-  viabilidad?: {
-    resultado: 'viable' | 'requiere ajustes' | 'no viable' | 'pendiente';
-    observaciones: string;
-    fechaEvaluacion?: string;
-    evaluador?: string;
+  const currentSheet = globalTechnicalSheet || {
+    operativeName: "SRR-2026 Inteligencia Territorial",
+    generalObjective: "Medir el Constructo Social del Riesgo y percepción de vulnerabilidad.",
+    specificObjectives: ["Identificar nodos de riesgo social", "Evaluar resiliencia comunitaria"],
+    universeDescription: "Comunidades en áreas de influencia bajo estándares OCDE.",
+    analysisUnit: ["Hogar", "Individuo"],
+    coverage: {
+      levels: ["Departamental", "Municipal"],
+      classification: ["Urbana", "Rural"],
+      prioritizedZones: ["Zonas de alta amenaza"]
+    },
+    samplingDesign: {
+      type: "Muestreo Aleatorio Simple (MAS) Estratificado",
+      sampleSize: 1200,
+      selectionCriteria: ["Ubicación en zona de riesgo", "Residencia permanente"]
+    },
+    collectionMethod: ["CAPI (Computer-Assisted Personal Interviewing)"],
+    collectionPeriod: "Bimensual",
+    conceptualFramework: "Marco de gobernanza del riesgo OCDE 2026",
+    limitations: ["Acceso a zonas de orden público", "Conectividad intermitente"],
+    expectedResults: ["Mapa de calor social", "Índice de vulnerabilidad percibida"],
+    normativity2026: true
   };
-  estructuracion?: {
-    tecnico: ChecklistItem[];
-    financiero: ChecklistItem[];
-    juridico: ChecklistItem[];
-    tecnicoValidado?: boolean;
-    financieroValidado?: boolean;
-    juridicoValidado?: boolean;
+
+  const handleStartEdit = () => {
+    setTempTechnicalSheet(currentSheet);
+    setIsEditingTechnicalSheet(true);
   };
-  liquidacion?: {
-    checklist: ChecklistItem[];
-    fechaCierre?: string;
+
+  const handleSaveTechnicalSheet = () => {
+    if (tempTechnicalSheet) {
+      updateGlobalTechnicalSheet(tempTechnicalSheet);
+    }
+    setIsEditingTechnicalSheet(false);
   };
-}
 
-export interface InformeMensual {
-  id: string;
-  mes: string;
-  anio: number;
-  url: string;
-  estado: 'Radicado' | 'Aprobado' | 'Rechazado';
-  fechaRadicacion: string;
-  observaciones?: string;
-  valorPagado?: number;
-}
-
-export interface Professional {
-  id: string;
-  projectId?: string;
-  nombre: string;
-  email?: string;
-  telefono?: string;
-  profesion: string;
-  experienciaAnios: number;
-  especialidades: string[];
-  sectoresTrabajados: string[];
-  proyectosRelevantes: string[];
-  salarioMensual: number;
-  gastosRepresentacion?: number;
-  incrementoAntiguedad?: number;
-  valorTotalContrato?: number;
-  valorHora: number;
-  proyectosActivos: number;
-  horasEstimadas: number;
-  carga: 'Disponible' | 'Media' | 'Sobrecargado';
-  departamentosExperiencia: string[];
-  hojaDeVidaUrl?: string;
-  rutUrl?: string;
-  desempeño?: number; // 0-100
-  formacionAcademica?: string[];
-  certificaciones?: string[];
-  idiomas?: string[];
-  habilidadesTecnicas?: string[];
-  linkedinUrl?: string;
-  fechaNacimiento?: string;
-  direccion?: string;
-  ciudad?: string;
-  numeroContrato?: string;
-  cdp?: string;
-  rc?: string;
-  vigencia?: string;
-  horasReuniones?: number;
-  horasPMU?: number;
-  horasSeguimiento?: number;
-  horasCoordinacion?: number;
-  objetoContrato?: string;
-  supervisor?: string;
-  fechaInicio?: string;
-  fechaFinalizacion?: string;
-  informesMensuales?: InformeMensual[];
-}
-
-export interface PublicAsset {
-  id: string;
-  nombre: string;
-  sector: 'Salud' | 'Educación' | 'Transporte' | 'Agua y Saneamiento' | 'Energía' | 'Administrativo' | 'Otros';
-  departamento: string;
-  municipio: string;
-  valorReposicion: number;
-  valorAsegurado: number;
-  nivelRiesgo: 'Bajo' | 'Medio' | 'Alto' | 'Crítico';
-  tipoSeguro: 'Tradicional' | 'Paramétrico' | 'Ninguno' | 'Todo Riesgo';
-  criticidadOperativa: 'Baja' | 'Media' | 'Alta' | 'Esencial';
-}
-
-export interface ActuarialParameters {
-  periodoRetornoPMP: number; // Años (ej. 100, 250, 500)
-  factorDanoPMP: number; // Porcentaje de daño esperado (0-100)
-  frecuenciaEventosPAE: number; // Eventos por año
-  severidadPromedioPAE: number; // Valor en COP
-}
-
-export interface FiscalParameters {
-  presupuestoAnual: number;
-  icld: number; // Ingresos Corrientes de Libre Destinación
-  fondoContingencia: number;
-  capacidadEndeudamiento: number;
-}
-
-export type InstrumentType = 'Fondo GRD' | 'Reserva Presupuestal' | 'Crédito Contingente' | 'Seguro Paramétrico' | 'Seguro Tradicional' | 'Cat Bond' | 'Pool de Aseguramiento' | 'Respaldo Soberano';
-
-export interface FinancialInstrument {
-  id: string;
-  layerId: string; // 'l1', 'l2', 'l3', 'l4'
-  name: string;
-  type: InstrumentType;
-  capacity: number; // Valor máximo de cobertura (COP)
-  cost: number; // Prima anual, costo de mantenimiento o cupón (COP)
-  activationTrigger: string; // Condición de activación
-  liquidityTime: string; // Tiempo estimado de desembolso
-  status: 'Activo' | 'En Estructuración' | 'Inactivo';
-  parameters: {
-    triggerType?: string;
-    triggerUnit?: string;
-    triggerValue?: number;
-    payoutStructure?: string;
-    interestRate?: number;
-    commitmentFee?: number;
-    deductible?: number;
-    couponRate?: number;
+  // Geographic Helpers
+  const departments: Departamento[] = colombiaData.map(d => ({ id: d.id, nombre: d.name }));
+  const getMunicipalities = (deptId: string): Municipio[] => {
+    const dept = colombiaData.find(d => d.id === deptId);
+    return dept ? dept.municipalities.map((m, i) => ({ id: `${deptId}-${i}`, nombre: m, departamentoId: deptId })) : [];
   };
-}
 
-export interface TerritoryRiskProfile {
-  departamento: string;
-  irftScore: number; // 0-100
-  exposicionFisica: number;
-  exposicionEconomica: number;
-  exposicionSocial: number;
-  pmp: number; // Pérdida Máxima Probable
-  pae: number; // Pérdida Anual Esperada
-  parametrosActuariales?: ActuarialParameters;
-  parametrosFiscales?: FiscalParameters;
-}
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+            <ClipboardList size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 leading-tight">Módulo de Encuestas</h1>
+            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Gestión del Constructo Social y Riesgo</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowMethodology(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-all font-bold text-xs uppercase tracking-wider h-10"
+          >
+            <Calculator size={14} className="text-indigo-600" />
+            Ficha Técnica
+          </button>
+          
+          {view !== 'list' ? (
+          <button 
+            onClick={() => { setView('list'); setSelectedSurvey(null); }}
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all font-medium text-sm"
+          >
+            <ArrowLeft size={18} />
+            Volver al Listado
+          </button>
+        ) : (
+          onExit && (
+            <button 
+              onClick={onExit}
+              className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all font-medium text-sm border border-slate-100"
+            >
+              <LogOut size={18} />
+              Cerrar Módulo
+            </button>
+          )
+        )}
+      </div>
+      </header>
 
-export interface ProjectMatrix {
-  id?: string;
-  departamento?: string;
-  codigoDepartamento?: string;
-  municipio?: string;
-  ubicacion?: string;
-  codigoMunicipio?: string;
-  clave?: string;
-  tipoObra?: string;
-  nombreProyecto?: string;
-  linea?: string;
-  regalias?: string;
-  afectacionPresupuestal?: string;
-  afectacionesPresupuestalesAdiciones?: string;
-  aporteMunicipioGobernacionObraInterventoria?: number;
-  aporteDistrito?: number;
-  aporteGobernacion?: number;
-  aporteMunicipio?: number;
-  aporteFngrdObraInterventoria?: number;
-  valorTotalProyecto?: number;
-  valorObraInterventoria?: number;
-  aporteFondo?: number;
-  personasBeneficiadas?: number;
-  empleosGenerados?: number;
-  
-  // Convenio fields
-  numeroConvenio?: string;
-  objetoConvenio?: string;
-  partesConvenio?: string;
-  plazoInicialMesesConvenio?: number;
-  tiempoTotalEjecucionMeses?: number;
-  actaInicioConvenio?: string;
-  fechaFinalizacionConvenio?: string;
-  cdpConvenio?: string;
-  fechaCdpConvenio?: string;
-  rcConvenio?: string;
-  fechaRcConvenio?: string;
-  valorRcConvenio?: number;
-  valorPagadoConvenio?: number;
-  valorPorPagarConvenio?: number;
+      <main className="p-8 lg:p-12 max-w-[1600px] mx-auto pb-24">
+         {/* Main Institutional Header */}
+         <div className="flex items-center gap-6 mb-12 border-b border-slate-200 pb-10">
+            <div className="w-20 h-20 bg-slate-900 rounded-[30px] flex items-center justify-center text-white shadow-2xl relative overflow-hidden group border-4 border-white">
+               <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600 to-transparent opacity-30 group-hover:opacity-60 transition-opacity" />
+               <Database size={40} className="relative z-10" />
+            </div>
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest rounded-full border border-indigo-100">Inteligencia Territorial</span>
+                <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-100">
+                  <ShieldCheck size={12} />
+                  LEY 1523 / 2026
+                </span>
+              </div>
+              <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none mb-1">Operaciones Estadísticas</h2>
+              <p className="text-slate-500 font-medium text-lg italic">Instrumentos de Medición de Pobreza y Constructo Social del Riesgo</p>
+            </div>
+          </div>
 
-  // Obra fields
-  numeroContratoObra?: string;
-  contratistaObra?: string;
-  nitContratistaObra?: string;
-  valorContratoObra?: number;
-  objetoObra?: string;
-  conformacionLegalObra?: string;
-  fechaInicioObra?: string;
-  fechaFinalizacionActual?: string;
-  cdpObra?: string;
-  fechaCdpObra?: string;
-  rcObra?: string;
-  fechaRcObra?: string;
-  valorRcObra?: number;
-  valorPagadoObra?: number;
-  valorPorPagarObra?: number;
-  atrasoEjecucionObra?: number;
+          <AnimatePresence mode="wait">
+          {view === 'list' && (
+            <SurveyList 
+              surveys={state.surveys} 
+              responses={state.surveyResponses}
+              departments={departments}
+              getMunicipalities={getMunicipalities}
+              onCreate={() => { setEditingSurveyId(null); setView('create'); }} 
+              onEdit={(s) => { setEditingSurveyId(s.id); setView('create'); }}
+              onFill={(s) => { setSelectedSurvey(s); setView('fill'); }}
+              onAnalyze={(s) => { setSelectedSurvey(s); setView('analysis'); }}
+              onDelete={(s) => deleteSurvey(s.id)}
+            />
+          )}
 
-  // Interventoria fields
-  numeroContratoInterventoria?: string;
-  contratistaInterventoria?: string;
-  nitContratistaInterventoria?: string;
-  valorContratoInterventoria?: number;
-  objetoInterventoria?: string;
-  conformacionLegalInterventoria?: string;
-  fechaSuscripcionInterventoria?: string;
-  cdpInterventoria?: string;
-  fechaCdpInterventoria?: string;
-  rcInterventoria?: string;
-  fechaRcInterventoria?: string;
-  valorRcInterventoria?: number;
-  valorPagadoInterventoria?: number;
-  valorPorPagarInterventoria?: number;
+          {view === 'create' && (
+            <SurveyBuilder 
+              departments={departments} 
+              getMunicipalities={getMunicipalities}
+              initialSurvey={editingSurveyId ? state.surveys.find(s => s.id === editingSurveyId) : undefined}
+              onSave={(s) => {
+                if (editingSurveyId) {
+                  updateSurvey(s);
+                } else {
+                  addSurvey(s);
+                }
+                setView('list'); 
+              }}
+            />
+          )}
 
-  // Other fields
-  avanceFisico?: number;
-  avanceProgramado?: number;
-  avanceFinancieroPonderado?: number;
-  avanceFinancieroObra?: number;
-  estadoProyecto?: string;
-  vencioTerminosLiquidacion?: boolean;
+          {view === 'fill' && selectedSurvey && (
+            <SurveyTaker 
+              survey={selectedSurvey} 
+              departments={departments}
+              getMunicipalities={getMunicipalities}
+              onSave={(r) => { addSurveyResponse(r); setView('list'); }}
+            />
+          )}
 
-  apoyoTecnico?: string;
-  apoyoTecnicoAntigüo?: string;
-  apoyoTecnico2026?: string;
-  apoyoFinanciero?: string;
-  apoyoJuridico?: string;
-  apoyoJuridico2026?: string;
-}
+          {view === 'analysis' && selectedSurvey && (
+            <SurveyAnalysisEngine 
+              survey={selectedSurvey} 
+              responses={state.surveyResponses.filter(r => r.surveyId === selectedSurvey.id)}
+              analyses={state.surveyAnalyses.filter(a => a.surveyId === selectedSurvey.id)}
+              onAddAnalysis={addSurveyAnalysis}
+            />
+          )}
+        </AnimatePresence>
 
-export interface Project {
-  id: string;
-  codigo?: string;
-  convenioId?: string; // Ahora es opcional
-  eventoId?: string; // Evento de emergencia asociado
-  nombre: string;
-  municipio?: string;
-  departamento?: string;
-  actasComite?: ActaComite[];
-  suspensiones?: Suspension[];
-  compromisos?: Compromiso[];
-  historialAvances?: {
-    fecha: string;
-    valor: number;
-    origenId: string;
-    origenTipo: 'Informe' | 'ActaComite' | 'Otro';
-  }[];
-  fases?: Fase[];
-  avanceFisico?: number;
-  avanceProgramado?: number;
-  avanceFinanciero?: number;
-  estado?: ProjectStatus;
-  fechaFin?: string;
-  fechaInicio?: string;
-  riesgosMitigados?: string[];
-  objetivoGeneral?: string;
-  objetivosEspecificos?: string[];
-  necesidad?: string;
-  descripcionRiesgo?: string;
-  linea?: string;
-  tipoObra?: string;
-  beneficiarios?: string;
-  matrix?: ProjectMatrix;
-  lifecycle?: ProjectLifecycle;
-  poblacionBeneficiada?: number;
-  poblacionObjetivo?: number;
-  empleosGenerados?: number;
-  riesgoAntes?: number;
-  riesgoDespues?: number;
-  coherenciaTerritorial?: number;
-  responsableOpsId?: string;
-  apoyoTecnicoId?: string;
-  apoyoFinancieroId?: string;
-  apoyoJuridicoId?: string;
-  vigencia?: string;
-  alcance?: string;
-  justificacion?: string;
-  solicitudAlcalde?: any;
-  alertas?: any[];
-  presupuestoDetallado?: any[];
-  actividadesPrincipales?: any[];
-  esEjecucionDirecta?: boolean;
-  estadoSNGRD?: 'CONOCIMIENTO' | 'REDUCCIÓN' | 'MANEJO' | 'RECONSTRUCCIÓN';
-  situacionSNGRD?: 'NORMAL' | 'CRISIS' | 'POST-CRISIS';
-  // ... resto de campos
-}
+        {/* Methodology Modal */}
+        <AnimatePresence>
+          {showMethodology && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-white w-full max-w-4xl max-h-[85vh] rounded-[40px] shadow-2xl overflow-hidden border border-slate-200 flex flex-col"
+              >
+                <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center">
+                      <BookOpen size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black">{isEditingTechnicalSheet ? 'Parametrización de Ficha' : 'Metodología y Ficha Técnica'}</h3>
+                      <p className="text-indigo-300 text-xs font-bold uppercase tracking-widest">Protocolo de Operación Estadística SRR-2026</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {!isEditingTechnicalSheet && (
+                      <button 
+                        onClick={handleStartEdit}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all"
+                      >
+                        Parametrizar
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => { setShowMethodology(false); setIsEditingTechnicalSheet(false); }}
+                      className="p-3 hover:bg-white/10 rounded-full transition-colors"
+                    >
+                      <X size={24} />
+                    </button>
+                  </div>
+                </div>
 
-export type ContractType = 'Convenio' | 'Obra' | 'Interventoría' | 'OPS' | 'Interadministrativo' | 'Consultoría';
+                <div className="p-10 overflow-y-auto custom-scrollbar space-y-10">
+                  {isEditingTechnicalSheet ? (
+                    <div className="space-y-8">
+                      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nombre Operativo</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 font-bold text-sm"
+                            value={tempTechnicalSheet?.operativeName || ''}
+                            onChange={(e) => setTempTechnicalSheet({...tempTechnicalSheet!, operativeName: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Periodo de Recolección</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 font-bold text-sm"
+                            value={tempTechnicalSheet?.collectionPeriod || ''}
+                            onChange={(e) => setTempTechnicalSheet({...tempTechnicalSheet!, collectionPeriod: e.target.value})}
+                          />
+                        </div>
+                      </section>
 
-export type ContractEventType = 
-  | 'Acta de Inicio' 
-  | 'Otrosí' 
-  | 'Suspensión' 
-  | 'Reinicio' 
-  | 'Prórroga' 
-  | 'Modificación de Valor'
-  | 'Acta de Liquidación';
+                      <section className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Objetivo General</label>
+                        <textarea 
+                          className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 font-medium text-sm h-24"
+                          value={tempTechnicalSheet?.generalObjective || ''}
+                          onChange={(e) => setTempTechnicalSheet({...tempTechnicalSheet!, generalObjective: e.target.value})}
+                        />
+                      </section>
 
-export interface Poliza {
-  id: string;
-  id_contrato: string;
-  id_proyecto?: string;
-  id_convenio?: string;
-  numero_proyecto?: string;
-  tipo_contrato: ContractType;
-  numero_contrato: string;
-  tipo_amparo: string;
-  numero_poliza: string;
-  valor_asegurado: number;
-  numero_certificado_anexo: string;
-  entidad_aseguradora: string;
-  tipo_garantia: string;
-  fecha_expedicion: string;
-  fecha_aprobacion: string;
-  fecha_inicio_vigencia: string;
-  fecha_finalizacion_vigencia: string;
-  estado: 'Vigente' | 'Vencida' | 'En Trámite' | 'Anulada';
-  apoyo_supervision: string;
-  riesgo_cubierto: string; // cumplimiento, calidad, estabilidad, etc.
-  porcentaje_cobertura: number; // calculated: valor_asegurado / valor_contrato
-  estado_cobertura: 'Adecuado' | 'Parcial' | 'Insuficiente';
-  riesgo_descubierto: number; // $ no cubierto
-  impacto_financiero_potencial: string;
-  relacion_con_otrosi?: string;
-  documento_url?: string;
-  documento_nombre?: string;
-  aprobada_por?: string;
-  fecha_aprobacion_interventoria?: string;
-  interventoria_valida?: boolean;
-  validacion_ia?: {
-    coherente: boolean;
-    observaciones: string;
-    inconsistencias: string[];
-    cumplimiento_ley_1523?: {
-      cumple: boolean;
-      analisis: string;
-      articulos_relacionados: string[];
-    };
-  };
-  historial_modificaciones?: string[];
-}
+                      <section className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descripción del Universo</label>
+                        <textarea 
+                          className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 font-medium text-sm h-24"
+                          value={tempTechnicalSheet?.universeDescription || ''}
+                          onChange={(e) => setTempTechnicalSheet({...tempTechnicalSheet!, universeDescription: e.target.value})}
+                        />
+                      </section>
 
-export interface ContractEvent {
-  id: string;
-  contractId: string;
-  tipo: ContractEventType;
-  fecha: string;
-  descripcion: string;
-  impactoPlazoMeses: number;
-  impactoValor: number;
-  documentoUrl?: string;
-  documentoNombre?: string;
-}
+                      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de Muestreo</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 font-bold text-sm"
+                            value={tempTechnicalSheet?.samplingDesign.type || ''}
+                            onChange={(e) => setTempTechnicalSheet({
+                              ...tempTechnicalSheet!, 
+                              samplingDesign: {...tempTechnicalSheet!.samplingDesign, type: e.target.value}
+                            })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tamaño Muestra (Meta)</label>
+                          <input 
+                            type="number" 
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 font-bold text-sm"
+                            value={tempTechnicalSheet?.samplingDesign.sampleSize || 0}
+                            onChange={(e) => setTempTechnicalSheet({
+                              ...tempTechnicalSheet!, 
+                              samplingDesign: {...tempTechnicalSheet!.samplingDesign, sampleSize: parseInt(e.target.value)}
+                            })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Error Absoluto (%)</label>
+                          <input 
+                            type="number" 
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 font-bold text-sm"
+                            value={tempTechnicalSheet?.marginOfError || 5.0}
+                            onChange={(e) => setTempTechnicalSheet({...tempTechnicalSheet!, marginOfError: parseFloat(e.target.value)})}
+                          />
+                        </div>
+                      </section>
 
-export interface Convenio {
-  id: string;
-  numero: string;
-  nombre: string;
-  objeto: string;
-  partes: string;
-  valorTotal: number;
-  valorAportadoFondo: number;
-  valorAportadoContrapartida: number;
-  aporteDistrito?: number;
-  aporteGobernacion?: number;
-  aporteMunicipio?: number;
-  aporteFondo?: number;
-  aportesFngrd?: number;
-  aportesLocal?: number;
-  aportesOtros?: number;
-  fechaInicio: string; // Cambiado de fechaFirma
-  fechaFin: string;
-  estado: 'Activo' | 'Liquidado' | 'En liquidación';
-  tipo: 'marco' | 'específico' | 'interadministrativo';
-  documentoUrl?: string;
-  metadata: {
-    juridica?: Record<string, any>;
-    financiera?: Record<string, any>;
-  };
-  cdp?: string;
-  rp?: string;
-  riesgosImpactadosIds?: string[];
-  fases?: Fase[];
-  
-  // Mandatory fields for effective tracking
-  plazoInicialMesesConvenio?: number;
-  tiempoTotalEjecucionMeses?: number;
-  actaInicioConvenio?: string;
-  fechaFinalizacionConvenio?: string;
-  afectacionPresupuestal?: string;
-  cdpConvenio?: string;
-  fechaCdpConvenio?: string;
-  rcConvenio?: string;
-  fechaRcConvenio?: string;
-  cdpObra?: string;
-  fechaCdpObra?: string;
-  rcObra?: string;
-  fechaRcObra?: string;
-  cdpInterventoria?: string;
-  fechaCdpInterventoria?: string;
-  rcInterventoria?: string;
-  fechaRcInterventoria?: string;
-  afectacionesPresupuestalesAdiciones?: string;
-  aporteMunicipioGobernacionObraInterventoria?: number;
-  aporteFngrdObraInterventoria?: number;
-  valorTotalProyecto?: number;
-  personasBeneficiadas?: number;
-  empleosGenerados?: number;
-  estadoSNGRD?: 'CONOCIMIENTO' | 'REDUCCIÓN' | 'MANEJO' | 'RECONSTRUCCIÓN';
-  situacionSNGRD?: 'NORMAL' | 'CRISIS' | 'POST-CRISIS';
-}
+                      <section className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Marco Conceptual / Estándar</label>
+                        <input 
+                          type="text" 
+                          className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 font-bold text-sm"
+                          value={tempTechnicalSheet?.conceptualFramework || ''}
+                          onChange={(e) => setTempTechnicalSheet({...tempTechnicalSheet!, conceptualFramework: e.target.value})}
+                        />
+                      </section>
+                    </div>
+                  ) : (
+                    <>
+                  {/* General Methodology */}
+                  <section>
+                    <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                       <Target size={14} /> {currentSheet.operativeName}
+                    </h4>
+                    <p className="text-slate-600 leading-relaxed text-sm font-medium text-justify">
+                      {currentSheet.generalObjective} {currentSheet.universeDescription} 
+                      La presente arquitectura estadística ha sido diseñada bajo los estándares de **{currentSheet.conceptualFramework}**. El instrumento de recolección utiliza un {currentSheet.samplingDesign.type}.
+                    </p>
+                    <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                       <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col gap-2">
+                          <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg w-fit">
+                             <Users size={16} />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Universo</p>
+                          <p className="text-xs font-black text-slate-800 leading-tight">Población objetivo bajo marco conceptual: {currentSheet.universeDescription}</p>
+                       </div>
+                       <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col gap-2">
+                          <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg w-fit">
+                             <Activity size={16} />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Técnica</p>
+                          <p className="text-xs font-black text-slate-800 leading-tight">{currentSheet.collectionMethod[0] || 'CAPI Automatizado'}</p>
+                       </div>
+                       <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col gap-2">
+                          <div className="p-2 bg-amber-100 text-amber-600 rounded-lg w-fit">
+                             <ShieldCheck size={16} />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Error Absoluto</p>
+                          <p className="text-xs font-black text-slate-800 leading-tight">Margen admitido de +/- {currentSheet.marginOfError || 5.0}% con p=0.5 y q=0.5.</p>
+                       </div>
+                    </div>
+                  </section>
 
-export interface Fase {
-  id: string;
-  nombre: string;
-  fechaInicio?: string;
-  fechaFin?: string;
-}
+                  {/* The Formula Section */}
+                  <section className="bg-slate-50 p-8 rounded-[32px] border border-slate-200 relative overflow-hidden">
+                    <div className="absolute right-0 top-0 p-8 text-slate-100">
+                      <Calculator size={120} />
+                    </div>
+                    <div className="relative z-10">
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                        <Calculator size={14} className="text-indigo-600" /> Formulación del Tamaño de Muestra
+                      </h4>
+                      <p className="text-slate-500 text-xs mb-8 font-bold leading-relaxed max-w-lg">
+                        Para asegurar la validez estadística con una población finita, aplicamos la fórmula de proporción poblacional con ajuste de varianza máxima prevista.
+                      </p>
+                      
+                      <div className="flex flex-col md:flex-row items-center gap-12 bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                        <div className="text-3xl font-serif text-slate-800 tracking-tighter">
+                          <span className="italic">n =</span> 
+                          <span className="mx-2 inline-block text-center align-middle">
+                            <span className="block border-b border-slate-900 pb-1">N · Z² · p · q</span>
+                            <span className="block pt-1">e² · (N - 1) + Z² · p · q</span>
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-4 border-l border-slate-100 pl-8">
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase">n</p>
+                            <p className="text-xs font-bold text-slate-700">Tamaño muestral</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase">Z</p>
+                            <p className="text-xs font-bold text-slate-700">Confianza (1.96)</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase">p</p>
+                            <p className="text-xs font-bold text-slate-700">Probabilidad (0.5)</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase">e</p>
+                            <p className="text-xs font-bold text-slate-700">Margen de Error (5%)</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
 
-export interface ActaInicioData {
-  numero: string;
-  fechaSuscripcion: string;
-  fechaInicio: string;
-  fechaFinPrevista: string;
-  plazoMeses: number;
-  valorContrato: number;
-  valorAnticipo: number;
-  supervisor: string;
-  interventor: string;
-  objeto: string;
-  observaciones: string;
-}
+                  {/* Technical Specifications */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-6">
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                        <ShieldCheck size={14} className="text-emerald-500" /> Rigurosidad Técnica
+                      </h4>
+                      <ul className="space-y-4">
+                        <li className="flex gap-4">
+                          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                            <CheckCircle2 size={12} />
+                          </div>
+                          <p className="text-xs text-slate-600 font-medium">**Margen de Error:** Máximo del {currentSheet.marginOfError || 5.0}% para indicadores principales a nivel departamental.</p>
+                        </li>
+                        <li className="flex gap-4">
+                          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                            <CheckCircle2 size={12} />
+                          </div>
+                          <p className="text-xs text-slate-600 font-medium">**Nivel de Confianza:** {currentSheet.confidenceLevel || 95}%, asumiendo una distribución normal de las respuestas.</p>
+                        </li>
+                        <li className="flex gap-4">
+                          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                            <CheckCircle2 size={12} />
+                          </div>
+                          <p className="text-xs text-slate-600 font-medium">**Marco Muestral:** {currentSheet.conceptualFramework || 'Proyecciones poblacionales DANE 2026'}.</p>
+                        </li>
+                      </ul>
+                    </div>
+                    
+                    <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100">
+                      <h4 className="text-xs font-black text-indigo-700 uppercase tracking-widest mb-4">Metodología de Campo</h4>
+                      <p className="text-xs text-indigo-900 leading-relaxed font-bold italic mb-4">
+                        "La recolección se realiza mediante dispositivos móviles con georreferenciación obligatoria y validación biométrica del encuestador."
+                      </p>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-[10px] font-black text-indigo-400 uppercase">
+                          <span>Tipo de Muestreo</span>
+                          <span className="text-indigo-700">{currentSheet.samplingDesign.type}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px] font-black text-indigo-400 uppercase">
+                          <span>Unidad Observacional</span>
+                          <span className="text-indigo-700">{currentSheet.analysisUnit.join(' / ')}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px] font-black text-indigo-400 uppercase">
+                          <span>Periodicidad</span>
+                          <span className="text-indigo-700">{currentSheet.collectionPeriod}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  </>
+                  )}
+                </div>
 
-export interface Compromiso {
-  id: string;
-  descripcion: string;
-  responsable: string;
-  fechaLimite?: string;
-  estado: 'Pendiente' | 'En Proceso' | 'Cumplido' | 'Atrasado';
-  trazabilidad?: string;
-  fechaRegistro: string;
-  actaId?: string;
-}
+                <div className="p-8 bg-slate-50 border-t border-slate-200 flex justify-end gap-4 shrink-0">
+                  {isEditingTechnicalSheet ? (
+                    <>
+                      <button 
+                        onClick={() => setIsEditingTechnicalSheet(false)}
+                        className="px-8 py-3 bg-slate-200 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-300 transition-colors"
+                      >
+                        Descartar
+                      </button>
+                      <button 
+                        onClick={handleSaveTechnicalSheet}
+                        className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
+                      >
+                        Guardar Parámetros
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={() => setShowMethodology(false)}
+                      className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-xl shadow-slate-200"
+                    >
+                      Entendido, cerrar ficha
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
-export interface ActaComite {
-  id: string;
-  projectId: string;
-  eventId?: string;
-  numero: string;
-  fecha: string;
-  temaCentral: string;
-  decisiones: string[];
-  compromisosAnteriores?: {
-    descripcion: string;
-    estadoActual: string;
-    observaciones?: string;
-  }[];
-  compromisosNuevos?: Compromiso[];
-  preocupaciones?: string[];
-  estadoCronograma?: {
-    fechaInicioPrevista?: string;
-    fechaFinPrevista?: string;
-    avanceFisico?: number;
-    observaciones?: string;
-  };
-  afectacionesGeneradas: {
-    tipo: 'Financiera' | 'Social' | 'Técnica' | 'Legal';
-    descripcion: string;
-    valorEstimado?: number;
-  }[];
-  documentId?: string;
-  evaluacionImpacto?: 'Positivo' | 'Neutral' | 'Negativo';
-  conclusionesIA?: string;
-  contextoPrevio?: string;
-  mejoroEstado?: boolean;
-}
+        {/* Legal Footer */}
+        <footer className="mt-20 pt-10 border-t border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-8 text-slate-400">
+           <div>
+              <p className="text-[10px] font-black uppercase tracking-widest mb-4">Marco Normativo</p>
+              <p className="text-xs leading-relaxed font-medium">
+                Esta plataforma cumple con los protocolos de recolección de datos de la Ley de Gestión del Riesgo 2026. 
+                Los datos son procesados bajo parámetros de confidencialidad estadística.
+              </p>
+           </div>
+           <div>
+              <p className="text-[10px] font-black uppercase tracking-widest mb-4">Metodología</p>
+              <p className="text-xs leading-relaxed font-medium">
+                Dimensionamiento basado en el índice de pobreza multidimensional expuesta (IPME-2026) y teoría de construcción social del riesgo.
+              </p>
+           </div>
+           <div className="flex flex-col items-end pt-4 md:pt-0">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 bg-slate-200 rounded-md" />
+                <div className="w-6 h-6 bg-slate-200 rounded-md" />
+                <div className="w-6 h-6 bg-slate-200 rounded-md" />
+              </div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em]">SRR Institutional Framework</p>
+           </div>
+        </footer>
+      </main>
+    </div>
+  );
+};
 
-export interface Suspension {
-  id: string;
-  contractId: string;
-  numero: string;
-  fechaInicio: string;
-  fechaFin?: string;
-  plazoMeses?: number;
-  motivo: string;
-  justificacion: string;
-  documentId?: string;
-}
+// --- Sub-Components ---
 
-export interface Contract {
-  id: string;
-  projectId: string;
-  numero: string;
-  cdp?: string;
-  rp?: string;
-  tipo: ContractType;
-  contratista: string;
-  nit: string;
-  valor: number;
-  objetoContractual: string;
-  plazoMeses: number;
-  fechaInicio?: string;
-  fechaFin?: string;
-  supervisor?: string;
-  formaPago?: string;
-  garantias?: string[];
-  obligacionesPrincipales?: string[];
-  eventos: ContractEvent[];
-  interventoriaId?: string;
-  vigencia?: string;
-  lineaInversion?: string;
-  contractorId?: string;
-  actaInicio?: string;
-  actaInicioData?: ActaInicioData;
-  actaLiquidacion?: string;
-  suspensiones?: { fechaInicio: string; fechaFin?: string; motivo: string; }[];
-  reinicios?: { fecha: string; motivo: string; }[];
-  estado: 'En ejecución' | 'En liquidación' | 'Liquidado';
-  faseId?: string;
-  aportesFngrd?: number;
-  aportesLocal?: number;
-  aportesOtros?: number;
-  aporteDistrito?: number;
-  aporteGobernacion?: number;
-  aporteMunicipio?: number;
-  aporteFondo?: number;
-  responsibleId?: string; // New field
-  valorPagado?: number;
-  avanceFisico?: number;
-  avanceProgramado?: number;
-  avanceFinanciero?: number;
-  analysis?: {
-    summary: string;
-    type: string;
-    importance: string;
-    risks: string[];
-    impacts: {
-      schedule: string;
-      budget: string;
-      progress: string;
-    };
-    inconsistencies: string[];
-    highlightedData: { key: string; value: string; context: string }[];
-    riesgosMitigados?: string[];
-    poblacionObjetivo?: number;
-    deepLearningInsights?: {
-      patronesDetectados: string[];
-      casosExitoEstructuracion: string[];
-      oportunidadesAhorro: string[];
-      innovacionesDetectadas: string[];
-      leccionesAprendidas: string[];
-    };
-  };
-}
+const SurveyList: React.FC<{ 
+  surveys: Survey[], 
+  responses: SurveyResponse[],
+  departments: Departamento[],
+  getMunicipalities: (id: string) => Municipio[],
+  onCreate: () => void, 
+  onEdit: (s: Survey) => void,
+  onFill: (s: Survey) => void,
+  onAnalyze: (s: Survey) => void,
+  onDelete: (s: Survey) => void
+}> = ({ surveys, responses, departments, getMunicipalities, onCreate, onEdit, onFill, onAnalyze, onDelete }) => {
+  const [tab, setTab] = useState<'cards' | 'territory'>('cards');
 
-export interface Pago {
-  id: string;
-  contractId: string;
-  rcId?: string; // Nuevo: Link al RC para trazabilidad financiera directa
-  reportId?: string; // Link to the supervision report that justifies this payment
-  numero: string;
-  fecha: string;
-  valor: number;
-  referencia?: string;
-  estado: 'Pendiente' | 'Pagado' | 'Rechazado';
-  observaciones: string;
-  soporteUrl?: string;
-  soporteNombre?: string;
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('all');
 
-  // Nuevos campos masivos (CSV)
-  cdp?: string;
-  proteccionCostera?: string;
-  areaEjecutora?: string;
-  identificacion?: string;
-  banco?: string;
-  tipoCuenta?: string;
-  cuenta?: string;
-  solicitud?: string;
-  numeroContratoOriginal?: string;
-  rc?: string;
-  valorDistribuido?: number;
-  resolucion?: string;
-  fuente?: string;
-  fechaRadicado?: string;
-  departamento?: string;
-  ciudad?: string;
-  codigoRubro?: string;
-  rubro?: string;
-  cuentaPago?: string;
-  firma?: string;
-  cargo?: string;
-
-  // Nuevos campos para detalle ampliado del requerimiento funcional
-  numeroFactura?: string;
-  beneficiario?: string;
-  nitBeneficiario?: string;
-  entidadBancaria?: string;
-  cuentaBancaria?: string;
-  comprobanteEgreso?: string;
-  fechaPagoReal?: string;
-}
-
-export interface Financial {
-  id: string;
-  projectId: string;
-  cdp: string;
-  rc: string;
-  valorTotal: number;
-  aportesFngrd: number;
-  aportesMunicipio: number;
-  pagosRealizados: number;
-}
-
-export interface Tracking {
-  id: string;
-  projectId: string;
-  fechaSeguimiento: string;
-  avanceReportado: number;
-  observaciones: string;
-  reportadoPor: string;
-  adjuntos?: { id: string; name: string; type: string; url: string; }[];
-}
-
-export interface Alert {
-  id: string;
-  projectId: string;
-  tipo: 'SARLAFT' | 'Incumplimiento' | 'Alerta Temprana' | 'Ente de Control';
-  descripcion: string;
-  nivel: 'Alto' | 'Medio' | 'Bajo';
-  fecha: string;
-  estado: 'Abierta' | 'Cerrada';
-  recomendacionIA?: string;
-}
-
-export interface Environmental {
-  id: string;
-  projectId: string;
-  permiso: string;
-  resolucion: string;
-  estado: 'Aprobado' | 'En Trámite' | 'Rechazado' | 'No Aplica';
-  compensaciones: string;
-}
-
-export interface InterventoriaReport {
-  id: string;
-  projectId: string;
-  contractId?: string; // Link to the specific contract being supervised
-  semana: number;
-  fechaInicio: string;
-  fechaFin: string;
-  interventorResponsable: string;
-  obraProgramadaPct: number;
-  obraEjecutadaPct: number;
-  valorProgramado: number;
-  valorEjecutado: number;
-  valorPagado?: number;
-  actividadesEjecutadas: string;
-  actividadesProximas: string;
-  sisoAmbiental: string;
-  observaciones: string;
-  fotografias: { id: string; url: string; descripcion: string }[];
-  documentIds?: string[]; // IDs of documents linked to this report
-  validado?: boolean; // Progress validation status
-}
-
-export interface OpsContractor {
-  id: string;
-  projectId: string;
-  nombre: string;
-  cedula: string;
-  rol: string;
-  honorariosMensuales: number;
-  fechaInicio: string;
-  fechaFin: string;
-  estado: 'Activo' | 'Inactivo';
-}
-
-export interface HeatMapPoint {
-  lat: number;
-  lng: number;
-  intensity: number; // 0-1
-  type: 'rain' | 'wind' | 'flood' | 'temp' | 'surge';
-  radius: number;
-  description?: string;
-}
-
-export interface InventoryItem {
-  id: string;
-  tipo: 'vivienda' | 'vial' | 'cultivo' | 'servicio';
-  subtipo: string; // Ej: 'Papa', 'Red Eléctrica', 'Vía Terciaria'
-  cantidad: number;
-  unidad: string; // Ej: 'Hectáreas', 'Unidades', 'Kilómetros'
-  valorUnitarioReposicion: number;
-  municipio: string;
-  departamento: string;
-}
-
-export interface EmergenciaEvento {
-  id: string;
-  nombre: string;
-  tipo: 'Inundación' | 'Deslizamiento' | 'Sismo' | 'Incendio Forestal' | 'Sequía' | 'Frente Frío' | 'Otro';
-  departamentosAfectados: string[];
-  municipiosAfectados: string[];
-  fechaInicio: string;
-  fechaFin?: string;
-  descripcion: string;
-  estado: 'Activo' | 'Controlado' | 'Cerrado';
-  // Caracterización Técnica (IDEAM / Metodología)
-  caracterizacion?: {
-    duracionDias?: number;
-    intensidad?: number; // Escala 1-10 para funciones de daño
-    intensidadDesc?: string; // Ej: "150mm/24h"
-    coberturaGeografica?: string; // Ej: "Regional - 15 municipios"
-    anomaliaClimatica?: number; // % vs histórico
-    tipoAmenaza?: string;
-  };
-  heatmapPoints?: HeatMapPoint[];
-  inventory?: InventoryItem[]; // Inventario parametrizado para este evento
-  metrics?: {
-    // CAPA 1: Cuantificación Física
-    hectareasAfectadas?: number;
-    viviendasDanadas?: number;
-    infraestructuraAfectada?: number;
-    poblacionImpactada?: number;
-    activosPublicos?: number;
+  // Aggregation Logic
+  const territorialData = useMemo(() => {
+    const depts: Record<string, { 
+      name: string, 
+      count: number, 
+      munis: Record<string, { 
+        name: string, 
+        count: number, 
+        target?: number 
+      }> 
+    }> = {};
     
-    // Cuantificación Detallada (Solicitada)
-    acueductosAfectados?: {
-      cantidad: number;
-      tipo: 'Rural' | 'Urbano' | 'Municipal';
-    }[];
-    puentesAfectados?: {
-      cantidad: number;
-      longitudTotal: number;
-    };
-    usuariosSinServicioPublico?: number;
+    // Filter responses by selected survey
+    const filteredResponses = selectedSurveyId === 'all' 
+      ? responses 
+      : responses.filter(r => r.surveyId === selectedSurveyId);
+
+    filteredResponses.forEach(r => {
+      const dept = departments.find(d => d.id === r.departamentoId);
+      const deptName = dept?.nombre || r.departamentoId;
+      
+      if (!depts[r.departamentoId]) {
+        depts[r.departamentoId] = { name: deptName, count: 0, munis: {} };
+      }
+      depts[r.departamentoId].count++;
+      
+      if (!depts[r.departamentoId].munis[r.municipioId]) {
+        const munis = getMunicipalities(r.departamentoId);
+        const muni = munis.find(m => m.id === r.municipioId);
+        depts[r.departamentoId].munis[r.municipioId] = { 
+          name: muni?.nombre || r.municipioId, 
+          count: 0,
+          target: r.territorialComplexity?.targetSampleSize
+        };
+      }
+      depts[r.departamentoId].munis[r.municipioId].count++;
+
+      // Update target if current one is smaller or missing
+      const currentTarget = depts[r.departamentoId].munis[r.municipioId].target;
+      const newTarget = r.territorialComplexity?.targetSampleSize;
+      if (newTarget && (!currentTarget || newTarget > currentTarget)) {
+        depts[r.departamentoId].munis[r.municipioId].target = newTarget;
+      }
+    });
     
-    // CAPA 2: Valoración Económica (VCRA)
-    costoReposicion?: number;
-    costoReparacion?: number;
-    perdidaEconomica?: number;
+    return depts;
+  }, [responses, departments, getMunicipalities]);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="space-y-6"
+    >
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Instrumentos y Territorio</h2>
+          <p className="text-slate-500 text-sm font-medium">Gestión jerárquica de la operación estadística</p>
+        </div>
+        
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
+          <button 
+            onClick={() => setTab('cards')}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${tab === 'cards' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            ENCUESTAS
+          </button>
+          <button 
+            onClick={() => setTab('territory')}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${tab === 'territory' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            DESAGREGACIÓN TERRITORIAL
+          </button>
+        </div>
+
+        <button 
+          onClick={onCreate}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-slate-900 text-white px-5 py-3 rounded-2xl transition-all shadow-xl shadow-indigo-100 font-bold text-sm"
+        >
+          <Plus size={18} />
+          Nueva Operación
+        </button>
+      </div>
+
+      {tab === 'territory' ? (
+        <div className="space-y-6">
+           {/* Survey Selector for Disaggregation */}
+           <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-3">
+                 <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                    <Filter size={24} />
+                 </div>
+                 <div>
+                    <h3 className="font-black text-slate-800">Filtrar por Operación</h3>
+                    <p className="text-slate-500 text-xs font-medium">Seleccione una encuesta para ver su avance territorial específico</p>
+                 </div>
+              </div>
+              
+              <select 
+                value={selectedSurveyId}
+                onChange={(e) => setSelectedSurveyId(e.target.value)}
+                className="w-full md:w-80 p-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-200 font-bold text-slate-700 text-sm appearance-none cursor-pointer"
+              >
+                 <option value="all">Todas las Operaciones Estadísticas</option>
+                 {surveys.map(s => (
+                   <option key={s.id} value={s.id}>{s.title}</option>
+                 ))}
+              </select>
+           </div>
+
+           <div className="flex items-center justify-between">
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+                 {selectedSurveyId === 'all' ? 'Consolidado Territorial Global' : `Avance: ${surveys.find(s => s.id === selectedSurveyId)?.title || 'Encuesta Seleccionada'}`}
+              </h3>
+              <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
+                 <Activity size={12} className="text-indigo-500" />
+                 Sincronizado en Tiempo Real
+              </div>
+           </div>
+
+           {Object.keys(territorialData).length === 0 ? (
+             <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-slate-100">
+                <MapPin size={48} className="mx-auto text-slate-200 mb-4" />
+                <p className="text-slate-400 font-medium italic">Aún no hay datos georreferenciados para mostrar desagregación.</p>
+             </div>
+           ) : (
+             Object.entries(territorialData).map(([deptId, data]) => (
+               <div key={deptId} className="bg-white rounded-[32px] p-6 border border-slate-200 overflow-hidden group">
+                  <div className="flex justify-between items-center mb-6">
+                     <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black">
+                           {data.name.charAt(0)}
+                        </div>
+                        <div>
+                           <h3 className="font-black text-slate-900 uppercase tracking-wider">{data.name}</h3>
+                           <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{data.count} Total Encuestas</p>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                     {Object.entries(data.munis).map(([muniId, mData]) => {
+                       const target = mData.target || 1; 
+                       const progressPct = Math.min(Math.round((mData.count / target) * 100), 100);
+                       const missing = Math.max(target - mData.count, 0);
+
+                       return (
+                        <div key={muniId} className="bg-slate-50 p-5 rounded-[28px] border border-slate-100 hover:border-indigo-200 transition-all shadow-sm">
+                           <div className="flex justify-between items-start mb-3">
+                              <div>
+                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Municipio</p>
+                                 <p className="font-black text-slate-800 truncate text-sm">{mData.name}</p>
+                              </div>
+                              <div className="text-right">
+                                 <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${progressPct >= 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-indigo-600 shadow-sm'}`}>
+                                    {progressPct}%
+                                 </span>
+                              </div>
+                           </div>
+                           
+                           <div className="space-y-3">
+                              <div className="h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                                 <motion.div 
+                                   initial={{ width: 0 }}
+                                   animate={{ width: `${progressPct}%` }}
+                                   className={`h-full transition-all duration-1000 ${
+                                     progressPct < 30 ? 'bg-rose-500' : 
+                                     progressPct < 70 ? 'bg-amber-500' : 
+                                     'bg-emerald-500'
+                                   }`}
+                                 />
+                              </div>
+                              
+                              <div className="flex justify-between items-center text-[10px] font-bold">
+                                 <div className="text-slate-500">
+                                    <span className="text-slate-900">{mData.count}</span>
+                                    <span className="text-slate-300 mx-1">/</span>
+                                    <span className="text-slate-400">{target} <span className="text-[8px] opacity-70">OBJ.</span></span>
+                                 </div>
+                                 {missing > 0 ? (
+                                   <div className="text-rose-500 flex items-center gap-1">
+                                      <AlertTriangle size={10} />
+                                      Faltan {missing}
+                                   </div>
+                                 ) : (
+                                   <div className="text-emerald-600 font-extrabold flex items-center gap-1">
+                                      <CheckCircle2 size={10} />
+                                      LISTO
+                                   </div>
+                                 )}
+                              </div>
+                           </div>
+                        </div>
+                       );
+                     })}
+                  </div>
+               </div>
+             ))
+           )}
+        </div>
+      ) : surveys.length === 0 ? (
+        <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center">
+          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+            <ClipboardList size={32} />
+          </div>
+          <h3 className="text-lg font-bold text-slate-700">No hay encuestas creadas</h3>
+          <p className="text-slate-500 max-w-sm mx-auto mt-2 mb-6">Comienza creando tu primera encuesta para medir el constructo social del riesgo.</p>
+          <button 
+            onClick={onCreate}
+            className="text-indigo-600 font-bold hover:underline"
+          >
+            Crear encuesta ahora
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {surveys.map(survey => (
+            <motion.div 
+              key={survey.id}
+              whileHover={{ scale: 1.02 }}
+              className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all group relative overflow-hidden"
+            >
+              {(() => {
+                const surveyResponses = responses.filter(r => r.surveyId === survey.id);
+                const responseCount = surveyResponses.length;
+                
+                return (
+                  <>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
+                        <FileText size={24} />
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 bg-slate-100 text-slate-500 rounded-lg">
+                          {survey.questions.length} preguntas
+                        </span>
+                        {survey.isGroupSurvey && (
+                          <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-indigo-600 text-white rounded-lg shadow-sm">
+                            Modo Grupal
+                          </span>
+                        )}
+                        {responseCount > 0 ? (
+                          <motion.span 
+                            initial={{ scale: 0.8 }}
+                            animate={{ scale: 1 }}
+                            className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg flex items-center gap-1 shadow-sm border border-emerald-200"
+                          >
+                            <CheckCircle2 size={10} />
+                            {responseCount} {responseCount === 1 ? 'respuesta' : 'respuestas'}
+                          </motion.span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 bg-amber-50 text-amber-600 rounded-lg">
+                            0 recolectadas
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <h3 className="text-lg font-black text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors">{survey.title}</h3>
+                    <p className="text-slate-500 text-xs font-medium line-clamp-2 mb-4 leading-relaxed">{survey.description}</p>
+                    
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-tighter bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                        <Target size={12} className="text-indigo-500" />
+                        Operación: {survey.technicalSheet?.operativeName.substring(0, 30)}...
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] font-black text-indigo-600 uppercase tracking-tighter bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
+                        <Database size={12} />
+                        Aplicación Global / Multinivel
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3 pt-6 border-t border-slate-100">
+                      <button 
+                        onClick={() => onEdit(survey)}
+                        className="flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all"
+                        title="Editar Encuesta"
+                      >
+                        <Settings2 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => onDelete(survey)}
+                        className="flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => onFill(survey)}
+                        className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95"
+                      >
+                        <MessageSquare size={16} />
+                        Responder
+                      </button>
+                      <button 
+                        onClick={() => onAnalyze(survey)}
+                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                          responseCount > 0 
+                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-100' 
+                          : 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-50'
+                        }`}
+                        disabled={responseCount === 0}
+                      >
+                        <BrainCircuit size={16} />
+                        Análisis
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const SurveyBuilder: React.FC<{ 
+  departments: Departamento[], 
+  getMunicipalities: (id: string) => Municipio[],
+  initialSurvey?: Survey,
+  onSave: (s: Survey) => void 
+}> = ({ departments, getMunicipalities, initialSurvey, onSave }) => {
+  const [step, setStep] = useState<'ficha' | 'preguntas'>('ficha');
+  const [title, setTitle] = useState(initialSurvey?.title || 'Encuesta Modelo de Ocupación Frente Frío – Construcción Social del Riesgo');
+  const [description, setDescription] = useState(initialSurvey?.description || 'Caracterizar las dinámicas de ocupación del territorio, condiciones socioeconómicas y percepción del riesgo.');
+  const [isGroupSurvey, setIsGroupSurvey] = useState(initialSurvey?.isGroupSurvey || false);
+  const [defaultGroupSize, setDefaultGroupSize] = useState(initialSurvey?.defaultGroupSize || 20);
+  
+  // Ficha Técnica default state based on DANE/Expert requirements
+  const [techSheet, setTechSheet] = useState<TechnicalSheet>(initialSurvey?.technicalSheet || {
+    operativeName: 'Encuesta Modelo de Ocupación del Territorio en Escenarios de Inundación – Frente Frío',
+    generalObjective: 'Caracterizar las dinámicas de ocupación del territorio, condiciones socioeconómicas y percepción del riesgo en zonas afectadas.',
+    specificObjectives: [
+      'Identificar patrones de ocupación del suelo en zonas inundables',
+      'Caracterizar condiciones socioeconómicas (ingreso, medios de vida, estabilidad)',
+      'Analizar procesos de poblamiento (origen, desplazamiento, arraigo)',
+      'Evaluar acceso a servicios básicos y equipamientos'
+    ],
+    universeDescription: 'Población residente en mancha de inundación (179 territorios).',
+    universeTotal: 15400,
+    marginOfError: 5,
+    confidenceLevel: 95,
+    formulaUsed: 'Muestreo aleatorio simple para proporciones con corrección por finitud.',
+    analysisUnit: ['Hogares', 'Jefes de Hogar'],
+    coverage: {
+      levels: ['Municipal', 'Local'],
+      classification: ['Urbano', 'Rural'],
+      prioritizedZones: ['Canalete', 'Sinú', 'Ciénagas', 'San Jorge', 'Tierra Alta']
+    },
+    samplingDesign: {
+      type: 'No probabilística / intencional (estratégica por riesgo)',
+      sampleSize: 50,
+      selectionCriteria: ['Nivel de afectación', 'Representatividad territorial']
+    },
+    collectionMethod: ['Encuesta estructurada cara a cara'],
+    collectionPeriod: 'Abril - Junio 2026',
+    conceptualFramework: 'Enfoque de construcción social del riesgo: el riesgo como resultado de decisiones históricas y exclusión estructural.',
+    limitations: ['Muestra no probabilística', 'Subregistro de ingresos'],
+    expectedResults: ['Tipologías de ocupación', 'Relación pobreza-exposición'],
+    normativity2026: true
+  });
+
+  const [questions, setQuestions] = useState<SurveyQuestion[]>(initialSurvey?.questions || [
+    { id: 'q-cons-1', text: '¿Otorga consentimiento informado?', type: 'boolean', options: ['Sí, otorgo consentimiento — continuar', 'No otorgo consentimiento — detener el instrumento'], required: true, category: 'Identificación territorial' },
+    { 
+      id: 'q-org-comp', 
+      text: 'Datos de la organización', 
+      type: 'composite', 
+      required: true, 
+      category: 'Organización',
+      subQuestions: [
+        { id: 'q-org-n', text: 'Nombre', type: 'text', required: true, category: 'Organización' },
+        { id: 'q-org-a', text: 'Año de conformación', type: 'number', required: false, category: 'Organización' },
+        { id: 'q-org-r', text: 'Rol o cargo del instrumentado dentro de la organización', type: 'text', required: false, category: 'Organización' },
+        { id: 'q-org-pj', text: 'Personería jurídica (Sí/No, N° si aplica)', type: 'text', required: false, category: 'Organización' }
+      ]
+    },
+    { id: 'q-pop-1', text: 'Composición de la población vinculada a la organización', type: 'matrix', rows: ['Infancia', 'Jóvenes', 'Adultos', 'TOTAL'], columns: ['Mujeres', 'Hombres', 'Otros', 'Total'], required: true, category: 'Organización' },
+    { id: 'q-pop-2', text: 'Número de personas con discapacidad', type: 'number', required: true, category: 'Organización', tags: ['Sector Igualdad y Equidad (ICBF) + Salud'] },
+    { id: 'q-eth-1', text: '13. Pertenencia étnica y poblacional', type: 'multiple', options: ['Campesinado', 'Comunidad indígena', 'Comunidad afrocolombiana, negra, raizal o palenquera', 'Pueblo Rrom (gitano)', 'Pescadores artesanales', 'Productores agropecuarios', 'Comerciantes', 'Población migrante extranjera', 'Población víctima de desplazamiento forzado', 'Población reasentada'], required: true, category: 'Población', tags: ['Enfoque diferencial transversal'] },
+    { id: 'q-geo-1', text: '14. Tipo de área geográfica donde se asienta la comunidad', type: 'multiple', options: ['Marino-costero', 'Ciénagas, humedales o playones', 'Áreas planas — playones de río', 'Laderas de pendiente moderada', 'Colinas suaves', 'Llanura aluvial', 'Zona urbana consolidada', 'Borde periurbano'], required: true, category: 'Territorio', tags: ['Sector Ambiente + Vivienda + UNGRD-SRR'] },
+    { id: 'q-pol-1', text: '24. Zonas afectadas (polígonos)', type: 'geopolygon', required: false, category: 'Afectación' },
+    { id: 'q-dyn-1', text: '17. Relación entre actividades productivas y dinámicas naturales', type: 'matrix', rows: ['Periodos normales de lluvia / verano', 'Inundaciones anuales en zonas de río', 'Crecientes rápidas de arroyos', 'Ascensos/descensos en ciénagas', 'Vientos y dinámica costera'], columns: ['Aplica', 'Beneficia', 'Habitable', 'Observación'], required: true, category: 'Afectación', tags: ['Sector Ambiente (POMCAS)'] },
+    { id: 'q-aud-1', text: '20. ¿Qué actividades, prácticas y formas de vida deben mantenerse en el territorio para vivir en armonía con las dinámicas de la naturaleza?', type: 'audio', required: false, category: 'Saberes' },
+    { id: 'q-dam-1', text: '29. Inventario cuantitativo de daños', type: 'matrix', rows: ['Predios inundados (predios)', 'Viviendas destruidas totalmente (viviendas)', 'Cultivos perdidos (hectáreas)', 'Animales perdidos (cabezas)', 'Pérdida de vidas humanas (personas)'], columns: ['Aplica', 'Cantidad'], required: true, category: 'Afectación', tags: ['Sector Vivienda + Agricultura + Salud'] }
+  ]);
+
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+
+  const handleSave = () => {
+    if (!title || questions.length === 0) {
+      showAlert('Por favor completa los campos obligatorios.');
+      return;
+    }
+    const newSurvey: Survey = {
+      ...(initialSurvey || {}),
+      id: initialSurvey?.id || crypto.randomUUID(),
+      title,
+      description,
+      departamentoId: initialSurvey?.departamentoId || 'global',
+      municipioId: initialSurvey?.municipioId || 'nacional',
+      questions,
+      createdAt: initialSurvey?.createdAt || new Date().toISOString(),
+      technicalSheet: techSheet,
+      isGroupSurvey,
+      defaultGroupSize: isGroupSurvey ? defaultGroupSize : undefined
+    };
+    onSave(newSurvey);
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="space-y-8"
+    >
+      {/* Step Indicator */}
+      <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-200 w-fit mx-auto shadow-sm">
+        <button 
+          onClick={() => setStep('ficha')}
+          className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${step === 'ficha' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
+        >
+          1. Ficha Técnica
+        </button>
+        <div className="w-8 h-px bg-slate-200" />
+        <button 
+          onClick={() => setStep('preguntas')}
+          className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${step === 'preguntas' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
+        >
+          2. Cuestionario
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {step === 'ficha' ? (
+          <div className="lg:col-span-12 space-y-6">
+            <div className="bg-white rounded-[40px] p-10 border border-slate-200 shadow-xl max-w-5xl mx-auto">
+              <div className="flex items-center gap-4 mb-8 border-b border-slate-100 pb-6">
+                <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-white">
+                  <FileText size={32} />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900">Definición de Operación Estadística</h3>
+                  <p className="text-slate-500 font-medium italic">Alineado con estándares SRR / DANE 2026</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Nombre de la Operación</label>
+                    <input 
+                      type="text" 
+                      value={techSheet.operativeName}
+                      onChange={(e) => setTechSheet({...techSheet, operativeName: e.target.value})}
+                      className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Objetivo General</label>
+                    <textarea 
+                      value={techSheet.generalObjective ?? ""}
+                      onChange={(e) => setTechSheet({...techSheet, generalObjective: e.target.value})}
+                      rows={3}
+                      className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-medium text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Enfoque Conceptual</label>
+                    <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                      <p className="text-xs text-indigo-900 leading-relaxed">
+                        {techSheet.conceptualFramework}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Configuración de Operación</label>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-100 mb-4 animate-pulse">
+                        <div className="flex items-center gap-3">
+                          <Users size={24} className="text-white" />
+                          <div>
+                            <p className="text-sm font-black uppercase tracking-widest">ACTIVAR MODO GRUPAL (LÍDERES)</p>
+                            <p className="text-[10px] text-indigo-100 font-medium tracking-tight">Crucial para encuestas a 20-30 personas simultáneas</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setIsGroupSurvey(!isGroupSurvey)}
+                          className={`w-14 h-7 rounded-full relative transition-colors ${isGroupSurvey ? 'bg-white' : 'bg-indigo-400'}`}
+                        >
+                          <div className={`absolute top-1 w-5 h-5 transition-all ${isGroupSurvey ? 'left-8 bg-indigo-600' : 'left-1 bg-white'}`} />
+                        </button>
+                      </div>
+
+                      {isGroupSurvey && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-3"
+                        >
+                          <label className="block text-[9px] font-black text-indigo-700 uppercase tracking-widest">Tamaño de Grupo Sugerido</label>
+                          <div className="flex items-center gap-4">
+                            <input 
+                              type="range" 
+                              min="2" 
+                              max="50" 
+                              value={defaultGroupSize}
+                              onChange={(e) => setDefaultGroupSize(Number(e.target.value))}
+                              className="flex-1 accent-indigo-600"
+                            />
+                            <span className="text-xl font-black text-indigo-600 w-12 text-center">{defaultGroupSize}</span>
+                          </div>
+                          <p className="text-[9px] text-indigo-400 font-medium italic">* Se habilitarán {defaultGroupSize} espacios de captura por cada pregunta.</p>
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Unidad de Análisis</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['Hogares', 'Individuos', 'Comunidad'].map(unit => (
+                        <button 
+                          key={unit}
+                          onClick={() => {
+                            const newUnits = techSheet.analysisUnit.includes(unit) 
+                              ? techSheet.analysisUnit.filter(u => u !== unit)
+                              : [...techSheet.analysisUnit, unit];
+                            setTechSheet({...techSheet, analysisUnit: newUnits});
+                          }}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${techSheet.analysisUnit.includes(unit) ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400'}`}
+                        >
+                          {unit}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-slate-100">
+                     <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                          <ShieldCheck size={20} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-900">Validado Ley 2026</p>
+                          <p className="text-[10px] text-slate-500 font-medium">Cumple con protocolos de integridad estadística</p>
+                        </div>
+                     </div>
+                  </div>
+                  </div>
+                </div>
+
+                {/* Rigurosidad Estadística */}
+                <div className="mt-12 pt-8 border-t border-slate-100">
+                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <BarChart3 size={18} className="text-indigo-600" />
+                    Rigurosidad y Diseño Muestral
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Población Universo</label>
+                      <input 
+                        type="number" 
+                        value={techSheet.universeTotal}
+                        onChange={(e) => setTechSheet({...techSheet, universeTotal: Number(e.target.value)})}
+                        className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-bold text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Margen de Error (%)</label>
+                      <input 
+                        type="number" 
+                        value={techSheet.marginOfError}
+                        onChange={(e) => setTechSheet({...techSheet, marginOfError: Number(e.target.value)})}
+                        className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-bold text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Nivel de Confianza (%)</label>
+                      <input 
+                        type="number" 
+                        value={techSheet.confidenceLevel}
+                        onChange={(e) => setTechSheet({...techSheet, confidenceLevel: Number(e.target.value)})}
+                        className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-bold text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Fórmula Utilizada</label>
+                      <input 
+                        type="text" 
+                        value={techSheet.formulaUsed}
+                        onChange={(e) => setTechSheet({...techSheet, formulaUsed: e.target.value})}
+                        className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-bold text-slate-800 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-12 flex justify-center">
+                <button 
+                  onClick={() => setStep('preguntas')}
+                  className="bg-indigo-600 hover:bg-slate-900 text-white px-12 py-5 rounded-[24px] font-black text-lg shadow-2xl transition-all flex items-center gap-4"
+                >
+                  Continuar al Diseño de Preguntas
+                  <ChevronRight size={24} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Preguntas UI (simplified reuse from previous module but with mandatory categories) */}
+            <div className="lg:col-span-12">
+               <div className="flex justify-between items-center mb-6">
+                 <div>
+                   <h3 className="text-2xl font-black text-slate-900">Diseño del Instrumento</h3>
+                   <p className="text-slate-500 font-medium">Asegura la trazabilidad de condiciones socioeconómicas (Pobreza)</p>
+                 </div>
+                 <div className="flex gap-4">
+                    <button 
+                      onClick={handleSave}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-2xl font-black shadow-lg transition-all flex items-center gap-2"
+                    >
+                      <Save size={20} />
+                      Publicar Encuesta
+                    </button>
+                 </div>
+               </div>
+
+               <div className="space-y-4">
+                  {questions.map((q, idx) => (
+                    <div key={q.id} className="bg-white rounded-3xl p-6 border border-slate-200 flex flex-col md:flex-row gap-6 hover:border-indigo-200 transition-all group overflow-hidden relative">
+                       <div className="flex gap-4 flex-1 relative z-10">
+                          <span className="text-2xl font-black text-slate-200 group-hover:text-indigo-100 transition-colors shrink-0">{String(idx+1).padStart(2,'0')}</span>
+                          <div className="flex-1">
+                             <div className="flex flex-wrap gap-2 mb-3">
+                                <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase border border-indigo-100">{q.category}</span>
+                                <span className="text-[9px] font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-md uppercase border border-slate-200">{q.type}</span>
+                                {q.required && <span className="text-[9px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-md uppercase border border-rose-100">Obligatoria</span>}
+                                {q.tags?.map(tag => (
+                                  <span key={tag} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md uppercase border border-emerald-100 flex items-center gap-1">
+                                    <Globe size={10} /> {tag}
+                                  </span>
+                                ))}
+                                {q.id.startsWith('q-poverty') && <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md uppercase border border-amber-100 flex items-center gap-1"><AlertTriangle size={10} /> Variable Crítica</span>}
+                             </div>
+                             <p className="font-black text-slate-800 text-lg mb-1">{q.text || <span className="text-slate-300 italic">Pregunta sin texto...</span>}</p>
+                          </div>
+                       </div>
+
+                       <div className="flex md:flex-col gap-2 relative z-10 shrink-0">
+                          <button 
+                            onClick={() => setEditingQuestionId(q.id)}
+                            className="p-3 bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white rounded-2xl transition-all shadow-sm"
+                            title="Parametrizar Detalle"
+                          >
+                            <Settings2 size={20} />
+                          </button>
+                          <button 
+                            onClick={() => setQuestions(questions.filter(item => item.id !== q.id))}
+                            className="p-3 bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white rounded-2xl transition-all shadow-sm"
+                            title="Eliminar Pregunta"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                       </div>
+                    </div>
+                  ))}
+                  {/* Detalle de Pregunta (Parametrizable a detalle) */}
+                  <AnimatePresence>
+                    {editingQuestionId && (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm"
+                      >
+                         <motion.div 
+                           initial={{ scale: 0.9, y: 20 }}
+                           animate={{ scale: 1, y: 0 }}
+                           className="bg-white rounded-[40px] w-full max-w-2xl shadow-2xl p-8 md:p-10 relative max-h-[90vh] overflow-y-auto custom-scrollbar"
+                         >
+                            <button 
+                              onClick={() => setEditingQuestionId(null)}
+                              className="absolute top-8 right-8 p-3 hover:bg-slate-100 rounded-full transition-all text-slate-400"
+                            >
+                              <X size={24} />
+                            </button>
+
+                            <div className="flex items-center gap-4 mb-8">
+                               <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100">
+                                  <Settings2 size={32} />
+                               </div>
+                               <div>
+                                  <h3 className="text-2xl font-black text-slate-900">Parametrización Detallada</h3>
+                                  <p className="text-slate-500 font-medium">Configura el comportamiento lógico de la variable</p>
+                               </div>
+                            </div>
+
+                            <div className="space-y-6">
+                               {(() => {
+                                 const q = questions.find(item => item.id === editingQuestionId);
+                                 if (!q) return null;
+                                 return (
+                                   <>
+                                     <div>
+                                        <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Texto de la Pregunta</label>
+                                        <input 
+                                          type="text" 
+                                          value={q.text}
+                                          onChange={(e) => {
+                                            setQuestions(questions.map(item => item.id === q.id ? {...item, text: e.target.value} : item));
+                                          }}
+                                          className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 shadow-inner"
+                                          placeholder="Ej: ¿Qué tipo de material es el piso?"
+                                        />
+                                     </div>
+
+                                     <div>
+                                        <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Instrucción / Descripción Técnica</label>
+                                        <textarea 
+                                          value={q.description || ''}
+                                          onChange={(e) => {
+                                            setQuestions(questions.map(item => item.id === q.id ? {...item, description: e.target.value} : item));
+                                          }}
+                                          className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-medium text-slate-600"
+                                          rows={2}
+                                          placeholder="Instrucciones para el encuestador..."
+                                        />
+                                     </div>
+
+                                     <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                           <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Tipo de Captura</label>
+                                           <select 
+                                             value={q.type}
+                                             onChange={(e) => {
+                                               setQuestions(questions.map(item => item.id === q.id ? {...item, type: e.target.value as any} : item));
+                                             }}
+                                             className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800"
+                                           >
+                                              <option value="text">Texto (Abierta)</option>
+                                              <option value="number">Numérica (Cantidad / Escala)</option>
+                                              <option value="boolean">Booleana (Sí/No o Condición)</option>
+                                              <option value="select">Selección Única</option>
+                                              <option value="multiple">Selección Múltiple</option>
+                                              <option value="matrix">Matriz / Tabla de Datos</option>
+                                              <option value="composite">Grupo (Compuesta)</option>
+                                              <option value="geopolygon">Polígono Geográfico</option>
+                                              <option value="audio">Audio (Respuesta Abierta Hablada)</option>
+                                           </select>
+                                        </div>
+                                        <div>
+                                           <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Categoría SRR</label>
+                                           <input 
+                                             type="text" 
+                                             value={q.category}
+                                             onChange={(e) => {
+                                               setQuestions(questions.map(item => item.id === q.id ? {...item, category: e.target.value} : item));
+                                             }}
+                                             className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800"
+                                             placeholder="Ej: Infraestructura"
+                                           />
+                                        </div>
+                                     </div>
+
+                                     {(q.type === 'select' || q.type === 'multiple' || q.type === 'boolean') && (
+                                       <div>
+                                          <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Opciones de Respuesta</label>
+                                          <div className="space-y-2">
+                                            {(q.options?.length ? q.options : (q.type === 'boolean' ? ['Sí', 'No'] : [])).map((opt, i) => (
+                                              <div key={i} className="flex gap-2 relative group items-center">
+                                                <input 
+                                                  type="text"
+                                                  value={opt}
+                                                  onChange={(e) => {
+                                                    const newOpts = [...(q.options?.length ? q.options : (q.type === 'boolean' ? ['Sí', 'No'] : []))];
+                                                    newOpts[i] = e.target.value;
+                                                    setQuestions(questions.map(item => item.id === q.id ? {...item, options: newOpts} : item));
+                                                  }}
+                                                  className="w-full bg-slate-50 border-none rounded-xl px-6 py-4 font-bold text-slate-800"
+                                                  placeholder={`Opción ${i + 1}`}
+                                                />
+                                                {q.type !== 'boolean' && (
+                                                  <button 
+                                                    onClick={() => {
+                                                      const newOpts = (q.options || []).filter((_, idx) => idx !== i);
+                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, options: newOpts} : item));
+                                                    }}
+                                                    className="p-3 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                                    title="Eliminar opción"
+                                                  >
+                                                    <X size={16} />
+                                                  </button>
+                                                )}
+                                              </div>
+                                            ))}
+                                            {q.type !== 'boolean' && (
+                                              <button
+                                                onClick={() => {
+                                                  const newOpts = [...(q.options || []), `Opción ${(q.options?.length || 0) + 1}`];
+                                                  setQuestions(questions.map(item => item.id === q.id ? {...item, options: newOpts} : item));
+                                                }}
+                                                className="mt-2 flex items-center gap-2 text-[10px] font-black text-indigo-500 uppercase px-4 py-3 hover:bg-indigo-50 rounded-xl transition-all w-full justify-center border-2 border-dashed border-indigo-100"
+                                              >
+                                                <Plus size={14} /> Añadir Opción
+                                              </button>
+                                            )}
+                                          </div>
+                                       </div>
+                                     )}
+
+                                     {q.type === 'matrix' && (
+                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                          <div>
+                                            <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Filas de la Matriz</label>
+                                            <div className="space-y-2">
+                                              {(q.rows || []).map((row, i) => (
+                                                <div key={i} className="flex gap-2 items-center">
+                                                  <input 
+                                                    type="text"
+                                                    value={row}
+                                                    onChange={(e) => {
+                                                      const newRows = [...(q.rows || [])];
+                                                      newRows[i] = e.target.value;
+                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, rows: newRows} : item));
+                                                    }}
+                                                    className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 font-bold text-slate-800 text-xs"
+                                                    placeholder={`Fila ${i + 1}`}
+                                                  />
+                                                  <button 
+                                                    onClick={() => {
+                                                      const newRows = (q.rows || []).filter((_, idx) => idx !== i);
+                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, rows: newRows} : item));
+                                                    }}
+                                                    className="p-2 text-slate-300 hover:text-rose-500 rounded-lg transition-colors"
+                                                  >
+                                                    <X size={14} />
+                                                  </button>
+                                                </div>
+                                              ))}
+                                              <button
+                                                onClick={() => {
+                                                  const newRows = [...(q.rows || []), `Nueva Fila ${(q.rows?.length || 0) + 1}`];
+                                                  setQuestions(questions.map(item => item.id === q.id ? {...item, rows: newRows} : item));
+                                                }}
+                                                className="text-[10px] font-black text-indigo-500 uppercase flex items-center gap-1 hover:text-indigo-700 mt-1 transition-all"
+                                              >
+                                                <Plus size={12} /> Añadir Fila
+                                              </button>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Columnas de la Matriz</label>
+                                            <div className="space-y-2">
+                                              {(q.columns || []).map((col, i) => (
+                                                <div key={i} className="flex gap-2 items-center">
+                                                  <input 
+                                                    type="text"
+                                                    value={col}
+                                                    onChange={(e) => {
+                                                      const newCols = [...(q.columns || [])];
+                                                      newCols[i] = e.target.value;
+                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, columns: newCols} : item));
+                                                    }}
+                                                    className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 font-bold text-slate-800 text-xs"
+                                                    placeholder={`Columna ${i + 1}`}
+                                                  />
+                                                  <button 
+                                                    onClick={() => {
+                                                      const newCols = (q.columns || []).filter((_, idx) => idx !== i);
+                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, columns: newCols} : item));
+                                                    }}
+                                                    className="p-2 text-slate-300 hover:text-rose-500 rounded-lg transition-colors"
+                                                  >
+                                                    <X size={14} />
+                                                  </button>
+                                                </div>
+                                              ))}
+                                              <button
+                                                onClick={() => {
+                                                  const newCols = [...(q.columns || []), `Col ${(q.columns?.length || 0) + 1}`];
+                                                  setQuestions(questions.map(item => item.id === q.id ? {...item, columns: newCols} : item));
+                                                }}
+                                                className="text-[10px] font-black text-indigo-500 uppercase flex items-center gap-1 hover:text-indigo-700 mt-1 transition-all"
+                                              >
+                                                <Plus size={12} /> Añadir Columna
+                                              </button>
+                                            </div>
+                                          </div>
+                                       </div>
+                                     )}
+
+                                     {q.type === 'composite' && (
+                                       <div className="space-y-4">
+                                          <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest">Sub-campos / Variables del Grupo</label>
+                                          <div className="space-y-2 border-l-4 border-indigo-100 pl-4">
+                                            {(q.subQuestions || []).map((sq, i) => (
+                                              <div key={sq.id} className="bg-slate-50 p-4 rounded-2xl relative shadow-sm border border-slate-100">
+                                                <button 
+                                                  onClick={() => {
+                                                    const nextSubs = (q.subQuestions || []).filter(item => item.id !== sq.id);
+                                                    setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
+                                                  }}
+                                                  className="absolute top-2 right-2 text-slate-300 hover:text-rose-500 p-1"
+                                                >
+                                                  <Trash2 size={14} />
+                                                </button>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                  <input 
+                                                    type="text"
+                                                    value={sq.text}
+                                                    onChange={(e) => {
+                                                      const nextSubs = [...(q.subQuestions || [])];
+                                                      nextSubs[i] = { ...sq, text: e.target.value };
+                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
+                                                    }}
+                                                    className="col-span-2 bg-white border-none rounded-xl px-3 py-2 font-bold text-slate-800 text-xs"
+                                                    placeholder="Nombre del campo..."
+                                                  />
+                                                  <select
+                                                    value={sq.type}
+                                                    onChange={(e) => {
+                                                      const nextSubs = [...(q.subQuestions || [])];
+                                                      nextSubs[i] = { ...sq, type: e.target.value as any };
+                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
+                                                    }}
+                                                    className="bg-white border-none rounded-xl px-3 py-2 font-bold text-slate-800 text-[10px]"
+                                                  >
+                                                    <option value="text">Texto</option>
+                                                    <option value="number">Número</option>
+                                                    <option value="boolean">Booleano</option>
+                                                  </select>
+                                                </div>
+                                              </div>
+                                            ))}
+                                            <button 
+                                              onClick={() => {
+                                                const newSub: SurveyQuestion = { id: crypto.randomUUID(), text: '', type: 'text', required: false, category: q.category };
+                                                const nextSubs = [...(q.subQuestions || []), newSub];
+                                                setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
+                                              }}
+                                              className="w-full py-3 border-2 border-dashed border-indigo-100 rounded-2xl text-[10px] font-black text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
+                                            >
+                                              <Plus size={14} /> Añadir Sub-campo
+                                            </button>
+                                          </div>
+                                       </div>
+                                     )}
+
+                                     <div>
+                                        <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Etiquetas / Metadatos</label>
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                          {(q.tags || []).map((tag, i) => (
+                                            <span key={i} className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase flex items-center gap-2 border border-emerald-100">
+                                              {tag}
+                                              <button onClick={() => {
+                                                const nextTags = q.tags?.filter((_, idx) => idx !== i);
+                                                setQuestions(questions.map(item => item.id === q.id ? {...item, tags: nextTags} : item));
+                                              }}>
+                                                <X size={10} />
+                                              </button>
+                                            </span>
+                                          ))}
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <input 
+                                            type="text" 
+                                            id={`new-tag-${q.id}`}
+                                            className="flex-1 bg-slate-50 border-none rounded-[16px] px-4 py-3 text-xs font-bold"
+                                            placeholder="Nueva etiqueta..."
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                const val = (e.currentTarget as HTMLInputElement).value.trim();
+                                                if (val) {
+                                                  const nextTags = [...(q.tags || []), val];
+                                                  setQuestions(questions.map(item => item.id === q.id ? {...item, tags: nextTags} : item));
+                                                  e.currentTarget.value = '';
+                                                }
+                                              }
+                                            }}
+                                          />
+                                        </div>
+                                     </div>
+
+                                     <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[32px]">
+                                        <div className="flex items-center gap-3">
+                                          <button 
+                                            onClick={() => {
+                                              setQuestions(questions.map(item => item.id === q.id ? {...item, required: !item.required} : item));
+                                            }}
+                                            className={`w-12 h-6 rounded-full relative transition-colors ${q.required ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                                          >
+                                             <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${q.required ? 'left-7' : 'left-1'}`} />
+                                          </button>
+                                          <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Respuesta Obligatoria</span>
+                                        </div>
+                                     </div>
+
+                                     <div className="pt-6">
+                                        <button 
+                                          onClick={() => setEditingQuestionId(null)}
+                                          className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black text-lg shadow-xl hover:bg-black transition-all"
+                                        >
+                                          Guardar Parámetros
+                                        </button>
+                                     </div>
+                                   </>
+                                 );
+                               })()}
+                            </div>
+                         </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <button 
+                    onClick={() => {
+                      const newQId = crypto.randomUUID();
+                      const newQ: SurveyQuestion = { id: newQId, text: '', type: 'text', required: true, category: 'General' };
+                      setQuestions([...questions, newQ]);
+                      setEditingQuestionId(newQId);
+                    }}
+                    className="w-full border-2 border-dashed border-slate-200 rounded-3xl py-6 flex flex-col items-center gap-2 text-slate-300 hover:text-indigo-600 hover:border-indigo-200 transition-all font-black uppercase text-xs"
+                  >
+                    <Plus size={32} />
+                    Agregar Variable Adicional
+                  </button>
+               </div>
+            </div>
+          </>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+const SurveyTaker: React.FC<{ 
+  survey: Survey, 
+  departments: Departamento[],
+  getMunicipalities: (id: string) => Municipio[],
+  onSave: (r: SurveyResponse) => void 
+}> = ({ survey, departments, getMunicipalities, onSave }) => {
+  const [ungrdCode, setUngrdCode] = useState('UNGRD-PRT-' + Math.floor(Math.random()*10000).toString().padStart(4, '0'));
+  const [surveyCode] = useState('QST-' + crypto.randomUUID().substring(0, 6).toUpperCase());
+  const [deptId, setDeptId] = useState('');
+  const [muniId, setMuniId] = useState('');
+  const [zonaId, setZonaId] = useState(''); // Could be used for DANE code or cuenca
+  const [tipoZona, setTipoZona] = useState('Urbana');
+  const [zonaAfectacion, setZonaAfectacion] = useState('');
+  const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null);
+  const [capturingCoords, setCapturingCoords] = useState(false);
+  const [gridView, setGridView] = useState(false);
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [progress, setProgress] = useState(0);
+
+  // Identity States
+  const [surveyor, setSurveyor] = useState({ fullName: '', idNumber: '', role: 'Encuestador Regional' });
+  const [respondent, setRespondent] = useState({ fullName: '', idNumber: '', contact: '', age: 18, gender: 'Otro' });
+  const [groupRespondents, setGroupRespondents] = useState<{ fullName: string, idNumber: string, contact: string }[]>(
+    survey.isGroupSurvey ? Array(survey.defaultGroupSize || 5).fill(null).map(() => ({ fullName: '', idNumber: '', contact: '' })) : []
+  );
+
+  const municipalities = useMemo(() => getMunicipalities(deptId), [deptId, getMunicipalities]);
+
+  // Territorial Intelligence Metrics (Deterministic Simulation based on Region)
+  const territorialMetrics = useMemo(() => {
+    if (!muniId) return { nbi: 15.0, gini: 0.45 };
+    const hash = Array.from(muniId).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return {
+      nbi: Number((5 + (hash % 50)).toFixed(1)), // NBI range 5-55%
+      gini: Number((0.42 + ((hash % 15) / 100)).toFixed(3)) // Gini range 0.42 - 0.57
+    };
+  }, [muniId]);
+
+  const deffValue = useMemo(() => {
+    // formula: 1 + (NBI weight) + (Gini weight)
+    return Number((1 + (territorialMetrics.nbi / 100 * 1.2) + (territorialMetrics.gini * 0.8)).toFixed(2));
+  }, [territorialMetrics]);
+
+  // Territorial Sizing logic
+  const [localUniverse, setLocalUniverse] = useState(10000);
+  const [localMargin, setLocalMargin] = useState(5.0);
+  const [localConfidence, setLocalConfidence] = useState(95);
+  const [showCalculator, setShowCalculator] = useState(false);
+
+  const sampleSize = useMemo(() => {
+    const Z = localConfidence === 95 ? 1.96 : (localConfidence === 99 ? 2.58 : 1.645);
+    const P = 0.5;
+    const Q = 0.5;
+    const E = localMargin / 100;
+    const N = localUniverse;
+    const DEFF = deffValue;
+
+    const numerator = Math.pow(Z, 2) * P * Q * N;
+    const denominator = (Math.pow(E, 2) * (N - 1)) + (Math.pow(Z, 2) * P * Q);
     
-    // Factores VCRA (Metodología Auditable)
-    vcra?: {
-      costoUnitarioVivienda?: number;
-      factorDanoVivienda?: number; // 0.3, 0.6, 0.8, 1.0
-      factorTerritorial?: number; // 1.0 (urbano), 1.2 (rural), 1.3 (difícil acceso)
+    return Math.ceil((numerator / denominator) * DEFF);
+  }, [localUniverse, localMargin, localConfidence, deffValue]);
+
+  const handleCaptureCoordinates = () => {
+    if (!navigator.geolocation) {
+      showAlert("Tu navegador no soporta geolocalización.");
+      return;
+    }
+    setCapturingCoords(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoordinates({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setCapturingCoords(false);
+        showAlert(`Coordenadas capturadas: ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`);
+      },
+      (err) => {
+        console.error(err);
+        setCapturingCoords(false);
+        showAlert("Error al capturar coordenadas. Por favor revisa los permisos.");
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
+  const handleSubmit = () => {
+    // Validation
+    if (!deptId || !muniId) {
+      showAlert('Por favor indica el Departamento y Municipio.');
+      return;
+    }
+
+    if (!surveyor.fullName) {
+      showAlert('La información del encuestador es obligatoria para la validez legal.');
+      return;
+    }
+
+    if (!survey.isGroupSurvey && !respondent.fullName) {
+      showAlert('La información del respondiente es obligatoria para la validez legal.');
+      return;
+    }
+
+    if (survey.isGroupSurvey) {
+      const activeRespondents = groupRespondents.filter(r => r.fullName);
+      if (activeRespondents.length === 0) {
+        showAlert('Debe registrar al menos un integrante del grupo con nombre.');
+        return;
+      }
+    }
+
+    const missing = survey.questions.filter(q => q.required && !answers[q.id]);
+    if (missing.length > 0) {
+      showAlert(`Por favor responde las preguntas obligatorias: ${missing.map((_, i) => i + 1).join(', ')}`);
+      return;
+    }
+
+    const response: SurveyResponse = {
+      id: crypto.randomUUID(),
+      surveyId: survey.id,
+      surveyorInfo: surveyor,
+      respondentInfo: respondent,
+      groupRespondents: survey.isGroupSurvey ? groupRespondents.filter(r => r.fullName) : undefined,
+      departamentoId: deptId,
+      municipioId: muniId,
+      zonaId: zonaId,
+      zonaAfectacion: zonaAfectacion,
+      coordinates: coordinates || undefined,
+      date: new Date().toISOString(),
+      answers,
+      territorialComplexity: {
+        nbi: territorialMetrics.nbi,
+        gini: territorialMetrics.gini,
+        deff: deffValue,
+        targetSampleSize: sampleSize
+      }
     };
-
-    // CAPA 3: Cuantificación de Necesidades
-    atencionInmediata?: number;
-    maquinariaHoras?: number;
-    rehabilitacion?: number;
-    reconstruccion?: number;
-    tipoEventoComposition?: Record<string, number>;
-    
-    // Seguimiento Financiero del Evento
-    financiero?: {
-      presupuestoAsignado: number;
-      valorComprometido: number;
-      valorPagado: number;
-      valorPorPagar: number;
-      cdps: string[];
-      rcs: string[];
-    };
+    onSave(response);
+    showAlert('Operación Estadística completada y sincronizada.');
   };
-  solicitudesMaquinaria?: SolicitudMaquinaria[];
-  comisionesIds?: string[];
-  costosOperativos?: {
-    reunionesPMU?: {
-      id: string;
-      fecha: string;
-      tema: string;
-      participantes: string[];
-      costoEstimado?: number;
-    }[];
-    comisionesSugeridas?: {
-      id: string;
-      departamento: string;
-      municipios: string;
-      objeto: string;
-      numeroDias: number;
-      perfilesRequeridos: string[];
-      costoEstimado?: number;
-    }[];
-    presupuestoEstimado?: number;
+
+  const updateAnswer = (qid: string, val: any, respondentIndex?: number) => {
+    if (survey.isGroupSurvey && respondentIndex !== undefined) {
+      const currentAnswers = (answers[qid] as any[]) || [];
+      const newGroupAnswers = [...currentAnswers];
+      newGroupAnswers[respondentIndex] = val;
+      const newAnswers = { ...answers, [qid]: newGroupAnswers };
+      setAnswers(newAnswers);
+      const answeredCount = Object.keys(newAnswers).filter(k => 
+        Array.isArray(newAnswers[k]) ? newAnswers[k].some((v: any) => v !== undefined && v !== '') : newAnswers[k]
+      ).length;
+      setProgress(Math.round((answeredCount / survey.questions.length) * 100));
+    } else if (survey.isGroupSurvey && respondentIndex === undefined && Array.isArray(val)) {
+       // Bulk update for current group
+       const newAnswers = { ...answers, [qid]: val };
+       setAnswers(newAnswers);
+       const answeredCount = Object.keys(newAnswers).filter(k => 
+         Array.isArray(newAnswers[k]) ? newAnswers[k].some((v: any) => v !== undefined && v !== '') : newAnswers[k]
+       ).length;
+       setProgress(Math.round((answeredCount / survey.questions.length) * 100));
+    } else {
+      const newAnswers = { ...answers, [qid]: val };
+      setAnswers(newAnswers);
+      const answeredCount = Object.keys(newAnswers).filter(k => 
+         Array.isArray(newAnswers[k]) ? newAnswers[k].some((v: any) => v !== undefined && v !== '') : newAnswers[k]
+      ).length;
+      setProgress(Math.round((answeredCount / survey.questions.length) * 100));
+    }
   };
-}
 
-export interface SolicitudMaquinaria {
-  id: string;
-  municipio: string;
-  departamento: string;
-  horasSolicitadas: number;
-  tipoMaquinaria: string;
-  estado: 'Pendiente' | 'Aprobada' | 'En Operación' | 'Finalizada';
-  fechaSolicitud: string;
-  descripcion?: string;
-}
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="max-w-5xl mx-auto bg-white rounded-[40px] shadow-2xl border border-slate-100"
+    >
+      {/* Visual Header */}
+      <div className="h-32 bg-indigo-600 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full -translate-x-1/2 translate-y-1/2" />
+        </div>
+        <div className="absolute inset-0 flex flex-col justify-center px-12">
+          <h2 className="text-white text-3xl font-black">{survey.title}</h2>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-bold text-white uppercase tracking-widest backdrop-blur-md">
+              Encuesta de Territorio
+            </span>
+          </div>
+        </div>
+      </div>
 
-export interface Comision {
-  id: string;
-  projectId?: string; 
-  projectIds?: string[];
-  professionalIds: string[];
-  tipoVinculacion: 'CONTRATISTA' | 'FUNCIONARIO' | 'OTRO';
-  responsableNombre: string;
-  tipoComision: string;
-  proyectoNombre: string;
-  departamento: string;
-  municipios: string;
-  objeto: string;
-  fechaInicio: string;
-  fechaFin: string;
-  anio: number;
-  numeroDias: number;
-  requiereViaticos: boolean;
-  transporteTerrestre: boolean;
-  rutaAerea: string;
-  autorizadoVB: string;
-  planTrabajo1: string;
-  planTrabajo2: string;
-  planTrabajo3: string;
-  linkSoporte: string;
-  fechaSolicitudFuncionario: string;
-  fechaSolicitud: string;
-  fechaAprobacionSG: string;
-  diasGestionHabiles: number;
-  destinoInternacional?: boolean;
-  
-  // Campos técnicos existentes/necesarios para cálculos
-  fechaAprobacion?: string; 
-  eventoId?: string;
-  pernocta: boolean;
-  costoProfesionales: number;
-  costosAdicionales: {
-    transporte: number;
-    viaticos: number;
-    alojamiento: number;
+      <div className="p-8 lg:p-12 space-y-10">
+        {/* Geographic Context (Mandatory for Surveyor) - Block 1.1 */}
+        <div className="space-y-6 bg-slate-50 p-8 rounded-[32px] border border-slate-100">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4 mb-4">
+             <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+               <MapPin size={16} />
+               Bloque 1.1 — Identificación Territorial
+             </h3>
+             <div className="flex items-center gap-3">
+               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cód. Cuestionario:</span>
+               <span className="px-3 py-1 bg-slate-200 text-slate-600 rounded-lg text-xs font-black">{surveyCode}</span>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Código territorial UNGRD-PRT</label>
+              <input 
+                 type="text"
+                 value={ungrdCode}
+                 onChange={(e) => setUngrdCode(e.target.value)}
+                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+              />
+            </div>
+            <div className="flex flex-col justify-center">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1 flex justify-between">
+                Captura GPS Georreferenciada
+                {coordinates && (
+                  <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                    <MapPin size={10} />
+                    {coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)}
+                  </span>
+                )}
+              </label>
+              <button 
+                onClick={handleCaptureCoordinates}
+                disabled={capturingCoords}
+                className={`w-full py-3 rounded-2xl flex justify-center items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all shadow-sm border-2 ${
+                  coordinates 
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                  : capturingCoords 
+                    ? 'bg-slate-50 text-slate-400 border-slate-100 animate-pulse'
+                    : 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                }`}
+                title="Capturar Coordenadas GPS"
+              >
+                <MapPin size={16} className={capturingCoords ? 'animate-bounce' : ''} />
+                {capturingCoords ? 'Capturando...' : coordinates ? 'Coordenadas Guardadas' : '📍 Iniciar Captura de Punto GPS'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Departamento</label>
+              <select 
+                value={deptId}
+                onChange={(e) => setDeptId(e.target.value)}
+                className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all cursor-pointer"
+              >
+                <option value="">Seleccionar...</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Municipio</label>
+              <select 
+                value={muniId}
+                onChange={(e) => {
+                  setMuniId(e.target.value);
+                  if (e.target.value) setShowCalculator(true);
+                }}
+                className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all cursor-pointer"
+              >
+                <option value="">Seleccionar...</option>
+                {municipalities.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Código DANE Municipio</label>
+              <input 
+                 type="text"
+                 value={muniId}
+                 readOnly
+                 placeholder="Auto-generado"
+                 className="w-full bg-slate-100 border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-400 outline-none cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Corregimiento / Vereda / Barrio</label>
+              <input 
+                type="text" 
+                value={zonaAfectacion}
+                onChange={(e) => setZonaAfectacion(e.target.value)}
+                placeholder="Especifique el área..."
+                className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Cuenca / Sector Hidrográfico</label>
+              <input 
+                type="text" 
+                value={zonaId}
+                onChange={(e) => setZonaId(e.target.value)}
+                placeholder="Nombre de la cuenca..."
+                className="w-full bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 mt-4">
+             <label className="block text-[10px] font-black text-slate-500 uppercase mb-3 ml-1 flex items-center gap-1.5">
+              <Layers size={14} className="text-indigo-400" />
+              Tipo de Zona
+            </label>
+            <div className="flex flex-wrap gap-3">
+               {['Urbana', 'Centro poblado', 'Rural', 'Rural dispersa'].map(ambito => (
+                 <button 
+                  key={ambito}
+                  onClick={() => setTipoZona(ambito)}
+                  className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm border-2 ${
+                    tipoZona === ambito 
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                      : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-100'
+                  }`}
+                 >
+                   {ambito}
+                 </button>
+               ))}
+            </div>
+          </div>
+
+          <AnimatePresence>
+            {showCalculator && muniId && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-4 pt-6 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                   <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">NBI Territorial</label>
+                      <span className="text-xl font-black text-slate-800">{territorialMetrics.nbi}%</span>
+                   </div>
+                   <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">GINI (Inequidad)</label>
+                      <span className="text-xl font-black text-slate-800">{territorialMetrics.gini}</span>
+                   </div>
+                   <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col justify-center border-l-4 border-l-indigo-500">
+                      <label className="block text-[9px] font-black text-indigo-600 uppercase mb-1 tracking-tighter">Efecto Diseño (DEFF)</label>
+                      <span className="text-xl font-black text-indigo-600">{deffValue}</span>
+                   </div>
+                   <div className="bg-indigo-600 p-4 rounded-2xl shadow-xl shadow-indigo-100 flex flex-col justify-center">
+                      <label className="block text-[9px] font-black text-indigo-200 uppercase mb-1">Muestra Requerida (n)</label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-black text-white">{sampleSize}</span>
+                        <span className="text-[10px] font-bold text-indigo-100">Personas</span>
+                      </div>
+                   </div>
+                </div>
+                
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                   <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Población (N)</label>
+                      <input 
+                        type="number" 
+                        value={localUniverse}
+                        onChange={(e) => setLocalUniverse(Number(e.target.value))}
+                        className="w-full font-bold text-slate-600 outline-none text-sm bg-transparent"
+                      />
+                   </div>
+                   <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Error (%)</label>
+                      <input 
+                        type="number" 
+                        step="0.1"
+                        value={localMargin}
+                        onChange={(e) => setLocalMargin(Number(e.target.value))}
+                        className="w-full font-bold text-slate-600 outline-none text-sm bg-transparent"
+                      />
+                   </div>
+                </div>
+                <p className="mt-4 text-[10px] text-slate-400 font-medium italic text-center">
+                  * DEFF dinámico calculado según NBI y Gini institucional 2026.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                 <Users size={14} className="text-indigo-500" />
+                 Identificación del Encargador
+               </h3>
+               <div className="space-y-3">
+                  <input 
+                    type="text" 
+                    value={surveyor.fullName}
+                    onChange={(e) => setSurveyor({...surveyor, fullName: e.target.value})}
+                    placeholder="Nombres completos del encuestador"
+                    className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  />
+                  <input 
+                    type="text" 
+                    value={surveyor.idNumber}
+                    onChange={(e) => setSurveyor({...surveyor, idNumber: e.target.value})}
+                    placeholder="Cédula / ID Institucional"
+                    className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  />
+               </div>
+            </div>
+
+            <div className="space-y-4">
+               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                 <Target size={14} className="text-emerald-500" />
+                 {survey.isGroupSurvey ? 'Datos del Grupo de Líderes' : 'Datos del Encuestado'}
+               </h3>
+               {survey.isGroupSurvey ? (
+                 <div className="space-y-4 max-h-[300px] overflow-y-auto pr-4 custom-scrollbar bg-white/50 p-4 rounded-3xl border border-slate-100 shadow-inner">
+                    {groupRespondents.map((r, i) => (
+                      <div key={i} className="grid grid-cols-12 gap-3 pb-3 border-b border-slate-100 last:border-0 pt-3 first:pt-0 group/leader">
+                        <div className="col-span-1 flex items-center justify-center font-black text-slate-300 text-xs">
+                          {i+1}
+                        </div>
+                        <div className="col-span-4">
+                          <input 
+                            type="text" 
+                            placeholder="Nombre Completo"
+                            value={r.fullName}
+                            onChange={(e) => {
+                              const newGroup = [...groupRespondents];
+                              newGroup[i] = { ...r, fullName: e.target.value };
+                              setGroupRespondents(newGroup);
+                            }}
+                            className="w-full bg-white border-slate-100 rounded-lg px-3 py-2 text-xs font-bold"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <input 
+                            type="text" 
+                            placeholder="Identificación"
+                            value={r.idNumber}
+                            onChange={(e) => {
+                              const newGroup = [...groupRespondents];
+                              newGroup[i] = { ...r, idNumber: e.target.value };
+                              setGroupRespondents(newGroup);
+                            }}
+                            className="w-full bg-white border-slate-100 rounded-lg px-3 py-2 text-xs font-bold"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <input 
+                            type="text" 
+                            placeholder="Contacto"
+                            value={r.contact}
+                            onChange={(e) => {
+                              const newGroup = [...groupRespondents];
+                              newGroup[i] = { ...r, contact: e.target.value };
+                              setGroupRespondents(newGroup);
+                            }}
+                            className="w-full bg-white border-slate-100 rounded-lg px-3 py-2 text-xs font-bold"
+                          />
+                        </div>
+                        <div className="col-span-1 flex items-center justify-center">
+                          <button 
+                            onClick={() => {
+                              if (groupRespondents.length <= 1) return;
+                              const newGroup = groupRespondents.filter((_, idx) => idx !== i);
+                              setGroupRespondents(newGroup);
+                              // Sync answers: remove entry i from all answer arrays
+                              const newAnswers = { ...answers };
+                              Object.keys(newAnswers).forEach(qid => {
+                                if (Array.isArray(newAnswers[qid])) {
+                                  newAnswers[qid] = (newAnswers[qid] as any[]).filter((_, idx) => idx !== i);
+                                }
+                              });
+                              setAnswers(newAnswers);
+                            }}
+                            className="text-slate-300 hover:text-rose-500 transition-colors p-1"
+                            title="Eliminar Líder"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex gap-2 mt-2">
+                       <button 
+                        onClick={() => setGroupRespondents([...groupRespondents, { fullName: '', idNumber: '', contact: '' }])}
+                        className="flex-1 py-3 bg-slate-100 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                      >
+                        + Agregar Líder
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const count = prompt("¿Cuántos líderes desea agregar adicionalmente?", "10");
+                          if (count && !isNaN(Number(count))) {
+                            const newEntries = Array(Number(count)).fill(null).map(() => ({ fullName: '', idNumber: '', contact: '' }));
+                            setGroupRespondents([...groupRespondents, ...newEntries]);
+                          }
+                        }}
+                        className="px-4 py-3 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100"
+                      >
+                        + Carga Masiva
+                      </button>
+                    </div>
+                 </div>
+               ) : (
+                <div className="space-y-3">
+                    <input 
+                      type="text" 
+                      value={respondent.fullName}
+                      onChange={(e) => setRespondent({...respondent, fullName: e.target.value})}
+                      placeholder="Nombre completo del ciudadano"
+                      className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    />
+                    <input 
+                      type="text" 
+                      value={respondent.idNumber}
+                      onChange={(e) => setRespondent({...respondent, idNumber: e.target.value})}
+                      placeholder="Número de identidad"
+                      className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    />
+                </div>
+               )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-end">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Progreso de Captura</h3>
+              <span className="text-xs font-bold text-indigo-600">{progress}%</span>
+            </div>
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                className="h-full bg-gradient-to-r from-indigo-500 to-indigo-700"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-12">
+          {survey.questions.map((q, idx) => (
+            <div key={q.id} className="space-y-5 group">
+              <div className="flex gap-4">
+                <span className="text-4xl font-black text-slate-100 group-focus-within:text-indigo-50 transition-colors">
+                  {String(idx + 1).padStart(2, '0')}
+                </span>
+                <div className="pt-2">
+                  <h4 className="text-lg font-bold text-slate-800 leading-snug">
+                    {q.text} {q.required && <span className="text-rose-500 ml-1 text-base">*</span>}
+                  </h4>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {q.category && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{q.category}</span>}
+                    {q.description && (
+                      <span className="flex items-center gap-1 text-[10px] font-medium text-indigo-500 italic">
+                        <Info size={10} />
+                        {q.description}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="ml-14 pl-2 space-y-4">
+                {survey.isGroupSurvey ? (
+                  <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 space-y-6">
+                    <div className="flex items-center justify-between mb-4">
+                       <div>
+                         <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Respuestas por Líder / Integrante</p>
+                         <span className="text-[10px] font-bold text-slate-400">{groupRespondents.filter(r => r.fullName).length} líderes activos</span>
+                       </div>
+                       <div className="flex gap-2">
+                         <button 
+                          onClick={() => setGridView(!gridView)}
+                          className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border-2 transition-all flex items-center gap-2 ${gridView ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100' : 'bg-white text-slate-400 border-slate-100'}`}
+                         >
+                           <Layers size={14} />
+                           {gridView ? 'Vista Rejilla (Modo Tablet)' : 'Vista Listado'}
+                         </button>
+                         <button 
+                          onClick={() => {
+                            const firstVal = (answers[q.id] || [])[0];
+                            if (firstVal !== undefined) {
+                              const bulk = Array(groupRespondents.length).fill(firstVal);
+                              updateAnswer(q.id, bulk);
+                            }
+                          }}
+                          className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border-2 bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-lg shadow-emerald-100 animate-pulse"
+                         >
+                           <Users size={14} />
+                           UNIFICAR (Respuesta General)
+                         </button>
+                       </div>
+                    </div>
+
+                    <div className={gridView ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-4"}>
+                      {groupRespondents.map((respondent, rIdx) => {
+                        if (!respondent.fullName) return null;
+                        const currentAnswer = (answers[q.id] || [])[rIdx];
+                        return (
+                          <div key={rIdx} className={`p-4 rounded-2xl bg-white border border-slate-100/50 shadow-sm transition-all hover:shadow-md ${gridView ? 'flex flex-col gap-3' : 'flex items-center gap-4'}`}>
+                            <div className={`flex items-center gap-2 ${gridView ? 'border-b border-slate-50 pb-2' : 'min-w-[150px]'}`}>
+                               <div className="w-5 h-5 bg-indigo-50 text-indigo-600 rounded-md flex items-center justify-center text-[10px] font-black">{rIdx+1}</div>
+                               <p className="text-xs font-bold text-slate-700 truncate max-w-[120px]">{respondent.fullName}</p>
+                            </div>
+                            
+                            <div className="flex-1">
+                              {q.type === 'text' && (
+                                <input 
+                                  type="text" 
+                                  value={currentAnswer || ''}
+                                  onChange={(e) => updateAnswer(q.id, e.target.value, rIdx)}
+                                  className="w-full bg-slate-50 rounded-lg px-3 py-2 outline-none transition-all text-xs"
+                                  placeholder="..."
+                                />
+                              )}
+
+                              {q.type === 'number' && (
+                                <div className="flex gap-1.5 flex-wrap">
+                                  {[1, 2, 3, 4, 5].map(n => (
+                                    <button
+                                      key={n}
+                                      onClick={() => updateAnswer(q.id, n, rIdx)}
+                                      className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-[10px] transition-all ${currentAnswer === n ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400 font-bold'}`}
+                                    >
+                                      {n}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+
+                              {q.type === 'boolean' && (
+                                <div className="flex gap-2">
+                                  {(q.options?.length ? q.options : ['Sí', 'No']).map(opt => (
+                                    <button
+                                      key={opt}
+                                      onClick={() => updateAnswer(q.id, opt, rIdx)}
+                                      className={`px-3 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${currentAnswer === opt ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-400'}`}
+                                    >
+                                      {opt}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+
+                              {(q.type === 'select' || q.type === 'multiple') && (
+                                <div className="flex flex-col gap-1.5">
+                                   {q.type === 'select' ? (
+                                     <select 
+                                      value={currentAnswer || ''}
+                                      onChange={(e) => updateAnswer(q.id, e.target.value, rIdx)}
+                                      className="w-full bg-slate-50 rounded-lg px-2 py-2 text-[10px] font-bold outline-none"
+                                     >
+                                       <option value="">Selección...</option>
+                                       {q.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                     </select>
+                                   ) : (
+                                     <div className="flex flex-wrap gap-1">
+                                        {q.options?.slice(0, 4).map(opt => (
+                                          <button 
+                                            key={opt}
+                                            onClick={() => {
+                                              const current = (currentAnswer as string[]) || [];
+                                              const next = current.includes(opt) ? current.filter(v => v !== opt) : [...current, opt];
+                                              updateAnswer(q.id, next, rIdx);
+                                            }}
+                                            className={`px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${
+                                              (currentAnswer as string[] || []).includes(opt) ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'
+                                            }`}
+                                          >
+                                            {opt.substring(0, 10)}
+                                          </button>
+                                        ))}
+                                     </div>
+                                   )}
+                                </div>
+                              )}
+
+                              {q.type === 'matrix' && (
+                                <div className="overflow-x-auto border border-slate-100 rounded-xl bg-slate-50 p-2">
+                                  <table className="w-full text-left border-collapse text-[10px]">
+                                    <thead>
+                                      <tr className="border-b border-slate-200">
+                                        <th className="p-1 font-black text-slate-400">Var</th>
+                                        {q.columns?.map(col => (
+                                          <th key={col} className="p-1 font-black text-slate-400 text-center">{col}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {q.rows?.map(row => (
+                                        <tr key={row} className="border-b border-white hover:bg-white/50">
+                                          <td className="p-1 font-bold text-slate-700 truncate max-w-[80px]" title={row}>{row}</td>
+                                          {q.columns?.map(col => (
+                                            <td key={col} className="p-1 text-center align-middle">
+                                              {col.toLowerCase().includes('aplica') || col.toLowerCase().includes('sí/no') ? (
+                                                <input 
+                                                  type="checkbox" 
+                                                  checked={(currentAnswer && currentAnswer[row] && currentAnswer[row][col]) || false}
+                                                  onChange={(e) => {
+                                                    const currentMat = currentAnswer || {};
+                                                    const currentRow = currentMat[row] || {};
+                                                    updateAnswer(q.id, {
+                                                      ...currentMat,
+                                                      [row]: { ...currentRow, [col]: e.target.checked }
+                                                    }, rIdx);
+                                                  }}
+                                                  className="w-3 h-3 rounded-sm border-slate-300"
+                                                />
+                                              ) : (
+                                                <input 
+                                                  type={col.toLowerCase().includes('cantidad') || col.toLowerCase().includes('número') || col.toLowerCase().includes('total') ? 'number' : 'text'}
+                                                  value={(currentAnswer && currentAnswer[row] && currentAnswer[row][col]) || ''}
+                                                  onChange={(e) => {
+                                                    const currentMat = currentAnswer || {};
+                                                    const currentRow = currentMat[row] || {};
+                                                    updateAnswer(q.id, {
+                                                      ...currentMat,
+                                                      [row]: { ...currentRow, [col]: e.target.value }
+                                                    }, rIdx);
+                                                  }}
+                                                  className="w-[40px] bg-white border border-slate-200 rounded px-1 py-0.5 text-[9px] outline-none text-center"
+                                                />
+                                              )}
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+
+                              {q.type === 'audio' && (
+                                <div className="flex gap-2 items-center">
+                                  {currentAnswer ? (
+                                    <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg w-full">
+                                      <Play size={10} className="text-emerald-500" />
+                                      <span className="text-[9px] font-bold text-emerald-700 flex-1">Audio guardado</span>
+                                      <button onClick={() => updateAnswer(q.id, null, rIdx)} className="text-emerald-400 hover:text-emerald-600"><X size={12}/></button>
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      onClick={() => updateAnswer(q.id, { type: 'audio', url: 'blob:fake' }, rIdx)}
+                                      className="flex justify-center w-full px-3 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors"
+                                    >
+                                      <Mic size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {q.type === 'geopolygon' && (
+                                <div className="flex gap-2 items-center">
+                                  {currentAnswer ? (
+                                    <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg w-full">
+                                      <MapPin size={10} className="text-emerald-500" />
+                                      <span className="text-[9px] font-bold text-emerald-700 flex-1">Polígono</span>
+                                      <button onClick={() => updateAnswer(q.id, null, rIdx)} className="text-emerald-400 hover:text-emerald-600"><X size={12}/></button>
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      onClick={() => updateAnswer(q.id, { type: 'polygon', area: '1ha' }, rIdx)}
+                                      className="flex justify-center w-full px-3 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors"
+                                    >
+                                      <MapIcon size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {q.type === 'composite' && (
+                                <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                  {q.subQuestions?.map(sq => (
+                                    <div key={sq.id} className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">{sq.text}</label>
+                                      {sq.type === 'text' && (
+                                        <input 
+                                          type="text"
+                                          value={(currentAnswer && currentAnswer[sq.id]) || ''}
+                                          onChange={(e) => {
+                                            const currentVal = currentAnswer || {};
+                                            updateAnswer(q.id, { ...currentVal, [sq.id]: e.target.value }, rIdx);
+                                          }}
+                                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] outline-none"
+                                        />
+                                      )}
+                                      {sq.type === 'number' && (
+                                        <input 
+                                          type="number"
+                                          value={(currentAnswer && currentAnswer[sq.id]) || ''}
+                                          onChange={(e) => {
+                                            const currentVal = currentAnswer || {};
+                                            updateAnswer(q.id, { ...currentVal, [sq.id]: e.target.value }, rIdx);
+                                          }}
+                                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] outline-none"
+                                        />
+                                      )}
+                                      {sq.type === 'boolean' && (
+                                        <div className="flex gap-2">
+                                          {['Sí', 'No'].map(o => (
+                                            <button 
+                                              key={o}
+                                              onClick={() => {
+                                                const currentVal = currentAnswer || {};
+                                                updateAnswer(q.id, { ...currentVal, [sq.id]: o }, rIdx);
+                                              }}
+                                              className={`px-3 py-1 rounded-md text-[9px] font-bold transition-all ${currentAnswer?.[sq.id] === o ? 'bg-indigo-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
+                                            >
+                                              {o}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {q.type === 'text' && (
+                      <input 
+                        type="text" 
+                        onChange={(e) => updateAnswer(q.id, e.target.value)}
+                        className="w-full bg-slate-50 border-b-2 border-slate-200 focus:border-indigo-600 px-2 py-3 outline-none bg-transparent transition-all text-lg"
+                        placeholder="Escribe tu respuesta aquí..."
+                      />
+                    )}
+
+                    {q.type === 'number' && (
+                      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                          <button
+                            key={n}
+                            onClick={() => updateAnswer(q.id, n)}
+                            className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg transition-all ${answers[q.id] === n ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 scale-110' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.type === 'boolean' && (
+                      <div className="flex flex-wrap gap-4">
+                        {(q.options?.length ? q.options : ['Sí', 'No']).map(opt => (
+                          <button
+                            key={opt}
+                            onClick={() => updateAnswer(q.id, opt)}
+                            className={`flex-1 min-w-[200px] px-8 py-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${answers[q.id] === opt ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-200' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {(q.type === 'select' || q.type === 'multiple') && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {q.options?.map(opt => (
+                          <button
+                            key={opt}
+                            onClick={() => {
+                              if (q.type === 'multiple') {
+                                const current = answers[q.id] || [];
+                                const next = current.includes(opt) ? current.filter((i: string) => i !== opt) : [...current, opt];
+                                updateAnswer(q.id, next);
+                              } else {
+                                updateAnswer(q.id, opt);
+                              }
+                            }}
+                            className={`flex items-center gap-4 px-6 py-4 rounded-3xl text-left font-bold transition-all ${
+                              (q.type === 'multiple' ? (answers[q.id] || []).includes(opt) : answers[q.id] === opt) 
+                              ? 'bg-indigo-50 border-2 border-indigo-200 text-indigo-700 shadow-sm' 
+                              : 'bg-white border-2 border-slate-100 text-slate-500 hover:border-slate-200'
+                            }`}
+                          >
+                            <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                                (q.type === 'multiple' ? (answers[q.id] || []).includes(opt) : answers[q.id] === opt) 
+                                ? 'bg-indigo-600 border-indigo-600' 
+                                : 'border-slate-200'
+                            }`}>
+                              { (q.type === 'multiple' ? (answers[q.id] || []).includes(opt) : answers[q.id] === opt) && <Plus size={14} className="text-white rotate-45" /> }
+                            </div>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.type === 'matrix' && (
+                      <div className="overflow-x-auto border-2 border-slate-100 rounded-2xl bg-white shadow-sm">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b-2 border-slate-100">
+                              <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">Variable / Condición</th>
+                              {q.columns?.map(col => (
+                                <th key={col} className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-center">{col}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {q.rows?.map((row, rIdx) => (
+                              <tr key={row} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4 text-sm font-bold text-slate-700 min-w-[200px]">{row}</td>
+                                {q.columns?.map((col, cIdx) => (
+                                  <td key={col} className="p-2 text-center align-middle">
+                                    {col.toLowerCase().includes('aplica') || col.toLowerCase().includes('sí/no') ? (
+                                      <input 
+                                        type="checkbox" 
+                                        checked={(answers[q.id] && answers[q.id][row] && answers[q.id][row][col]) || false}
+                                        onChange={(e) => {
+                                          const currentMat = answers[q.id] || {};
+                                          const currentRow = currentMat[row] || {};
+                                          updateAnswer(q.id, {
+                                            ...currentMat,
+                                            [row]: { ...currentRow, [col]: e.target.checked }
+                                          });
+                                        }}
+                                        className="w-6 h-6 rounded-md border-2 border-slate-200 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                      />
+                                    ) : (
+                                      <input 
+                                        type={col.toLowerCase().includes('cantidad') || col.toLowerCase().includes('número') || col.toLowerCase().includes('total') ? 'number' : 'text'}
+                                        value={(answers[q.id] && answers[q.id][row] && answers[q.id][row][col]) || ''}
+                                        onChange={(e) => {
+                                          const currentMat = answers[q.id] || {};
+                                          const currentRow = currentMat[row] || {};
+                                          updateAnswer(q.id, {
+                                            ...currentMat,
+                                            [row]: { ...currentRow, [col]: e.target.value }
+                                          });
+                                        }}
+                                        className="w-full bg-slate-100/50 border-2 border-transparent focus:bg-white focus:border-indigo-200 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 outline-none transition-all placeholder:text-slate-300"
+                                        placeholder="..."
+                                      />
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {q.type === 'composite' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-8 rounded-[40px] border-2 border-slate-100 shadow-inner">
+                        {q.subQuestions?.map(sq => (
+                          <div key={sq.id} className="space-y-2">
+                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">{sq.text}</label>
+                             {sq.type === 'text' && (
+                               <input 
+                                 type="text"
+                                 value={answers[q.id]?.[sq.id] || ''}
+                                 onChange={(e) => {
+                                   const current = answers[q.id] || {};
+                                   updateAnswer(q.id, { ...current, [sq.id]: e.target.value });
+                                 }}
+                                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                                 placeholder={`Ingresa ${sq.text.toLowerCase()}...`}
+                               />
+                             )}
+                             {sq.type === 'number' && (
+                               <input 
+                                 type="number"
+                                 value={answers[q.id]?.[sq.id] || ''}
+                                 onChange={(e) => {
+                                   const current = answers[q.id] || {};
+                                   updateAnswer(q.id, { ...current, [sq.id]: e.target.value });
+                                 }}
+                                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                                 placeholder="0"
+                               />
+                             )}
+                             {sq.type === 'boolean' && (
+                               <div className="flex gap-2">
+                                 {['Sí', 'No'].map(o => (
+                                   <button 
+                                     key={o}
+                                     onClick={() => {
+                                       const current = answers[q.id] || {};
+                                       updateAnswer(q.id, { ...current, [sq.id]: o });
+                                     }}
+                                     className={`flex-1 py-4 rounded-xl font-black text-xs uppercase transition-all ${answers[q.id]?.[sq.id] === o ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}
+                                   >
+                                     {o}
+                                   </button>
+                                 ))}
+                               </div>
+                             )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.type === 'audio' && (
+                      <div className="flex flex-col gap-4 items-start p-6 bg-slate-50 rounded-3xl border-2 border-slate-100">
+                         {answers[q.id] ? (
+                           <div className="flex items-center gap-4 w-full bg-white p-4 rounded-2xl shadow-sm border border-emerald-100">
+                             <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 shrink-0">
+                               <Play size={20} className="ml-1" />
+                             </div>
+                             <div className="flex-1">
+                               <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                 <div className="h-full bg-emerald-400 w-1/3 rounded-full"></div>
+                               </div>
+                               <div className="flex justify-between mt-2">
+                                 <span className="text-[10px] font-bold text-slate-400">0:00</span>
+                                 <span className="text-[10px] font-bold text-slate-400 text-right">Grabación adjunta (simulada)</span>
+                               </div>
+                             </div>
+                             <button
+                               onClick={() => updateAnswer(q.id, null)}
+                               className="w-10 h-10 shrink-0 flex items-center justify-center text-rose-400 hover:bg-rose-50 rounded-xl transition-colors"
+                               title="Eliminar Audio"
+                             >
+                                <Trash2 size={16} />
+                             </button>
+                           </div>
+                         ) : (
+                           <button 
+                             onClick={() => {
+                               // Simulate audio recording completion
+                               updateAnswer(q.id, {
+                                 type: 'audio',
+                                 url: 'blob:simulated-audio-1234',
+                                 duration: 124,
+                                 transcription: 'Audio pendiente de carga...'
+                               });
+                             }}
+                             className="w-full py-8 border-2 border-dashed border-indigo-200 rounded-2xl flex flex-col items-center justify-center gap-3 text-indigo-500 hover:bg-indigo-50 transition-all group"
+                           >
+                              <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shadow-indigo-100">
+                                <Mic size={28} />
+                              </div>
+                              <div>
+                                <h4 className="font-black uppercase tracking-widest text-sm text-slate-700">Comenzar Grabación</h4>
+                                <p className="text-xs text-slate-400 font-medium mt-1">Máx. 3 minutos. Presione para iniciar.</p>
+                              </div>
+                           </button>
+                         )}
+                      </div>
+                    )}
+
+                    {q.type === 'geopolygon' && (
+                      <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-3xl space-y-4">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h4 className="font-bold text-slate-700">Herramienta Cartográfica</h4>
+                            <p className="text-xs text-slate-400 font-medium">Trace el polígono aproximado del área en el dispositivo</p>
+                          </div>
+                          {answers[q.id] && (
+                            <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                              <CheckCircle2 size={12} />
+                              Área Capturada
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="w-full aspect-[21/9] bg-slate-200 rounded-2xl relative overflow-hidden border-2 border-slate-300">
+                           {/* Placeholder map layer */}
+                           <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at center, #64748b 2px, transparent 2px)', backgroundSize: '16px 16px' }}></div>
+                           
+                           {answers[q.id] ? (
+                             <div className="absolute inset-0 flex items-center justify-center">
+                               {/* Simulated polygon overlay */}
+                               <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                  <polygon points="20,80 40,30 70,40 80,90 40,95" fill="rgba(99, 102, 241, 0.4)" stroke="#4f46e5" strokeWidth="2" strokeDasharray="4 2" />
+                               </svg>
+                               <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-slate-100 flex gap-2">
+                                  <button onClick={() => updateAnswer(q.id, null)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 rounded-lg" title="Borrar">
+                                    <Trash2 size={16} />
+                                  </button>
+                               </div>
+                             </div>
+                           ) : (
+                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                                <MapIcon size={48} className="text-slate-400" />
+                                <button 
+                                  onClick={() => {
+                                    updateAnswer(q.id, {
+                                      type: 'polygon',
+                                      area: '14.5 ha',
+                                      points: [[-74.0, 4.5], [-74.1, 4.6], [-74.05, 4.7]]
+                                    });
+                                  }}
+                                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                                >
+                                  <Plus size={16} />
+                                  Trazar Polígono
+                                </button>
+                             </div>
+                           )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button 
+          onClick={handleSubmit}
+          className="w-full bg-slate-900 hover:bg-black text-white py-6 rounded-[32px] font-black text-xl shadow-2xl transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-4"
+        >
+          Finalizar y Enviar
+          <ChevronRight size={24} />
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
+const SurveyAnalysisEngine: React.FC<{
+  survey: Survey,
+  responses: SurveyResponse[],
+  analyses: SurveyAnalysis[],
+  onAddAnalysis: (a: SurveyAnalysis) => void
+}> = ({ survey, responses, analyses, onAddAnalysis }) => {
+  const [analyzing, setAnalyzing] = useState(false);
+
+  const performAIAnalysis = async () => {
+    if (responses.length === 0) {
+      showAlert('Se necesitan al menos algunas respuestas para realizar un análisis.');
+      return;
+    }
+
+    setAnalyzing(true);
+    try {
+      const tech = survey.technicalSheet;
+      const prompt = `
+        Eres el mayor experto en Gestión del Riesgo y Desastres, especializado en la teoría del "Constructo Social del Riesgo" y medición de Pobreza en escenarios de cambio climático y desastres (estándares BM/DANE 2026).
+        
+        Analiza los resultados de esta operación estadística institucional:
+        
+        FICHA TÉCNICA:
+        - Operación: ${tech?.operativeName || survey.title}
+        - Objetivo: ${tech?.generalObjective}
+        - Universo: ${tech?.universeDescription} (N=${tech?.universeTotal || 'No especificado'})
+        - Rigor: Error: ${tech?.marginOfError}%, Confianza: ${tech?.confidenceLevel}%, Fórmula: ${tech?.formulaUsed}
+        - Enfoque: ${tech?.conceptualFramework}
+        - Municipio: ${survey.municipioId}
+        
+        ENCUESTA: ${survey.title}
+        CONTEXTO EXPERTO: ${survey.expertContext || 'Ficha Técnica parametrizada'}
+        
+        ENFOQUE GRUPAL: ¿Es encuesta a líderes? ${survey.isGroupSurvey ? 'SÍ' : 'NO'}
+        ${survey.isGroupSurvey ? `Tamaño del grupo entrevistado: ${responses[0]?.groupRespondents?.length} líderes.` : ''}
+
+        RESULTADOS (${responses.length} registros recolectados):
+        ${responses.map((r, i) => `
+        REGISTRO #${i+1}:
+        - Ubicación: ${r.departamentoId} -> ${r.municipioId} | Zona: ${r.zonaAfectacion || 'No especificada'}
+        - Coordenadas GPS: ${r.coordinates ? `${r.coordinates.lat}, ${r.coordinates.lng}` : 'No capturadas'}
+        - Métricas Territoriales: NBI: ${r.territorialComplexity?.nbi}%, GINI: ${r.territorialComplexity?.gini}, DEFF: ${r.territorialComplexity?.deff}
+        - Auditoría: Encuestador: ${r.surveyorInfo?.fullName}
+        ${r.groupRespondents ? `- Grupo de Líderes (${r.groupRespondents.length}): ${r.groupRespondents.map(l => l.fullName).join(', ')}` : `- Ciudadano: ${r.respondentInfo?.fullName}`}
+        - Datos Capturados: ${JSON.stringify(r.answers)}
+        `).join('\n')}
+        
+        POR FAVOR GENERA UN INFORME DE DECISIÓN CRÍTICO (Markdown). 
+        Utiliza lenguaje técnico OCDE/DANE 2026.
+        Menciona específicamente la zona o polígono si se reportó.
+        
+        INDICADOR CLAVE: "Pobreza Expuesta al Riesgo".
+        
+        DEBES INCLUIR AL FINAL UN BLOQUE JSON CON 5 INDICADORES (0-100):
+        {"indicators": [{"label": "Pobreza Expuesta", "value": 85, "color": "red"}, ...]}
+      `;
+
+      const text = await aiProviderService.generateContent(prompt, "gemini-3-flash-preview");
+      
+      let parsedIndicators: Indicator[] = [
+        { label: 'Vulnerabilidad Social', value: 75, color: 'red' },
+        { label: 'Percepción de Amenaza', value: 60, color: 'yellow' },
+        { label: 'Resiliencia Comunitaria', value: 40, color: 'emerald' },
+        { label: 'Capacidad de Respuesta', value: 30, color: 'red' },
+        { label: 'Confianza Institucional', value: 50, color: 'yellow' }
+      ];
+
+      try {
+        const jsonMatch = text.match(/\{[\s\S]*"indicators"[\s\S]*\}/);
+        if (jsonMatch) {
+          const json = JSON.parse(jsonMatch[0]);
+          if (json.indicators) parsedIndicators = json.indicators;
+        }
+      } catch (e) { console.warn("Failed to parse indicators", e); }
+
+      const newAnalysis: SurveyAnalysis = {
+        id: crypto.randomUUID(),
+        surveyId: survey.id,
+        aiAnalysis: text.split('{')[0].trim(), // Remove JSON part from text
+        date: new Date().toISOString(),
+        indicators: parsedIndicators
+      };
+
+      onAddAnalysis(newAnalysis);
+      showAlert('Análisis experto completado con éxito.');
+    } catch (err) {
+      console.error('AI Analysis Error:', err);
+      showAlert('Error durante el análisis con IA. Por favor intenta de nuevo.');
+    } finally {
+      setAnalyzing(false);
+    }
   };
-  viaticosDetalle?: {
-    professionalId: string;
-    dias: number;
-    tarifaDiaria: number;
-    total: number;
-  }[];
-  costoTotal: number;
-  estado: 'Programada' | 'En Curso' | 'Ejecutada' | 'Cancelada' | 'Rechazada';
-  informe?: {
-    actividades: string;
-    hallazgos: string;
-    conclusiones: string;
-    recomendaciones: string;
-    fechaGeneracion: string;
-  };
-}
 
-export interface Riesgo {
-  id: string;
-  projectId: string;
-  descripcion: string;
-  probabilidad: 'Alta' | 'Media' | 'Baja';
-  impacto: 'Alto' | 'Medio' | 'Bajo';
-  estado: 'Activo' | 'Mitigado' | 'Materializado';
-  planMitigacion: string;
-}
+  const latestAnalysis = analyses.length > 0 ? analyses[0] : null;
 
-export interface Presupuesto {
-  id: string;
-  projectId: string;
-  cdp: string;
-  rc: string;
-  valorTotal: number;
-  aportesFngrd: number;
-  aportesMunicipio: number;
-  aporteDistrito?: number;
-  aporteGobernacion?: number;
-  aporteMunicipio?: number;
-  aporteFondo?: number;
-  aporteContrapartida?: number;
-  aportesLocal?: number; // Alias for consistency
-  aportesOtros?: number;
-  pagosRealizados: number;
-  valorComprometidoProfesionales?: number;
-  valorComprometidoComisiones?: number;
-  valorDisponible?: number;
-  vigencia: string;
-  lineaInversion: string;
-}
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8"
+    >
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center">
+            <BarChart3 size={32} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Motor de Análisis Experto</h2>
+            <div className="flex items-center gap-2">
+              <p className="text-slate-500 font-medium">Procesamiento de resultados IA</p>
+              <span className="w-1 h-1 bg-slate-300 rounded-full" />
+              <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+                {responses.length} respuestas detectadas
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <button 
+          onClick={performAIAnalysis}
+          disabled={analyzing || responses.length === 0}
+          className="flex items-center gap-3 bg-slate-900 hover:bg-black text-white px-6 py-3 rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-slate-200"
+        >
+          {analyzing ? (
+            <>
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+              >
+                <BrainCircuit size={20} />
+              </motion.div>
+              Pensando...
+            </>
+          ) : (
+            <>
+              <BrainCircuit size={20} />
+              Ejecutar Motor Experto
+            </>
+          )}
+        </button>
+      </div>
 
-export interface Avance {
-  id: string;
-  projectId: string;
-  reportId?: string; // Relación con informe de interventoría
-  fecha: string;
-  fisicoPct: number;
-  financieroPct: number;
-  programadoPct: number;
-  observaciones: string;
-  reportadoPor: string;
-  adjuntos?: { id: string; name: string; type: string; url: string; }[];
-}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Statistics Pillar */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Métrica de Muestreo</h4>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full border-[6px] border-indigo-50 flex items-center justify-center relative">
+                 <div className="absolute inset-0 border-[6px] border-indigo-600 rounded-full border-t-transparent -rotate-45" />
+                 <span className="text-3xl font-black text-slate-900">{responses.length}</span>
+              </div>
+              <p className="mt-4 font-bold text-slate-700">Respuestas Recibidas</p>
+              <div className="flex items-center gap-1.5 mt-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">
+                <Users size={14} />
+                Población territorio
+              </div>
+            </div>
+          </div>
 
-export interface Seguimiento {
-  id: string;
-  projectId: string;
-  fecha: string;
-  tipo: 'Institucional' | 'Técnico' | 'Financiero' | 'Legal';
-  descripcion: string;
-  responsable: string;
-  trazabilidad: string;
-}
+          <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl shadow-slate-200">
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Alcance Territorial</h4>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <MapPin size={18} className="text-rose-500" />
+                <span className="font-bold text-sm">{colombiaData.find(d => d.id === survey.departamentoId)?.name}</span>
+              </div>
+              <div className="h-px bg-white/10" />
+              <div className="flex items-center gap-3">
+                <ShieldAlert size={18} className="text-amber-500" />
+                <span className="font-bold text-xs opacity-80">Gestión de Riesgo Nivel 4</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-export interface Otrosie {
-  id: string;
-  contractId?: string;
-  convenioId?: string;
-  numero: string;
-  fechaFirma: string;
-  objeto: string;
-  justificacionTecnica: string;
-  justificacionJuridica: string;
-  valorAdicional: number;
-  aporteDistrito?: number;
-  aporteGobernacion?: number;
-  aporteMunicipio?: number;
-  aporteFondo?: number;
-  aportesFngrd?: number;
-  aportesLocal?: number;
-  aportesOtros?: number;
-  plazoAdicionalMeses: number;
-  fechaInicioProrroga?: string;
-  fechaFinProrroga?: string;
-  alcanceModificado?: string;
-  documentoUrl?: string;
-  documentoNombre?: string;
-  clausulasModificadas: {
-    numero: string;
-    descripcionAnterior: string;
-    descripcionNueva: string;
-  }[];
-  impactoPresupuestal: {
-    rubro: string;
-    valorAnterior: number;
-    valorNuevo: number;
-    variacion: number;
-  }[];
-  nuevasObligaciones: string[];
-  riesgosIdentificados: string[];
-  analisisOptimización: string;
-  tipoModificacion?: 'Adición' | 'Prórroga' | 'Adición y Prórroga' | 'Aclaración' | 'Modificación de Cláusulas';
-  supervisorResponsable?: string;
-  nitEntidad?: string;
-  nitContratista?: string;
-  estado?: 'Borrador' | 'En revisión' | 'Aprobado' | 'Firmado';
-}
+        {/* Indicators and Results Analysis */}
+        <div className="lg:col-span-3 space-y-6">
+          <AnimatePresence mode="wait">
+            {!latestAnalysis && !analyzing ? (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-slate-200"
+              >
+                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                  <Lightbulb size={40} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-700">Listo para el Procesamiento</h3>
+                <p className="text-slate-500 max-w-lg mx-auto mt-2">
+                  El motor de IA está esperando para leer las {responses.length} respuestas y generar una hoja de ruta estratégica basada en la teoría del riesgo social.
+                </p>
+              </motion.div>
+            ) : analyzing ? (
+              <motion.div 
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-white rounded-3xl p-20 text-center space-y-6"
+              >
+                <div className="flex justify-center gap-3">
+                  {[0, 1, 2].map(i => (
+                    <motion.div 
+                      key={i}
+                      animate={{ y: [0, -10, 0] }}
+                      transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.15 }}
+                      className="w-3 h-3 bg-indigo-600 rounded-full"
+                    />
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-extrabold text-slate-900">Analizando Constructo Social...</h3>
+                  <p className="text-slate-500 font-medium">El experto en gestión del riesgo está procesando las variables territoriales.</p>
+                </div>
+              </motion.div>
+            ) : latestAnalysis && (
+              <motion.div 
+                key="results"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="space-y-6"
+              >
+                {/* Indicators Row */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {latestAnalysis.indicators.map((ind, i) => (
+                    <div key={i} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                      <div className={`w-12 h-1.5 rounded-full mb-3 bg-${ind.color === 'red' ? 'rose' : ind.color === 'yellow' ? 'amber' : 'emerald'}-500`} />
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1">{ind.label}</span>
+                      <span className="text-xl font-black text-slate-800">{ind.value}%</span>
+                    </div>
+                  ))}
+                </div>
 
-export interface Afectacion {
-  id: string;
-  projectId: string;
-  contractId?: string;
-  numero: string;
-  tipo: 'Adición' | 'Reducción' | 'Liberación' | 'Pago' | 'Otro';
-  descripcion: string;
-  fecha: string;
-  valor: number;
-  aportesFngrd?: number;
-  aportesLocal?: number;
-  aportesOtros?: number;
-  aporteDistrito?: number;
-  aporteGobernacion?: number;
-  aporteMunicipio?: number;
-  aporteFondo?: number;
-  impacto?: 'Alto' | 'Medio' | 'Bajo';
-  estado?: 'Abierta' | 'Cerrada';
-  documentoUrl?: string;
-  documentoNombre?: string;
-  documentoReferenciaId?: string; // ID of the document that formalized this (e.g. Otrosí ID)
-  origenId?: string; // ID of the document that generated this (e.g. Acta de Comité ID)
-}
+                {/* Analysis Body */}
+                <div className="bg-white rounded-[32px] p-8 lg:p-10 border border-slate-200 shadow-xl relative overflow-hidden">
+                   <div className="absolute top-0 right-0 p-8 opacity-[0.03] rotate-12">
+                      <BrainCircuit size={200} />
+                   </div>
+                   
+                   <div className="flex items-center gap-2 mb-6">
+                     <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white">
+                        <ShieldAlert size={18} />
+                     </div>
+                     <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Informe Estratégico de Riesgos v1.0</span>
+                   </div>
 
-export interface Activity {
-  id: string;
-  title: string;
-  type: 'PMU' | 'Reunión' | 'Comité' | 'Visita' | 'Otra';
-  date: string;
-  durationHours: number;
-  phenomenon?: string;
-  eventoId?: string;
-  participantIds: string[];
-  description: string;
-  projectId?: string;
-}
+                   <div className="prose prose-slate max-w-none text-slate-700 leading-relaxed font-medium">
+                      <div className="whitespace-pre-wrap">
+                        {latestAnalysis.aiAnalysis}
+                      </div>
+                   </div>
 
-export interface FinancialDocument {
-  id: string;
-  contractId?: string;
-  convenioId?: string;
-  otrosieId?: string;
-  projectId?: string;
-  eventoId?: string;
-  
-  // Basic fields
-  tipo: 'CDP' | 'RC' | 'Otros';
-  numero: string;
-  valor: number;
-  fecha: string;
-  descripcion: string;
-  
-  // Extended matrix fields
-  radicado?: string;
-  solicitante?: string;
-  areaEjecutora?: string;
-  resolucion?: string;
-  alias?: string;
-  fuente?: string;
-  linea?: string;
-  nota?: string;
-  rubro?: string;
-  nacionalRegional?: string;
-  identificacion?: string;
-  nombre?: string;
-  
-  // RC specific fields
-  numeroCdp?: string;
-  numeroRc?: string;
-  fechaRc?: string;
-  valorRc?: number;
-  radicadoRc?: string;
-  contrato?: string; // Extracted contract number/name
-  areaSolicitante?: string;
-  
-  // Execution fields
-  estado?: string;
-  fechaInicial?: string;
-  fechaFinal?: string;
-  valorPagado?: number;
-  valorPorPagar?: number;
-  nombreFirma?: string;
-  cargoFirma?: string;
-  usuario?: string;
+                   <div className="mt-12 pt-8 border-t border-slate-100 flex flex-wrap gap-4">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-700 rounded-xl text-xs font-black uppercase">
+                        <AlertTriangle size={14} />
+                        Prioridad Alta
+                      </div>
+                      <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase">
+                        <FileText size={14} />
+                        Soporte Técnico
+                      </div>
+                   </div>
+                </div>
 
-  documento_url?: string;
-  documentoNombre?: string;
-  validacion_ia?: {
-    coherente: boolean;
-    observaciones: string;
-    inconsistencias: string[];
-  };
-}
+                {/* Individual Results Section */}
+                <div className="bg-white rounded-[32px] p-8 lg:p-10 border border-slate-200 shadow-xl mt-6">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">Registros Individuales</h3>
+                      <p className="text-slate-500 font-medium text-sm">Desglose detallado de las {responses.length} encuestas recolectadas</p>
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-600">
+                      Mostrando {responses.length} registros
+                    </div>
+                  </div>
 
-export interface FinancialTraceability {
-  id: string;
-  cdpId?: string;
-  rcId?: string;
-  rpIds: string[];
-  contractId?: string;
-  convenioId?: string;
-  otrosieId?: string;
-  projectId?: string;
-  eventoId?: string;
-  
-  // Lifecycle status
-  status: 'Disponibilidad' | 'Compromiso' | 'Contratación' | 'Ejecución' | 'Cerrado';
-  
-  // Totals
-  valorCDP: number;
-  valorRC: number;
-  valorRP: number; // Sum of RPs
-  valorPagado: number;
-  saldoPorComprometer: number; // CDP - RC
-  saldoPorContratar: number; // RC - Contract
-  saldoPorPagar: number; // RC - Pagado
-  
-  // Audit
-  lastAuditDate: string;
-  hasInconsistencies: boolean;
-  inconsistencyCount: number;
-  icf: number; // Índice de Coherencia Financiera (0-100)
-  semaforo: 'Verde' | 'Amarillo' | 'Rojo';
-}
-
-export interface FinancialAuditIssue {
-  id: string;
-  severity: 'Alta' | 'Media' | 'Baja';
-  type: 'Exceso' | 'FaltaVinculo' | 'InconsistenciaTemporal' | 'Duplicidad';
-  entityId: string;
-  entityType: 'CDP' | 'RC' | 'RP' | 'Contrato' | 'Proyecto';
-  description: string;
-  suggestedFix: string;
-  date: string;
-}
-
-export interface ProjectData {
-  project: Project;
-  contracts: Contract[];
-  otrosies: Otrosie[];
-  afectaciones: Afectacion[];
-  presupuesto: Presupuesto;
-  avances: Avance[];
-  seguimientos: Seguimiento[];
-  alerts: Alert[];
-  environmental: Environmental[];
-  interventoriaReports?: InterventoriaReport[];
-  pagos?: Pago[];
-  ops?: OpsContractor[];
-  comisiones?: Comision[];
-  riesgos?: Riesgo[];
-  polizas?: Poliza[];
-  documents?: ProjectDocument[];
-  actasComite?: ActaComite[];
-  suspensiones?: Suspension[];
-  financialDocuments?: FinancialDocument[];
-}
-
-export interface Vigencia {
-  id: string;
-  anio: string;
-  presupuestoAsignado: number;
-  estado: 'Abierta' | 'Cerrada';
-  descripcion?: string;
-}
-
-export interface LineaInversion {
-  id: string;
-  nombre: string;
-  codigo: string;
-  descripcion?: string;
-  color?: string;
-  presupuestosPorVigencia?: Record<string, number>; // Record<vigenciaId, presupuesto>
-}
-
-export interface Contractor {
-  id: string;
-  nombre: string;
-  nit: string;
-  tipo: 'Persona Natural' | 'Persona Jurídica' | 'Consorcio / Unión Temporal';
-  representanteLegal?: string;
-  email?: string;
-  telefono?: string;
-  direccion?: string;
-  fechaRegistro: string;
-  rutUrl?: string;
-}
-
-export interface ContractorEvaluation {
-  id: string;
-  contractorId: string;
-  fecha: string;
-  periodo: string;
-  calificacionCalidad: number; // 1-5
-  calificacionCumplimiento: number; // 1-5
-  calificacionSST: number; // 1-5
-  calificacionAmbiental: number; // 1-5
-  observaciones: string;
-  evaluador: string;
-}
-
-export type DocumentType = 
-  | 'Convenio'
-  | 'Contrato' 
-  | 'Acta' 
-  | 'Acta de Comité'
-  | 'Informe' 
-  | 'Soporte Financiero (CDP, RP)'
-  | 'Permiso Ambiental'
-  | 'CDP' 
-  | 'RC' 
-  | 'Otrosí' 
-  | 'Suspensión'
-  | 'Evidencia' 
-  | 'RUT' 
-  | 'Cédula' 
-  | 'Certificación' 
-  | 'Póliza' 
-  | 'Garantía'
-  | 'Factura'
-  | 'Soporte de Pago'
-  | 'Soporte Pago'
-  | 'Soporte Evento'
-  | 'Hoja de Vida'
-  | 'Documento Contractual'
-  | 'Documento Técnico'
-  | 'POT'
-  | 'POD'
-  | 'Reporte IDEAM'
-  | 'Estudio Técnico'
-  | 'Dataset Territorial';
-
-export interface DocumentVersion {
-  id: string;
-  version: number;
-  fecha: string;
-  url: string;
-  nombreArchivo: string;
-  subidoPor: string;
-  comentario?: string;
-  accion: 'Subida' | 'Edición' | 'Aprobación' | 'Firma';
-  estado: 'Borrador' | 'En revisión' | 'Aprobado' | 'Firmado';
-  responsablesRevision?: {
-    tecnico?: string;
-    juridico?: string;
-    financiero?: string;
-  };
-  firmas?: {
-    nombre: string;
-    fecha: string;
-  }[];
-}
-
-export interface ProjectDocument {
-  id: string;
-  projectId?: string;
-  convenioId?: string;
-  professionalId?: string;
-  comisionId?: string;
-  contractId?: string;
-  otrosiId?: string;
-  contractorId?: string;
-  eventId?: string;
-  reportId?: string;
-  department?: string;
-  municipio?: string;
-  titulo: string;
-  tipo: DocumentType;
-  area?: string;
-  descripcion?: string;
-  fechaCreacion: string;
-  ultimaActualizacion: string;
-  versiones: DocumentVersion[];
-  tags: string[];
-  folderPath?: string;
-  esObligatorio?: boolean;
-  entidadEmisora?: string;
-  estado: 'Borrador' | 'En revisión' | 'Aprobado' | 'Firmado';
-  responsable?: string;
-  linkedDocumentIds?: string[];
-  analysis?: {
-    summary: string;
-    type: 'modificación de plazo' | 'adición presupuestal' | 'suspensión' | 'reinicio' | 'otro';
-    importance: 'crítica' | 'media' | 'informativa';
-    risks: string[];
-    impacts: {
-      schedule: string;
-      budget: string;
-      progress: string;
-    };
-    inconsistencies: string[];
-    highlightedData: { key: string; value: string; context: string }[];
-    riesgosMitigados?: string[];
-    poblacionObjetivo?: number;
-    deepLearningInsights?: {
-      patronesDetectados: string[];
-      casosExitoEstructuracion: string[];
-      oportunidadesAhorro: string[];
-      innovacionesDetectadas: string[];
-      leccionesAprendidas: string[];
-    };
-  };
-}
-
-export interface RequiredDocument {
-  id: string;
-  projectId: string;
-  tipo: DocumentType;
-  nombre: string;
-  descripcion?: string;
-}
-
-export interface Task {
-  id: string;
-  projectId?: string;
-  title: string;
-  description: string;
-  assignedTo: string; // Professional ID
-  dueDate: string;
-  status: 'Pendiente' | 'En Progreso' | 'Completada' | 'Atrasada';
-  deliverableUrl?: string;
-  completedDate?: string;
-  priority: 'Baja' | 'Media' | 'Alta' | 'Urgente';
-}
-
-export type ReportType = 'Proyecto' | 'Territorio' | 'Riesgo' | 'LineaInversion' | 'Contratista' | 'General';
-
-export interface SystemReport {
-  id: string;
-  titulo: string;
-  tipo: ReportType;
-  referenciaId?: string; // ID of the project, linea, contractor, etc. Or string for territory name
-  fecha: string;
-  autor: string;
-  contenido: string;
-  hallazgos: string[];
-  recomendaciones: string[];
-  estado: 'Borrador' | 'Publicado' | 'Archivado';
-  documentosAdjuntos?: string[]; // URLs or IDs
-}
-
-export interface DamageRecord {
-  id: string;
-  eventId: string;
-  municipio: string;
-  departamento: string;
-  projectId?: string; // If a specific project was damaged
-  tipo: 'infraestructura' | 'social' | 'ambiental';
-  severidad: 'Leve' | 'Moderada' | 'Grave' | 'Total';
-  descripcion: string;
-  costoEstimado: number;
-  poblacionAfectada: number;
-  estado: 'Registrado' | 'Priorizado' | 'En Reconstrucción' | 'Recuperado';
-}
-
-export interface HistoricalEvent {
-  id: string;
-  municipio: string;
-  departamento: string;
-  fecha: string;
-  tipoAmenaza: string;
-  descripcion: string;
-  poblacionAfectada: number;
-  magnitud: 'Leve' | 'Moderada' | 'Grave' | 'Catastrófica';
-  estado?: 'Activo' | 'Cerrado';
-  faseReconstruccion?: boolean;
-}
-
-export interface ExternalDataset {
-  id: string;
-  fuente: 'IDEAM' | 'POT' | 'POD' | 'Estudio Técnico' | 'Otro';
-  titulo: string;
-  fechaPublicacion: string;
-  departamento: string;
-  municipio?: string;
-  hallazgosClave: string[];
-  url?: string;
-}
-
-export interface ConocimientoTerritorial {
-  id: string;
-  departamento: string;
-  poblacionEstimada?: number;
-  extension?: number;
-  historialDesastres?: any[];
-  recomendaciones?: string[];
-  nivelRiesgoGeneral?: string;
-  factoresRiesgo?: string[];
-  fechaActualizacion?: string;
-  documentosAnalizados?: {
-    id: string;
-    titulo: string;
-    tipo: 'POD' | 'POT' | 'Noticia' | 'Evento' | 'Directriz' | 'Otro';
-    municipio?: string;
-    fechaAnalisis: string;
-    resumen: string;
-    url?: string;
-  }[];
-  caracterizacionRiesgo?: string;
-  zonasRiesgo?: {
-    nombre?: string;
-    nivel: 'Alto' | 'Medio' | 'Bajo';
-    descripcion: string;
-    municipio?: string;
-  }[];
-  analisisEstrategico?: string;
-  analisisContratistas?: string;
-  analisisProfesionales?: string;
-  directricesEntidades?: {
-    entidad: string;
-    contenido: string;
-    fecha: string;
-  }[];
-  noticiasEventos?: {
-    titulo: string;
-    fecha: string;
-    descripcion: string;
-    impacto: string;
-  }[];
-  ultimaActualizacion?: string;
-}
-
-export interface RiesgoTerritorial {
-  id: string;
-  municipioId: string; // Relación con el municipio
-  tipo_riesgo: 'inundación' | 'deslizamiento' | 'sequía' | 'incendio' | 'sismo' | 'otro';
-  probabilidad: number; // 0-1
-  impacto: 'alto' | 'medio' | 'bajo';
-  poblacion_expuesta: number;
-  fecha_actualizacion: string;
-  fuente: 'IDEAM' | 'SGC' | 'histórico' | 'IA';
-}
-
-export interface EnteControlRecord {
-  id: string;
-  entidad: 'SARLAFT' | 'Contraloría' | 'Procuraduría' | 'Policía' | 'Fiscalía' | 'RNMC' | 'Otro';
-  tipoReferencia: 'Contratista' | 'Contrato';
-  referenciaId: string;
-  estado: 'Limpio' | 'Con Hallazgos' | 'En Investigación' | 'Sancionado';
-  fechaConsulta: string;
-  descripcion: string;
-  documentoUrl?: string;
-}
-
-export interface GlobalState {
-  proyectos: Project[];
-  convenios: Convenio[];
-  presupuestos: Presupuesto[];
-  contratos: Contract[];
-  otrosies: Otrosie[];
-  afectaciones: Afectacion[];
-  avances: Avance[];
-  seguimientos: Seguimiento[];
-  alertas: Alert[];
-  ambiental: Environmental[];
-  informesInterventoria: InterventoriaReport[];
-  pagos: Pago[];
-  ops: OpsContractor[];
-  comisiones: Comision[];
-  riesgos: Riesgo[];
-  polizas: Poliza[];
-  riesgosTerritoriales: RiesgoTerritorial[];
-  suspensiones: Suspension[];
-  vigencias: Vigencia[];
-  lineasInversion: LineaInversion[];
-  contratistas: Contractor[];
-  evaluacionesContratistas: ContractorEvaluation[];
-  documentos: ProjectDocument[];
-  actas: Acta[];
-  documentosSoporte: Documento[];
-  municipios: Municipio[];
-  departamentos: DepartmentRisk[];
-  documentosRequeridos: RequiredDocument[];
-  professionals: Professional[];
-  tasks: Task[];
-  systemReports: SystemReport[];
-  conocimientoTerritorial: ConocimientoTerritorial[];
-  externalDatasets: ExternalDataset[];
-  historicalEvents: HistoricalEvent[];
-  damageRecords: DamageRecord[];
-  activities: Activity[];
-  entesControl: EnteControlRecord[];
-  eventos: EmergenciaEvento[];
-  municipalityInventories: MunicipalityInventory[];
-  financialDocuments: FinancialDocument[];
-  financialAuditIssues: FinancialAuditIssue[];
-  financialTraceability: FinancialTraceability[];
-  globalICF: number;
-  globalTechnicalSheet?: TechnicalSheet;
-  surveys: Survey[];
-  surveyResponses: SurveyResponse[];
-  surveyAnalyses: SurveyAnalysis[];
-  globalTotalPagado?: number;
-}
-
-export type ActivityType = 'obra' | 'interventoría' | 'ambiental' | 'social';
-
-export interface ActivityMetric {
-  unit: 'metros' | 'm²' | 'm³' | 'km' | 'unidad';
-  quantityExecuted: number;
-  totalQuantity: number;
-  progress: number; // 0-100
-}
-
-export interface ExtractedActivity {
-  id: string;
-  name: string;
-  type: ActivityType;
-  description: string;
-  metrics: ActivityMetric;
-  cost: number;
-  status: 'Reportada' | 'Inferida';
-  inconsistencies?: string[];
-}
-
-export interface InformeAnalysis {
-  activities: ExtractedActivity[];
-  summary: string;
-  inconsistenciesDetected: boolean;
-}
-
-export interface Threat {
-  id: string;
-  name: 'Inundación' | 'Deslizamiento' | 'Sismo' | 'Sequía' | 'Erosión Costera';
-  description: string;
-}
-
-export interface DepartmentRisk {
-  id: string;
-  name: string;
-  population: number;
-  extension?: number; // km2
-  density: number;
-  riskIndex: number; // 0-100
-  threats: string[]; // Threat IDs
-  investment: number;
-  disasterHistoryScore: number; // 0-100
-}
-
-export interface RiskModelData {
-  departments: DepartmentRisk[];
-  threats: Threat[];
-}
-
-export interface PrioritizationCriteria {
-  riskLevelWeight: number;
-  populationWeight: number;
-  investmentWeight: number;
-  disasterHistoryWeight: number;
-}
-
-export interface PrioritizedDepartment extends DepartmentRisk {
-  priorityScore: number;
-  rank: number;
-}
-
-export interface PODDocument {
-  id: string;
-  departamento: string;
-  poblacion: number;
-  caracterizacionRiesgo: string;
-  zonasRiesgo: { name: string; level: 'Alto' | 'Medio' | 'Bajo'; description: string; municipio?: string }[];
-  normativas: string[];
-  analisisIA: string;
-  analisisContratistas?: string;
-  analisisProfesionales?: string;
-  noticiaEvento?: {
-    titulo: string;
-    descripcion: string;
-    impacto: string;
-  };
-  directriz?: {
-    entidad: string;
-    contenido: string;
-  };
-  documentUrl: string;
-}
-
-export interface ProjectPODConflict {
-  projectId: string;
-  conflictType: 'Zona de Riesgo' | 'Incumplimiento Normativo' | 'Alineación Estratégica';
-  description: string;
-  severity: 'Crítico' | 'Alto' | 'Medio' | 'Bajo';
-}
-
-export type ActaTipo = 'inicio' | 'suspensión' | 'reinicio' | 'liquidación';
-
-export interface Acta {
-  id: string;
-  tipo: ActaTipo;
-  fecha: string;
-  contratoId?: string;
-  projectId?: string;
-  documentoId?: string;
-}
-
-export interface Documento {
-  id: string;
-  tipo: 'contrato' | 'cdp' | 'rc' | 'informe' | 'interventoría' | 'bitácora' | 'evidencia';
-  nombre: string;
-  url: string;
-  soportaId: string;
-  soportaTipo: 'Convenio' | 'Proyecto' | 'Contrato' | 'Otrosie' | 'Acta';
-}
-
-export interface Contratista {
-  id: string;
-  nombre: string;
-  nit: string;
-  tipo: 'Persona Jurídica' | 'Persona Natural';
-}
-
-export interface Municipio {
-  id: string;
-  nombre: string;
-  departamentoId: string;
-}
-
-export interface Departamento {
-  id: string;
-  nombre: string;
-}
-
-export interface SurveyQuestion {
-  id: string;
-  text: string;
-  description?: string;
-  type: 'text' | 'number' | 'select' | 'boolean' | 'multiple' | 'matrix' | 'audio' | 'geopolygon' | 'composite';
-  options?: string[];
-  rows?: string[];
-  columns?: string[];
-  subQuestions?: SurveyQuestion[];
-  required: boolean;
-  category: string;
-  placeholder?: string;
-  tags?: string[];
-}
-
-export interface TechnicalSheet {
-  operativeName: string;
-  generalObjective: string;
-  specificObjectives: string[];
-  universeDescription: string;
-  universeTotal?: number;
-  marginOfError?: number;
-  confidenceLevel?: number;
-  formulaUsed?: string;
-  analysisUnit: string[];
-  coverage: {
-    levels: string[];
-    classification: string[];
-    prioritizedZones: string[];
-  };
-  samplingDesign: {
-    type: string;
-    sampleSize: number;
-    selectionCriteria: string[];
-  };
-  collectionMethod: string[];
-  collectionPeriod: string;
-  conceptualFramework: string;
-  limitations: string[];
-  expectedResults: string[];
-  normativity2026: boolean;
-}
-
-export interface Survey {
-  id: string;
-  title: string;
-  description: string;
-  departamentoId: string;
-  municipioId: string;
-  questions: SurveyQuestion[];
-  createdAt: string;
-  expertContext?: string;
-  technicalSheet?: TechnicalSheet;
-  isGroupSurvey?: boolean;
-  defaultGroupSize?: number;
-}
-
-export interface SurveyResponse {
-  id: string;
-  surveyId: string;
-  surveyorInfo: {
-    fullName: string;
-    idNumber: string;
-    role: string;
-  };
-  respondentInfo: {
-    fullName: string;
-    idNumber: string;
-    contact?: string;
-    age?: number;
-    gender?: string;
-  };
-  groupRespondents?: {
-    fullName: string;
-    idNumber: string;
-    contact?: string;
-  }[];
-  departamentoId: string;
-  municipioId: string;
-  zonaId?: string;
-  zonaAfectacion?: string;
-  coordinates?: { lat: number, lng: number };
-  date: string;
-  answers: Record<string, any | any[]>;
-  territorialComplexity?: {
-    nbi: number;
-    gini: number;
-    deff: number;
-    targetSampleSize?: number;
-  };
-}
-
-export interface SurveyAnalysis {
-  id: string;
-  surveyId: string;
-  aiAnalysis: string;
-  date: string;
-  indicators: {
-    label: string;
-    value: number;
-    color: string;
-  }[];
-}
+                  <div className="overflow-x-auto overflow-y-auto max-h-[600px] border border-slate-100 rounded-2xl">
+                    <table className="w-full text-left border-collapse min-w-[800px]">
+                      <thead>
+                        <tr className="border-b border-slate-100 italic">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-12">#</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Respondiente</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ubicación</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Complejidad</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {responses.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-8 py-12 text-center text-slate-400 font-medium italic">
+                              No se han recolectado respuestas para esta encuesta aún.
+                            </td>
+                          </tr>
+                        ) : (
+                          responses.map((resp, i) => (
+                            <motion.tr 
+                              initial={{ opacity: 0, y: 10 }}
+                              whileInView={{ opacity: 1, y: 0 }}
+                              viewport={{ once: true }}
+                              transition={{ delay: (i % 20) * 0.02 }}
+                              key={resp.id} 
+                              className="group hover:bg-slate-50 border-b border-slate-50 transition-colors"
+                            >
+                              <td className="px-4 py-4 text-center">
+                                <span className="text-[10px] font-black text-slate-300">{(i + 1).toString().padStart(3, '0')}</span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-[10px]">
+                                    {resp.respondentInfo?.fullName?.substring(0, 2).toUpperCase() || '??'}
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-bold text-slate-800">{resp.respondentInfo?.fullName || 'Anónimo'}</p>
+                                    <p className="text-[10px] text-slate-500 font-medium">Id: {resp.id.substring(0, 8)}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-[11px] font-bold text-slate-700">
+                                    {colombiaData.find(d => d.id === resp.departamentoId)?.name || resp.departamentoId}
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">{resp.municipioId}</span>
+                                  {resp.zonaAfectacion && (
+                                    <span className="text-[9px] text-indigo-500 font-bold border-l-2 border-indigo-500 pl-1 mt-0.5">
+                                      {resp.zonaAfectacion}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-wrap gap-1">
+                                  {resp.territorialComplexity?.nbi && (
+                                    <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 rounded text-[9px] font-black uppercase">NBI {resp.territorialComplexity.nbi}%</span>
+                                  )}
+                                  {resp.territorialComplexity?.gini && (
+                                    <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-[9px] font-black uppercase">GINI {resp.territorialComplexity.gini}</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-xs font-bold text-slate-500">
+                                {resp.date ? new Date(resp.date).toLocaleDateString() : 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 rounded-xl transition-all">
+                                  <FileSearch size={16} />
+                                </button>
+                              </td>
+                            </motion.tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
