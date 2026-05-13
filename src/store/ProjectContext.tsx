@@ -35,8 +35,9 @@ interface ProjectContextType {
   loading: boolean;
   syncing: boolean;
   error: string | null;
-  addInterventoriaReport: (report: InterventoriaReport) => void;
-  validateInterventoriaReport: (reportId: string, valid: boolean) => void;
+  addInterventoriaReport: (report: InterventoriaReport) => Promise<void>;
+  validateInterventoriaReport: (reportId: string, valid: boolean) => Promise<void>;
+  deleteInterventoriaReport: (reportId: string) => Promise<void>;
   addProject: (project: Project) => void;
   addContract: (contract: Contract) => void;
   updateContract: (contract: Contract) => void;
@@ -64,14 +65,14 @@ interface ProjectContextType {
   addContractor: (contractor: Contractor) => void;
   updateContractor: (contractor: Contractor) => void;
   addContractorEvaluation: (evaluation: ContractorEvaluation) => void;
-  addDocument: (doc: ProjectDocument) => void;
+  addDocument: (doc: ProjectDocument) => Promise<void>;
   deleteDocument: (docId: string) => void;
   updateDocumentAnalysis: (docId: string, analysis: ProjectDocument['analysis']) => void;
   applyDocumentAnalysis: (projectId: string, analysis: ProjectDocument['analysis']) => void;
   addDocumentVersion: (docId: string, version: DocumentVersion) => void;
   linkDocumentToReport: (docId: string, reportId: string) => void;
   checkMissingDocuments: (projectId: string) => void;
-  updateProject: (project: Project) => void;
+  updateProject: (project: Project) => Promise<void>;
   updatePresupuesto: (presupuesto: Presupuesto) => void;
   deleteProject: (projectId: string) => void;
   deleteProfessional: (professionalId: string) => void;
@@ -80,6 +81,7 @@ interface ProjectContextType {
   addComision: (comision: Comision) => void;
   updateComision: (comision: Comision) => void;
   deleteComision: (id: string) => void;
+  updateProjectData: (projectId: string, section: string, field: string, value: any) => void;
   addSeguimiento: (seguimiento: Seguimiento) => void;
   addAvance: (projectId: string, avance: Avance) => void;
   addTask: (task: Task) => void;
@@ -1424,7 +1426,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const addInterventoriaReport = (report: InterventoriaReport) => {
+  const addInterventoriaReport = async (report: InterventoriaReport) => {
     // Prompt 210: Cada informe genera automáticamente un registro en avances
     const newAvance: Avance = {
       id: `AVN-${Date.now()}`,
@@ -1455,21 +1457,37 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setState(prevState => {
       const newState = {
         ...prevState,
-        informesInterventoria: [...prevState.informesInterventoria, report],
-        avances: [...prevState.avances, newAvance],
-        ...(newPago ? { pagos: [...prevState.pagos, newPago] } : {})
+        informesInterventoria: [...(prevState.informesInterventoria || []), report],
+        avances: [...(prevState.avances || []), newAvance],
+        ...(newPago ? { pagos: [...(prevState.pagos || []), newPago] } : {})
       };
       return recalculateAll(newState);
     });
+    await saveToSupabase();
   };
 
-  const validateInterventoriaReport = (reportId: string, valid: boolean) => {
+  const validateInterventoriaReport = async (reportId: string, valid: boolean) => {
     setState(prevState => ({
       ...prevState,
       informesInterventoria: prevState.informesInterventoria.map(r => 
         r.id === reportId ? { ...r, validado: valid } : r
       )
     }));
+    await saveToSupabase();
+  };
+
+  const deleteInterventoriaReport = async (reportId: string) => {
+    setState(prevState => {
+      const newState = {
+        ...prevState,
+        informesInterventoria: prevState.informesInterventoria.filter(r => r.id !== reportId),
+        avances: prevState.avances.filter(a => a.reportId !== reportId),
+        pagos: prevState.pagos.filter(p => p.reportId !== reportId),
+        documentos: prevState.documentos.filter(d => d.reportId !== reportId)
+      };
+      return recalculateAll(newState);
+    });
+    await saveToSupabase();
   };
 
   const addContract = (contract: Contract) => {
@@ -2092,12 +2110,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   };
 
-  const addDocument = (doc: ProjectDocument) => {
+  const addDocument = async (doc: ProjectDocument) => {
     setState(prevState => ({
       ...prevState,
       documentos: [...prevState.documentos, doc]
     }));
-    saveToSupabase();
+    await saveToSupabase();
   };
 
   const deleteDocument = (docId: string) => {
@@ -2217,6 +2235,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateProfessionalsWorkload = (proyectos: Project[], professionals: Professional[]): Professional[] => {
+    if (!Array.isArray(professionals)) return [];
     return professionals.map(prof => {
       const activeProjects = proyectos.filter(p => 
         (p.estado !== 'Liquidado' && p.estado !== 'Banco de proyectos') && 
@@ -2240,7 +2259,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
-  const updateProject = (updatedProject: Project) => {
+  const updateProject = async (updatedProject: Project) => {
     setState(prev => {
       const newProyectos = prev.proyectos.map(p => p.id === updatedProject.id ? updatedProject : p);
       const newState = {
@@ -2248,8 +2267,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         proyectos: newProyectos,
         professionals: updateProfessionalsWorkload(newProyectos, prev.professionals)
       };
-      return recalculateAll(newState);
+      const recalculated = recalculateAll(newState);
+      return recalculated;
     });
+    await saveToSupabase();
   };
 
   const updatePresupuesto = (updatedPresupuesto: Presupuesto) => {
@@ -2265,6 +2286,46 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
       return recalculateAll(newState);
     });
+  };
+
+  const updateProjectData = (projectId: string, section: string, field: string, value: any) => {
+    setState(prev => {
+      const newState = { ...prev };
+      
+      if (section === 'project') {
+        newState.proyectos = prev.proyectos.map(p => 
+          p.id === projectId ? { ...p, [field]: value } : p
+        );
+      } else if (section === 'presupuesto') {
+        const existing = prev.presupuestos.find(p => p.projectId === projectId);
+        if (existing) {
+          newState.presupuestos = prev.presupuestos.map(p => 
+            p.id === existing.id ? { ...p, [field]: value } : p
+          );
+        } else {
+          newState.presupuestos = [...prev.presupuestos, { 
+            id: `PRE-${Date.now()}`, 
+            projectId, 
+            cdp: 'N/A',
+            rc: 'N/A',
+            valorTotal: 0,
+            aportesFngrd: 0,
+            aportesMunicipio: 0,
+            pagosRealizados: 0,
+            vigencia: '',
+            lineaInversion: '',
+            [field]: value 
+          } as Presupuesto];
+        }
+      } else if (section === 'matrix') {
+        newState.proyectos = prev.proyectos.map(p => 
+          p.id === projectId ? { ...p, matrix: { ...(p.matrix || {}), [field]: value } } : p
+        );
+      }
+      
+      return recalculateAll(newState);
+    });
+    saveToSupabase();
   };
 
   const deleteProject = async (projectId: string) => {
@@ -2415,7 +2476,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const presupuesto: Presupuesto = actualPresupuesto ? {
       ...actualPresupuesto,
       valorTotal: calculated.valorTotal, // Ensure it reflects dynamic additions
-      pagosRealizados: calculated.valorEjecutado
+      pagosRealizados: calculated.valorEjecutado,
+      aporteDistrito: calculated.aporteDistrito,
+      aporteGobernacion: calculated.aporteGobernacion,
+      aporteMunicipio: calculated.aporteMunicipio,
+      aporteFondo: calculated.aporteFondo
     } : {
       id: `PRE-CALC-${projectId}`,
       projectId,
@@ -2424,6 +2489,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       valorTotal: calculated.valorTotal,
       aportesFngrd: 0,
       aportesMunicipio: 0,
+      aporteDistrito: calculated.aporteDistrito,
+      aporteGobernacion: calculated.aporteGobernacion,
+      aporteMunicipio: calculated.aporteMunicipio,
+      aporteFondo: calculated.aporteFondo,
       pagosRealizados: calculated.valorEjecutado,
       vigencia: project.vigencia,
       lineaInversion: project.linea,
@@ -3017,6 +3086,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       error,
       addInterventoriaReport, 
       validateInterventoriaReport,
+      deleteInterventoriaReport,
       addProject, 
       addContract, 
       updateContract,
@@ -3060,6 +3130,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addComision,
       updateComision,
       deleteComision,
+      updateProjectData,
       addSeguimiento,
       addAvance,
       addTask,
