@@ -249,8 +249,9 @@ export const parseJSONResponse = (text: string) => {
   if (!text) return null;
   if (typeof text === 'object') return text;
   
-  // 1. Basic cleaning
-  let cleanText = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+  // Extract JSON using regex
+  const rootJsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+  let cleanText = rootJsonMatch ? rootJsonMatch[0] : "{}";
   
   const tryParse = (str: string) => {
     try {
@@ -363,7 +364,11 @@ export const extractConvenioDataFromPDF = async (file: File) => {
     - fechaRcInterventoria: Fecha de RC/RP INTERVENTORIA (YYYY-MM-DD)
     - afectacionesPresupuestalesAdiciones: AFECTACIONES PRESUPUESTALES ADICIONES
     - aporteMunicipioGobernacionObraInterventoria: APORTE DEL MUNICIPIO O GOBERNACION (Valor numérico)
-    - aporteFngrdObraInterventoria: APORTE DEL FNGRD (Valor numérico)
+    - aporteDistrito: APORTE DEL DISTRITO / CIUDAD (Valor numérico)
+    - aporteGobernacion: APORTE DE LA GOBERNACIÓN / DEPARTAMENTO (Valor numérico)
+    - aporteMunicipio: APORTE DEL MUNICIPIO (Valor numérico)
+    - aporteFondo: APORTE DEL FONDO / FNGRD / UNGRD (Valor numérico)
+    - aporteFngrdObraInterventoria: APORTE DEL FNGRD / UNGRD (Valor numérico)
     - valorTotalProyecto: VALOR TOTAL PROYECTO (Valor numérico)
     - personasBeneficiadas: PERSONAS BENEFICIADAS (Número)
     - empleosGenerados: EMPLEOS GENERADOS (Número)
@@ -398,6 +403,10 @@ export const extractConvenioDataFromPDF = async (file: File) => {
           fechaRcInterventoria: { type: Type.STRING },
           afectacionesPresupuestalesAdiciones: { type: Type.STRING },
           aporteMunicipioGobernacionObraInterventoria: { type: Type.NUMBER },
+          aporteDistrito: { type: Type.NUMBER },
+          aporteGobernacion: { type: Type.NUMBER },
+          aporteMunicipio: { type: Type.NUMBER },
+          aporteFondo: { type: Type.NUMBER },
           aporteFngrdObraInterventoria: { type: Type.NUMBER },
           valorTotalProyecto: { type: Type.NUMBER },
           personasBeneficiadas: { type: Type.NUMBER },
@@ -559,7 +568,11 @@ export const extractConvenioData = async (text: string) => {
     - fechaRcInterventoria: Fecha de RC/RP INTERVENTORIA (YYYY-MM-DD)
     - afectacionesPresupuestalesAdiciones: AFECTACIONES PRESUPUESTALES ADICIONES
     - aporteMunicipioGobernacionObraInterventoria: APORTE DEL MUNICIPIO O GOBERNACION (Valor numérico)
-    - aporteFngrdObraInterventoria: APORTE DEL FNGRD (Valor numérico)
+    - aporteDistrito: APORTE DEL DISTRITO / CIUDAD (Valor numérico)
+    - aporteGobernacion: APORTE DE LA GOBERNACIÓN / DEPARTAMENTO (Valor numérico)
+    - aporteMunicipio: APORTE DEL MUNICIPIO (Valor numérico)
+    - aporteFondo: APORTE DEL FONDO / FNGRD / UNGRD (Valor numérico)
+    - aporteFngrdObraInterventoria: APORTE DEL FNGRD / UNGRD (Valor numérico)
     - valorTotalProyecto: VALOR TOTAL PROYECTO (Valor numérico)
     - personasBeneficiadas: PERSONAS BENEFICIADAS (Número)
     - empleosGenerados: EMPLEOS GENERADOS (Número)
@@ -595,6 +608,10 @@ export const extractConvenioData = async (text: string) => {
           fechaRcInterventoria: { type: Type.STRING },
           afectacionesPresupuestalesAdiciones: { type: Type.STRING },
           aporteMunicipioGobernacionObraInterventoria: { type: Type.NUMBER },
+          aporteDistrito: { type: Type.NUMBER },
+          aporteGobernacion: { type: Type.NUMBER },
+          aporteMunicipio: { type: Type.NUMBER },
+          aporteFondo: { type: Type.NUMBER },
           aporteFngrdObraInterventoria: { type: Type.NUMBER },
           valorTotalProyecto: { type: Type.NUMBER },
           personasBeneficiadas: { type: Type.NUMBER },
@@ -804,6 +821,10 @@ export const extractProjectData = async (text: string) => {
               fechaRcInterventoria: { type: Type.STRING },
               afectacionesPresupuestalesAdiciones: { type: Type.STRING },
               aporteMunicipioGobernacionObraInterventoria: { type: Type.NUMBER },
+              aporteDistrito: { type: Type.NUMBER },
+              aporteGobernacion: { type: Type.NUMBER },
+              aporteMunicipio: { type: Type.NUMBER },
+              aporteFondo: { type: Type.NUMBER },
               aporteFngrdObraInterventoria: { type: Type.NUMBER },
               valorTotalProyecto: { type: Type.NUMBER },
               personasBeneficiadas: { type: Type.NUMBER },
@@ -821,7 +842,6 @@ export const extractProjectData = async (text: string) => {
               conformacionLegalInterventoria: { type: Type.STRING },
               nitContratistaInterventoria: { type: Type.STRING },
               valorObraInterventoria: { type: Type.NUMBER },
-              aporteFondo: { type: Type.NUMBER },
               fechaSuscripcionInterventoria: { type: Type.STRING },
               fechaInicioObra: { type: Type.STRING },
               fechaFinalizacionInicial: { type: Type.STRING },
@@ -1373,6 +1393,126 @@ export const generateShockPlan = async (project: ProjectData) => {
       required: ["resumenSituacion", "objetivosInmediatos", "accionesEspecificas", "hitosRecuperacion", "indicadoresExito"]
     }
   });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const extractWeeklyReportData = async (text: string, file?: File) => {
+  const model = getAIModel();
+  let inlineData: any = undefined;
+
+  if (file) {
+    const base64 = await fileToBase64(file);
+    inlineData = { inlineData: { mimeType: file.type, data: base64 } };
+  }
+
+  const prompt = `
+    Eres un auditor experto en supervisión de obras de la UNGRD. Analiza el siguiente INFORME SEMANAL DE AVANCE DE OBRA con MÁXIMO RIGOR.
+    El texto proviene de un reporte de interventoría con un formato específico.
+    
+    TEXTO DEL INFORME:
+    ${text}
+    
+    INSTRUCCIONES DE EXTRACCIÓN CRÍTICAS (PARA ESTE FORMATO):
+    1. SEMANA: Busca "Semana Número: X". Extrae solo el dígito.
+    2. FECHAS DE LA SEMANA: Busca "Del: [Fecha] Al: [Fecha]". Ojo: a veces las fechas aparecen solas en una línea (ej: "30/07/21 5/08/21"). Úsalas como fecha inicio y fin.
+    3. CONTRATISTA DE OBRA: Extrae el nombre después de "CONTRATISTA DE OBRA:". Ejemplo: "CONSORCIO PROPLAYA".
+    4. INTERVENTORÍA: Extrae el nombre después de "INTERVENTORIA:". Ejemplo: "AIDCON LTDA".
+    5. NÚMEROS DE CONTRATO: Extrae los números que siguen a "CONTRATO No:". Identifica cuál es de Obra y cuál de Interventoría basándote en la etiqueta anterior.
+    6. TIEMPO: Busca "Tiempo transcurrido desde la iniciación del contrato:". Ejemplo: "6 Días".
+    7. VALORES FINANCIEROS ($):
+       - "Valor Inicial": Es el valor del presupuesto original. Busca la cifra en pesos ($) cerca de esta etiqueta.
+       - "Valor Actualizado": Es el valor vigente considerando adiciones.
+       - "Disgregación/Recursos": Si el reporte menciona aportes específicos (ej: "Distrito: 1M", "Fondo: 5M"), extráelos en los campos aporteDistrito, aporteGobernacion, aporteMunicipio, aporteFondo.
+    8. FECHAS DEL CONTRATO: Busca "Fecha de Iniciación" y "Fecha de Vencimiento".
+    9. AVANCES (%): Busca "Obra programada (%)" y "Obra Física Ejecutada (%)". Toma siempre los valores ACUMULADOS.
+    10. TEXTOS OPERATIVOS:
+        - "OBJETO DEL CONTRATO DE OBRA" -> objeto.
+        - "ACTIVIDADES REALIZADAS EN LA SEMANA" -> actividadesEjecutadas.
+        - "ACTIVIDADES A REALIZAR EN LA SIGUIENTE SEMANA" -> actividadesProximas.
+        - "ACTIVIDADES SISO, AMBIENTALES Y SOCIALES" -> sisoAmbiental.
+        - "OBSERVACIONES DIRECTOR DE INTERVENTORIA" -> observaciones.
+
+    Estructura JSON requerida:
+    {
+      "semana": number,
+      "fechaInicio": "YYYY-MM-DD",
+      "fechaFin": "YYYY-MM-DD",
+      "contratistaObra": "string",
+      "interventoria": "string",
+      "interventorResponsable": "Director de Interventoría",
+      "supervisor": "string (Supervisor del contrato)",
+      "obraProgramadaPct": number (0-100),
+      "obraEjecutadaPct": number (0-100),
+      "valorProgramado": number (COP),
+      "valorEjecutado": number (COP),
+      "valorPagado": number (COP),
+      "valorInicial": number (COP),
+      "valorActualizado": number (COP),
+      "aporteDistrito": number (COP),
+      "aporteGobernacion": number (COP),
+      "aporteMunicipio": number (COP),
+      "aporteFondo": number (COP),
+      "tiempoTranscurrido": "string",
+      "fechaIniciacion": "YYYY-MM-DD",
+      "fechaVencimiento": "YYYY-MM-DD",
+      "plazoInicial": "string",
+      "plazoActualizado": "string",
+      "actividadesEjecutadas": "string",
+      "actividadesProximas": "string",
+      "sisoAmbiental": "string",
+      "observaciones": "string",
+      "numeroContrato": "string (Contrato de Obra)",
+      "numeroContratoInterventoria": "string"
+    }
+
+    NOTAS:
+    - Si no encuentras un valor, devuelve null. 
+    - Limpia los números eliminando símbolos de moneda y puntos decimales/miles si es necesario para que sea un Number válido.
+    - Ignora el encabezado "1 de 2".
+    `;
+
+  const responseText = await generateContent(prompt, model, {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        semana: { type: Type.NUMBER },
+        fechaInicio: { type: Type.STRING },
+        fechaFin: { type: Type.STRING },
+        contratistaObra: { type: Type.STRING },
+        interventoria: { type: Type.STRING },
+        interventorResponsable: { type: Type.STRING },
+        supervisor: { type: Type.STRING },
+        obraProgramadaPct: { type: Type.NUMBER },
+        obraEjecutadaPct: { type: Type.NUMBER },
+        valorProgramado: { type: Type.NUMBER },
+        valorEjecutado: { type: Type.NUMBER },
+        valorPagado: { type: Type.NUMBER },
+        valorInicial: { type: Type.NUMBER },
+        valorActualizado: { type: Type.NUMBER },
+        aporteDistrito: { type: Type.NUMBER },
+        aporteGobernacion: { type: Type.NUMBER },
+        aporteMunicipio: { type: Type.NUMBER },
+        aporteFondo: { type: Type.NUMBER },
+        tiempoTranscurrido: { type: Type.STRING },
+        fechaIniciacion: { type: Type.STRING },
+        fechaVencimiento: { type: Type.STRING },
+        plazoInicial: { type: Type.STRING },
+        plazoActualizado: { type: Type.STRING },
+        actividadesEjecutadas: { type: Type.STRING },
+        actividadesProximas: { type: Type.STRING },
+        sisoAmbiental: { type: Type.STRING },
+        observaciones: { type: Type.STRING },
+        numeroContrato: { type: Type.STRING },
+        numeroContratoInterventoria: { type: Type.STRING }
+      }
+    }
+  }, inlineData ? [inlineData] : undefined);
 
   if (!responseText) {
     throw new Error("El modelo no devolvió ningún contenido.");
