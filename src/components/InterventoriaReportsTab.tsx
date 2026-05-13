@@ -294,7 +294,21 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
             </div>
           </div>
           
-          <form onSubmit={handleSubmit} className="p-6 space-y-8">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              const requiredFields = ['semana', 'fechaInicio', 'fechaFin', 'interventorResponsable', 'obraProgramadaPct', 'obraEjecutadaPct', 'valorProgramado', 'valorEjecutado', 'actividadesEjecutadas', 'actividadesProximas'];
+              for(const field of requiredFields) {
+                if(formData[field as keyof typeof formData] === '' || formData[field as keyof typeof formData] === undefined) {
+                  showAlert(`El campo ${field} es obligatorio.`);
+                  return;
+                }
+              }
+              handleSubmit(e);
+            }} 
+            noValidate 
+            className="p-6 space-y-8"
+          >
             {/* Información general */}
             <section>
               <h4 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -451,7 +465,6 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                 <label className="block text-sm font-medium text-slate-700 mb-1">Seleccione el Contrato</label>
                 <select
                   name="contractId"
-                  required
                   value={formData.contractId}
                   onChange={handleInputChange as any}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
@@ -652,7 +665,7 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
               </div>
 
               {/* Lista de Informes */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {sortedReportsDesc.map((report) => {
                   const desviacionFisica = report.obraProgramadaPct - report.obraEjecutadaPct;
                   const desviacionFinanciera = report.valorProgramado - report.valorEjecutado;
@@ -664,11 +677,15 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                     haySobrecostos ? 'border-amber-400 ring-2 ring-amber-500/20' :
                     'border-emerald-300 ring-2 ring-emerald-500/10';
 
-                  const reportDocument = state.documentos?.find(d => d.reportId === report.id);
+                  const reportDocument = state.documentos?.find(d => d.reportId === report.id && d.tipo === 'Informe');
                   const documentUrl = reportDocument?.versiones?.[0]?.url;
 
                   return (
-                    <div key={report.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden hover:shadow-xl transition-all group transform hover:-translate-y-1 relative ${cardBorderColor}`}>
+                    <div 
+                      key={report.id} 
+                      onClick={() => setSelectedReport({ report, type: 'summary' })}
+                      className={`bg-white rounded-2xl border shadow-sm overflow-hidden hover:shadow-xl transition-all cursor-pointer group transform hover:-translate-y-1 ${cardBorderColor}`}
+                    >
                       <div className="p-6 border-b border-slate-100 relative">
                         {hayRetraso && (
                           <div className="absolute top-0 right-0 bg-rose-600 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest flex items-center gap-1">
@@ -696,21 +713,20 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                           </div>
                         </div>
 
-                        <div className="space-y-3 text-sm mb-4">
+                        <div className="space-y-3 text-sm">
                           <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                            <span className="text-slate-500 flex items-center gap-1"><User size={14}/>Responsable:</span>
+                            <span className="text-slate-500 flex items-center gap-1"><User size={14}/>Resp:</span>
                             <span className="font-medium text-slate-700 truncate max-w-[150px]" title={report.interventorResponsable}>{report.interventorResponsable}</span>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 gap-4 mt-2">
                             <div>
                                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Avance Físico</p>
                                <div className="flex items-end gap-2">
                                  <span className="text-lg font-bold text-slate-900">{report.obraEjecutadaPct}%</span>
-                                 <span className="text-xs text-slate-400 mb-1 whitespace-nowrap">/ {report.obraProgramadaPct}% prog.</span>
                                </div>
-                               <p className={`text-[10px] font-medium ${hayRetraso ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                 Desv: {desviacionFisica > 0 ? '-' : '+'}{Math.abs(desviacionFisica).toFixed(2)}%
+                               <p className={`text-[10px] font-medium mt-1 ${hayRetraso ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                 Prog: {report.obraProgramadaPct}%
                                </p>
                             </div>
                             <div className="text-right">
@@ -718,8 +734,8 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                                <div className="flex items-end justify-end gap-2">
                                  <span className="text-lg font-bold text-slate-900 whitespace-nowrap">{formatCurrency(report.valorEjecutado)}</span>
                                </div>
-                               <p className={`text-[10px] font-medium ${haySobrecostos ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                 Desv: {desviacionFinanciera < 0 ? '-' : '+'}{formatCurrency(Math.abs(desviacionFinanciera))}
+                               <p className={`text-[10px] font-medium mt-1 ${haySobrecostos ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                 Prog: {formatCurrency(report.valorProgramado)}
                                </p>
                             </div>
                           </div>
@@ -728,49 +744,41 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
 
                       <div className="p-6 bg-slate-50 space-y-4">
                         <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Actividades Destacadas</p>
-                          <p className="text-sm text-slate-700 line-clamp-2" title={report.actividadesEjecutadas}>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Actividades</p>
+                          <p className="text-xs text-slate-700 line-clamp-2" title={report.actividadesEjecutadas}>
                             {report.actividadesEjecutadas || 'Sin detalles registrados'}
                           </p>
                         </div>
                         
-                        <div className="flex flex-wrap items-center justify-between pt-4 gap-2 border-t border-slate-200">
-                           <div className="flex gap-2">
-                              <button 
-                                onClick={() => setSelectedReport({ report, type: 'summary' })}
-                                className="text-indigo-600 hover:text-indigo-800 text-xs font-bold flex items-center gap-1 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition-colors"
-                              >
-                                <FileSearch size={14} />
-                                Resumen
-                              </button>
-                           </div>
+                        <div className="flex items-center justify-end pt-4 border-t border-slate-200">
                            <div className="flex gap-2">
                               {documentUrl && (
                                 <a 
                                   href={documentUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-emerald-600 hover:text-emerald-800 text-xs font-bold flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="p-2 text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all"
+                                  title="Ver Documento Original"
                                 >
-                                  <Eye size={14} />
-                                  Ver Doc
+                                  <Eye size={18} />
                                 </a>
                               )}
                               <button 
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   try {
                                     if(window.confirm && window.confirm('¿Está seguro de eliminar este informe?')) {
                                       deleteInterventoriaReport(report.id);
                                     }
-                                  } catch(e) {
-                                      // fallback for non-confirm environment
+                                  } catch(err) {
                                       deleteInterventoriaReport(report.id);
                                   }
                                 }}
-                                className="text-rose-600 hover:text-rose-800 text-xs font-bold flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-rose-50 transition-colors"
+                                className="p-2 text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all"
+                                title="Eliminar Informe"
                               >
-                                <Trash2 size={14} />
-                                Eliminar
+                                <Trash2 size={18} />
                               </button>
                            </div>
                         </div>
