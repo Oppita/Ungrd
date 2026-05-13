@@ -18,13 +18,14 @@ interface InterventoriaReportsTabProps {
 }
 
 export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = ({ data, onUpdateProject }) => {
-  const { state, addInterventoriaReport, addDocument, updateProject, deleteInterventoriaReport } = useProject();
+  const { state, addInterventoriaReport, addDocument, updateProject, deleteInterventoriaReport, deleteDocument } = useProject();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pastedText, setPastedText] = useState('');
   const [uploadedFile, setUploadedFile] = useState<{ name: string; file: File } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingDoc, setIsUploadingDoc] = useState<string | null>(null);
   const reports = data.interventoriaReports || [];
   const [selectedReport, setSelectedReport] = useState<{ report: InterventoriaReport, type: 'summary' | 'full' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -744,17 +745,87 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                                 Resumen
                               </button>
                            </div>
-                           <div className="flex gap-2">
-                              {documentUrl && (
-                                <a 
-                                  href={documentUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-emerald-600 hover:text-emerald-800 text-xs font-bold flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                >
-                                  <Eye size={14} />
-                                  Ver Doc
-                                </a>
+                           <div className="flex flex-wrap gap-2">
+                              {documentUrl ? (
+                                <>
+                                  <a 
+                                    href={documentUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-emerald-600 hover:text-emerald-800 text-xs font-bold flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                  >
+                                    <Eye size={14} />
+                                    Ver Doc
+                                  </a>
+                                  <button 
+                                    onClick={() => {
+                                      try {
+                                        if(window.confirm && window.confirm('¿Está seguro de eliminar el PDF de este informe?')) {
+                                          if (reportDocument?.id) {
+                                            deleteDocument(reportDocument.id);
+                                          }
+                                        }
+                                      } catch(e) {
+                                          if (reportDocument?.id) {
+                                            deleteDocument(reportDocument.id);
+                                          }
+                                      }
+                                    }}
+                                    className="text-rose-500 hover:text-rose-700 text-xs font-bold flex items-center gap-1 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 transition-colors"
+                                    title="Eliminar Documento"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </>
+                              ) : (
+                                <label className={`text-slate-500 hover:text-indigo-600 text-xs font-bold flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-100 hover:bg-indigo-50 transition-colors cursor-pointer ${isUploadingDoc === report.id ? 'opacity-50 pointer-events-none' : ''}`}>
+                                  {isUploadingDoc === report.id ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                                  {isUploadingDoc === report.id ? 'Subiendo...' : 'Subir PDF'}
+                                  <input 
+                                    type="file" 
+                                    accept=".pdf" 
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        setIsUploadingDoc(report.id);
+                                        const file = e.target.files[0];
+                                        try {
+                                          const folderPath = `Informes/${data.nombre}`;
+                                          const publicUrl = await uploadDocumentToStorage(file, folderPath);
+                                          await addDocument({
+                                            id: `DOC-${Date.now()}`,
+                                            projectId: data.id,
+                                            reportId: report.id,
+                                            titulo: `Informe Interventoría Semana ${report.semana}`,
+                                            tipo: 'Informe',
+                                            descripcion: `Documento original del informe de interventoría semana ${report.semana}`,
+                                            fechaCreacion: new Date().toISOString(),
+                                            ultimaActualizacion: new Date().toISOString(),
+                                            versiones: [{
+                                              id: `VER-${Date.now()}`,
+                                              version: 1,
+                                              fecha: new Date().toISOString(),
+                                              url: publicUrl,
+                                              nombreArchivo: file.name,
+                                              subidoPor: 'Interventor',
+                                              accion: 'Subida',
+                                              estado: 'Aprobado'
+                                            }],
+                                            tags: ['Informe', 'Interventoría', `Semana ${report.semana}`],
+                                            folderPath,
+                                            estado: 'Aprobado'
+                                          });
+                                          showAlert('Documento subido correctamente', 'success');
+                                        } catch (error) {
+                                          console.error('Upload Error:', error);
+                                          showAlert('Error al subir el documento', 'error');
+                                        } finally {
+                                          setIsUploadingDoc(null);
+                                        }
+                                      }
+                                    }}
+                                  />
+                                </label>
                               )}
                               <button 
                                 onClick={() => {
@@ -763,14 +834,12 @@ export const InterventoriaReportsTab: React.FC<InterventoriaReportsTabProps> = (
                                       deleteInterventoriaReport(report.id);
                                     }
                                   } catch(e) {
-                                      // fallback for non-confirm environment
                                       deleteInterventoriaReport(report.id);
                                   }
                                 }}
                                 className="text-rose-600 hover:text-rose-800 text-xs font-bold flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-rose-50 transition-colors"
                               >
                                 <Trash2 size={14} />
-                                Eliminar
                               </button>
                            </div>
                         </div>
