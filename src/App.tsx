@@ -638,12 +638,7 @@ function App() {
           }
         }}
         onEnterSurveys={() => {
-          if (!user && isSupabaseConfigured) {
-            setPendingView("encuestas");
-            setShowAuth(true);
-          } else {
-            setActiveView("encuestas");
-          }
+          setActiveView("encuestas");
         }}
       />
     );
