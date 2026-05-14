@@ -104,23 +104,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
                 'Iniciar Sesión Segura'
               )}
             </button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-100"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-3 text-slate-400 font-bold tracking-widest">O entrar como</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onSuccess}
-              className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-semibold hover:bg-slate-100 transition-all flex items-center justify-center gap-2 border border-slate-200"
-            >
-              Invitado / Registrador de Datos
-            </button>
           </form>
         </div>
       </div>
