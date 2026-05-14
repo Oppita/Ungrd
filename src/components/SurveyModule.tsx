@@ -37,11 +37,7 @@ import {
   Activity,
   Calculator,
   GanttChart,
-  BookOpen,
-  Globe,
-  Play,
-  Mic,
-  Map as MapIcon
+  BookOpen
 } from 'lucide-react';
 import { useProject } from '../store/ProjectContext';
 import { 
@@ -933,19 +929,9 @@ const SurveyBuilder: React.FC<{
 
   const [questions, setQuestions] = useState<SurveyQuestion[]>(initialSurvey?.questions || [
     { id: 'q-cons-1', text: '¿Otorga consentimiento informado?', type: 'boolean', options: ['Sí, otorgo consentimiento — continuar', 'No otorgo consentimiento — detener el instrumento'], required: true, category: 'Identificación territorial' },
-    { 
-      id: 'q-org-comp', 
-      text: 'Datos de la organización', 
-      type: 'composite', 
-      required: true, 
-      category: 'Organización',
-      subQuestions: [
-        { id: 'q-org-n', text: 'Nombre', type: 'text', required: true, category: 'Organización' },
-        { id: 'q-org-a', text: 'Año de conformación', type: 'number', required: false, category: 'Organización' },
-        { id: 'q-org-r', text: 'Rol o cargo del instrumentado dentro de la organización', type: 'text', required: false, category: 'Organización' },
-        { id: 'q-org-pj', text: 'Personería jurídica (Sí/No, N° si aplica)', type: 'text', required: false, category: 'Organización' }
-      ]
-    },
+    { id: 'q-org-1', text: 'Datos de la organización: Nombre', type: 'text', required: true, category: 'Organización' },
+    { id: 'q-org-2', text: 'Año de conformación', type: 'number', required: false, category: 'Organización' },
+    { id: 'q-org-3', text: 'Personería jurídica', type: 'boolean', options: ['Sí', 'No'], required: false, category: 'Organización' },
     { id: 'q-pop-1', text: 'Composición de la población vinculada a la organización', type: 'matrix', rows: ['Infancia', 'Jóvenes', 'Adultos', 'TOTAL'], columns: ['Mujeres', 'Hombres', 'Otros', 'Total'], required: true, category: 'Organización' },
     { id: 'q-pop-2', text: 'Número de personas con discapacidad', type: 'number', required: true, category: 'Organización', tags: ['Sector Igualdad y Equidad (ICBF) + Salud'] },
     { id: 'q-eth-1', text: '13. Pertenencia étnica y poblacional', type: 'multiple', options: ['Campesinado', 'Comunidad indígena', 'Comunidad afrocolombiana, negra, raizal o palenquera', 'Pueblo Rrom (gitano)', 'Pescadores artesanales', 'Productores agropecuarios', 'Comerciantes', 'Población migrante extranjera', 'Población víctima de desplazamiento forzado', 'Población reasentada'], required: true, category: 'Población', tags: ['Enfoque diferencial transversal'] },
@@ -1317,7 +1303,6 @@ const SurveyBuilder: React.FC<{
                                               <option value="select">Selección Única</option>
                                               <option value="multiple">Selección Múltiple</option>
                                               <option value="matrix">Matriz / Tabla de Datos</option>
-                                              <option value="composite">Grupo (Compuesta)</option>
                                               <option value="geopolygon">Polígono Geográfico</option>
                                               <option value="audio">Audio (Respuesta Abierta Hablada)</option>
                                            </select>
@@ -1383,176 +1368,46 @@ const SurveyBuilder: React.FC<{
                                      )}
 
                                      {q.type === 'matrix' && (
-                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                           <div>
-                                            <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Filas de la Matriz</label>
-                                            <div className="space-y-2">
-                                              {(q.rows || []).map((row, i) => (
-                                                <div key={i} className="flex gap-2 items-center">
-                                                  <input 
-                                                    type="text"
-                                                    value={row}
-                                                    onChange={(e) => {
-                                                      const newRows = [...(q.rows || [])];
-                                                      newRows[i] = e.target.value;
-                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, rows: newRows} : item));
-                                                    }}
-                                                    className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 font-bold text-slate-800 text-xs"
-                                                    placeholder={`Fila ${i + 1}`}
-                                                  />
-                                                  <button 
-                                                    onClick={() => {
-                                                      const newRows = (q.rows || []).filter((_, idx) => idx !== i);
-                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, rows: newRows} : item));
-                                                    }}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 rounded-lg transition-colors"
-                                                  >
-                                                    <X size={14} />
-                                                  </button>
-                                                </div>
-                                              ))}
-                                              <button
-                                                onClick={() => {
-                                                  const newRows = [...(q.rows || []), `Nueva Fila ${(q.rows?.length || 0) + 1}`];
-                                                  setQuestions(questions.map(item => item.id === q.id ? {...item, rows: newRows} : item));
-                                                }}
-                                                className="text-[10px] font-black text-indigo-500 uppercase flex items-center gap-1 hover:text-indigo-700 mt-1 transition-all"
-                                              >
-                                                <Plus size={12} /> Añadir Fila
-                                              </button>
-                                            </div>
-                                          </div>
-                                          <div>
-                                            <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Columnas de la Matriz</label>
-                                            <div className="space-y-2">
-                                              {(q.columns || []).map((col, i) => (
-                                                <div key={i} className="flex gap-2 items-center">
-                                                  <input 
-                                                    type="text"
-                                                    value={col}
-                                                    onChange={(e) => {
-                                                      const newCols = [...(q.columns || [])];
-                                                      newCols[i] = e.target.value;
-                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, columns: newCols} : item));
-                                                    }}
-                                                    className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 font-bold text-slate-800 text-xs"
-                                                    placeholder={`Columna ${i + 1}`}
-                                                  />
-                                                  <button 
-                                                    onClick={() => {
-                                                      const newCols = (q.columns || []).filter((_, idx) => idx !== i);
-                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, columns: newCols} : item));
-                                                    }}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 rounded-lg transition-colors"
-                                                  >
-                                                    <X size={14} />
-                                                  </button>
-                                                </div>
-                                              ))}
-                                              <button
-                                                onClick={() => {
-                                                  const newCols = [...(q.columns || []), `Col ${(q.columns?.length || 0) + 1}`];
-                                                  setQuestions(questions.map(item => item.id === q.id ? {...item, columns: newCols} : item));
-                                                }}
-                                                className="text-[10px] font-black text-indigo-500 uppercase flex items-center gap-1 hover:text-indigo-700 mt-1 transition-all"
-                                              >
-                                                <Plus size={12} /> Añadir Columna
-                                              </button>
-                                            </div>
-                                          </div>
-                                       </div>
-                                     )}
-
-                                     {q.type === 'composite' && (
-                                       <div className="space-y-4">
-                                          <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest">Sub-campos / Variables del Grupo</label>
-                                          <div className="space-y-2 border-l-4 border-indigo-100 pl-4">
-                                            {(q.subQuestions || []).map((sq, i) => (
-                                              <div key={sq.id} className="bg-slate-50 p-4 rounded-2xl relative shadow-sm border border-slate-100">
-                                                <button 
-                                                  onClick={() => {
-                                                    const nextSubs = (q.subQuestions || []).filter(item => item.id !== sq.id);
-                                                    setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
-                                                  }}
-                                                  className="absolute top-2 right-2 text-slate-300 hover:text-rose-500 p-1"
-                                                >
-                                                  <Trash2 size={14} />
-                                                </button>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                  <input 
-                                                    type="text"
-                                                    value={sq.text}
-                                                    onChange={(e) => {
-                                                      const nextSubs = [...(q.subQuestions || [])];
-                                                      nextSubs[i] = { ...sq, text: e.target.value };
-                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
-                                                    }}
-                                                    className="col-span-2 bg-white border-none rounded-xl px-3 py-2 font-bold text-slate-800 text-xs"
-                                                    placeholder="Nombre del campo..."
-                                                  />
-                                                  <select
-                                                    value={sq.type}
-                                                    onChange={(e) => {
-                                                      const nextSubs = [...(q.subQuestions || [])];
-                                                      nextSubs[i] = { ...sq, type: e.target.value as any };
-                                                      setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
-                                                    }}
-                                                    className="bg-white border-none rounded-xl px-3 py-2 font-bold text-slate-800 text-[10px]"
-                                                  >
-                                                    <option value="text">Texto</option>
-                                                    <option value="number">Número</option>
-                                                    <option value="boolean">Booleano</option>
-                                                  </select>
-                                                </div>
-                                              </div>
-                                            ))}
-                                            <button 
-                                              onClick={() => {
-                                                const newSub: SurveyQuestion = { id: crypto.randomUUID(), text: '', type: 'text', required: false, category: q.category };
-                                                const nextSubs = [...(q.subQuestions || []), newSub];
-                                                setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
+                                            <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Filas (Separadas por Coma)</label>
+                                            <textarea 
+                                              value={q.rows?.join(', ') || ''}
+                                              onChange={(e) => {
+                                                const rows = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                                                setQuestions(questions.map(item => item.id === q.id ? {...item, rows} : item));
                                               }}
-                                              className="w-full py-3 border-2 border-dashed border-indigo-100 rounded-2xl text-[10px] font-black text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
-                                            >
-                                              <Plus size={14} /> Añadir Sub-campo
-                                            </button>
+                                              className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800 resize-none h-24"
+                                              placeholder="Fila 1, Fila 2"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Columnas (Separadas por Coma)</label>
+                                            <textarea 
+                                              value={q.columns?.join(', ') || ''}
+                                              onChange={(e) => {
+                                                const columns = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                                                setQuestions(questions.map(item => item.id === q.id ? {...item, columns} : item));
+                                              }}
+                                              className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800 resize-none h-24"
+                                              placeholder="Columna 1, Columna 2"
+                                            />
                                           </div>
                                        </div>
                                      )}
 
                                      <div>
-                                        <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Etiquetas / Metadatos</label>
-                                        <div className="flex flex-wrap gap-2 mb-2">
-                                          {(q.tags || []).map((tag, i) => (
-                                            <span key={i} className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase flex items-center gap-2 border border-emerald-100">
-                                              {tag}
-                                              <button onClick={() => {
-                                                const nextTags = q.tags?.filter((_, idx) => idx !== i);
-                                                setQuestions(questions.map(item => item.id === q.id ? {...item, tags: nextTags} : item));
-                                              }}>
-                                                <X size={10} />
-                                              </button>
-                                            </span>
-                                          ))}
-                                        </div>
-                                        <div className="flex gap-2">
-                                          <input 
-                                            type="text" 
-                                            id={`new-tag-${q.id}`}
-                                            className="flex-1 bg-slate-50 border-none rounded-[16px] px-4 py-3 text-xs font-bold"
-                                            placeholder="Nueva etiqueta..."
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                const val = (e.currentTarget as HTMLInputElement).value.trim();
-                                                if (val) {
-                                                  const nextTags = [...(q.tags || []), val];
-                                                  setQuestions(questions.map(item => item.id === q.id ? {...item, tags: nextTags} : item));
-                                                  e.currentTarget.value = '';
-                                                }
-                                              }
-                                            }}
-                                          />
-                                        </div>
+                                        <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Etiquetas PRT / Metadatos (Separadas por Coma)</label>
+                                        <input 
+                                          type="text" 
+                                          value={q.tags?.join(', ') || ''}
+                                          onChange={(e) => {
+                                            const tags = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                                            setQuestions(questions.map(item => item.id === q.id ? {...item, tags} : item));
+                                          }}
+                                          className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3 text-sm font-medium text-slate-700"
+                                          placeholder="Sector Ambiente, Sector Vivienda, etc..."
+                                        />
                                      </div>
 
                                      <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[32px]">
@@ -2372,57 +2227,9 @@ const SurveyTaker: React.FC<{
                                       onClick={() => updateAnswer(q.id, { type: 'polygon', area: '1ha' }, rIdx)}
                                       className="flex justify-center w-full px-3 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors"
                                     >
-                                      <MapIcon size={14} />
+                                      <Map size={14} />
                                     </button>
                                   )}
-                                </div>
-                              )}
-
-                              {q.type === 'composite' && (
-                                <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                  {q.subQuestions?.map(sq => (
-                                    <div key={sq.id} className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">{sq.text}</label>
-                                      {sq.type === 'text' && (
-                                        <input 
-                                          type="text"
-                                          value={(currentAnswer && currentAnswer[sq.id]) || ''}
-                                          onChange={(e) => {
-                                            const currentVal = currentAnswer || {};
-                                            updateAnswer(q.id, { ...currentVal, [sq.id]: e.target.value }, rIdx);
-                                          }}
-                                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] outline-none"
-                                        />
-                                      )}
-                                      {sq.type === 'number' && (
-                                        <input 
-                                          type="number"
-                                          value={(currentAnswer && currentAnswer[sq.id]) || ''}
-                                          onChange={(e) => {
-                                            const currentVal = currentAnswer || {};
-                                            updateAnswer(q.id, { ...currentVal, [sq.id]: e.target.value }, rIdx);
-                                          }}
-                                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] outline-none"
-                                        />
-                                      )}
-                                      {sq.type === 'boolean' && (
-                                        <div className="flex gap-2">
-                                          {['Sí', 'No'].map(o => (
-                                            <button 
-                                              key={o}
-                                              onClick={() => {
-                                                const currentVal = currentAnswer || {};
-                                                updateAnswer(q.id, { ...currentVal, [sq.id]: o }, rIdx);
-                                              }}
-                                              className={`px-3 py-1 rounded-md text-[9px] font-bold transition-all ${currentAnswer?.[sq.id] === o ? 'bg-indigo-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
-                                            >
-                                              {o}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
                                 </div>
                               )}
                             </div>
@@ -2559,56 +2366,6 @@ const SurveyTaker: React.FC<{
                       </div>
                     )}
 
-                    {q.type === 'composite' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-8 rounded-[40px] border-2 border-slate-100 shadow-inner">
-                        {q.subQuestions?.map(sq => (
-                          <div key={sq.id} className="space-y-2">
-                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">{sq.text}</label>
-                             {sq.type === 'text' && (
-                               <input 
-                                 type="text"
-                                 value={answers[q.id]?.[sq.id] || ''}
-                                 onChange={(e) => {
-                                   const current = answers[q.id] || {};
-                                   updateAnswer(q.id, { ...current, [sq.id]: e.target.value });
-                                 }}
-                                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
-                                 placeholder={`Ingresa ${sq.text.toLowerCase()}...`}
-                               />
-                             )}
-                             {sq.type === 'number' && (
-                               <input 
-                                 type="number"
-                                 value={answers[q.id]?.[sq.id] || ''}
-                                 onChange={(e) => {
-                                   const current = answers[q.id] || {};
-                                   updateAnswer(q.id, { ...current, [sq.id]: e.target.value });
-                                 }}
-                                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
-                                 placeholder="0"
-                               />
-                             )}
-                             {sq.type === 'boolean' && (
-                               <div className="flex gap-2">
-                                 {['Sí', 'No'].map(o => (
-                                   <button 
-                                     key={o}
-                                     onClick={() => {
-                                       const current = answers[q.id] || {};
-                                       updateAnswer(q.id, { ...current, [sq.id]: o });
-                                     }}
-                                     className={`flex-1 py-4 rounded-xl font-black text-xs uppercase transition-all ${answers[q.id]?.[sq.id] === o ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}
-                                   >
-                                     {o}
-                                   </button>
-                                 ))}
-                               </div>
-                             )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
                     {q.type === 'audio' && (
                       <div className="flex flex-col gap-4 items-start p-6 bg-slate-50 rounded-3xl border-2 border-slate-100">
                          {answers[q.id] ? (
@@ -2691,7 +2448,7 @@ const SurveyTaker: React.FC<{
                              </div>
                            ) : (
                              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                                <MapIcon size={48} className="text-slate-400" />
+                                <Map size={48} className="text-slate-400" />
                                 <button 
                                   onClick={() => {
                                     updateAnswer(q.id, {
