@@ -839,33 +839,48 @@ const SurveyList: React.FC<{
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 pt-6 border-t border-slate-100">
-                      <button 
-                        onClick={() => onEdit(survey)}
-                        className="flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all"
-                        title="Editar Encuesta"
-                      >
-                        <Settings2 size={16} />
-                      </button>
+                    <div className="grid grid-cols-2 gap-3 pt-6 border-t border-slate-100">
                       <button 
                         onClick={() => onFill(survey)}
-                        className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95"
+                        className="col-span-2 flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white py-3 rounded-2xl text-sm font-bold transition-all shadow-lg active:scale-95"
                       >
-                        <MessageSquare size={16} />
-                        Responder
+                        <MessageSquare size={18} />
+                        Realizar Encuesta
                       </button>
+                      
                       <button 
                         onClick={() => onAnalyze(survey)}
-                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                        className={`flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
                           responseCount > 0 
-                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-100' 
-                          : 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-50'
+                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-100 shadow-sm' 
+                          : 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
                         }`}
                         disabled={responseCount === 0}
                       >
-                        <BrainCircuit size={16} />
-                        Análisis
+                        <BrainCircuit size={14} />
+                        Análisis IA
                       </button>
+
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => onEdit(survey)}
+                          className="flex-1 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-all py-3 shadow-inner"
+                          title="Configuración"
+                        >
+                          <Settings2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (window.confirm('¿Está seguro de eliminar esta operación estadística? SE PERDERÁN TODAS LAS RESPUESTAS ASOCIADAS.')) {
+                              deleteSurvey(survey.id);
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-2xl transition-all py-3 border border-rose-100"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   </>
                 );
@@ -1004,7 +1019,45 @@ const SurveyBuilder: React.FC<{
       category: 'Servicios'
     },
     { id: 'q-rel-1', text: '17. Relación entre actividades productivas y dinámicas naturales del territorio', type: 'matrix', rows: ['Periodos normales de lluvia', 'Verano (Periodo seco)', 'Vientos fuertes'], columns: ['Aplica', 'Beneficia', 'Habitable'], matrixColumnTypes: { 'Aplica': 'boolean', 'Beneficia': 'boolean', 'Habitable': 'boolean' }, required: true, category: 'Territorio', tags: ['Dinámicas Naturales'], hasJustification: true, hasAudioJustification: true },
-    { id: 'q-dam-1', text: '29. Inventario cuantitativo de daños', type: 'matrix', rows: ['Predios inundados (predios)', 'Viviendas destruidas totalmente (viviendas)', 'Cultivos perdidos (hectáreas)', 'Animales perdidos (cabezas)', 'Pérdida de vidas humanas (personas)'], columns: ['Aplica', 'Cantidad'], required: true, category: 'Afectación', tags: ['Sector Vivienda + Agricultura + Salud'], hasJustification: true, hasAudioJustification: true }
+    { id: 'q-dam-1', text: '29. Inventario cuantitativo de daños', type: 'matrix', rows: ['Predios inundados (predios)', 'Viviendas destruidas totalmente (viviendas)', 'Cultivos perdidos (hectáreas)', 'Animales perdidos (cabezas)', 'Pérdida de vidas humanas (personas)'], columns: ['Aplica', 'Cantidad'], required: true, category: 'Afectación', tags: ['Sector Vivienda + Agricultura + Salud'], hasJustification: true, hasAudioJustification: true },
+    { 
+      id: 'q-infra-1', 
+      text: 'Inventario de vías, puentes, y pasos afectados', 
+      type: 'composite', 
+      category: 'Infraestructura',
+      isRepeater: true,
+      repeaterLabel: 'Añadir elemento afectado',
+      subQuestions: [
+        { id: 'sq1', text: 'Elemento afectado?', type: 'text', required: true, category: 'Infraestructura' },
+        { 
+          id: 'sq2', 
+          text: 'Tipo', 
+          type: 'select', 
+          options: ['Primario', 'Secundario', 'Terciario', 'Camino', 'Puente', 'Pontón', 'Box', 'Muelle', 'Puerto'], 
+          required: true, 
+          category: 'Infraestructura' 
+        },
+        { 
+          id: 'sq3', 
+          text: 'Daño', 
+          type: 'select', 
+          options: ['Erosión', 'Banca', 'Estructura', 'Aproches', 'Socavación', 'Otro'], 
+          required: true, 
+          category: 'Infraestructura' 
+        },
+        { id: 'sq4', text: 'km / m afectados', type: 'number', required: true, category: 'Infraestructura' },
+        { 
+          id: 'sq5', 
+          text: '¿Paso actual?', 
+          type: 'select', 
+          options: ['Sí', 'No', 'Parcial'], 
+          required: true, 
+          category: 'Infraestructura' 
+        }
+      ],
+      required: true,
+      tags: ['Transporte', 'Vial']
+    }
   ]);
 
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
@@ -1421,6 +1474,42 @@ const SurveyBuilder: React.FC<{
                                         </div>
                                      </div>
 
+                                     {q.type === 'composite' && (
+                                       <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 mb-6">
+                                         <div className="flex items-center gap-3">
+                                           <div className="p-2 bg-white rounded-xl shadow-sm">
+                                             <Layers className="text-indigo-600" size={18} />
+                                           </div>
+                                           <div className="flex-1">
+                                             <p className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Configuración de Repetidor</p>
+                                             <p className="text-[10px] font-bold text-indigo-400">Múltiples registros para este grupo</p>
+                                           </div>
+                                           <div className="flex items-center gap-2">
+                                             <input 
+                                               type="checkbox"
+                                               id={`repeater-${q.id}`}
+                                               checked={q.isRepeater}
+                                               onChange={(e) => setQuestions(questions.map(item => item.id === q.id ? {...item, isRepeater: e.target.checked} : item))}
+                                               className="w-5 h-5 rounded-lg text-indigo-600 focus:ring-indigo-500 border-slate-300 transition-all cursor-pointer"
+                                             />
+                                             <label htmlFor={`repeater-${q.id}`} className="text-xs font-black text-indigo-900 uppercase tracking-widest cursor-pointer">Habilitar</label>
+                                           </div>
+                                         </div>
+                                         {q.isRepeater && (
+                                           <div className="mt-4 pt-4 border-t border-indigo-100">
+                                             <label className="block text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Texto del botón "+ Añadir ..."</label>
+                                             <input 
+                                               type="text"
+                                               placeholder="Ej: Puente"
+                                               value={q.repeaterLabel || ''}
+                                               onChange={(e) => setQuestions(questions.map(item => item.id === q.id ? {...item, repeaterLabel: e.target.value} : item))}
+                                               className="w-full bg-white border-none rounded-xl px-4 py-2 text-xs font-bold text-slate-800 shadow-sm"
+                                             />
+                                           </div>
+                                         )}
+                                       </div>
+                                     )}
+
                                      {(q.type === 'select' || q.type === 'multiple' || q.type === 'boolean') && (
                                        <div>
                                           <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Opciones de Respuesta</label>
@@ -1573,7 +1662,8 @@ const SurveyBuilder: React.FC<{
                                      )}
 
                                      {q.type === 'composite' && (
-                                       <div className="space-y-4">
+                                       <>
+                                         <div className="space-y-4">
                                           <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest">Sub-campos / Variables del Grupo</label>
                                           <div className="space-y-2 border-l-4 border-indigo-100 pl-4">
                                             {(q.subQuestions || []).map((sq, i) => (
@@ -1611,7 +1701,60 @@ const SurveyBuilder: React.FC<{
                                                     <option value="text">Texto</option>
                                                     <option value="number">Número</option>
                                                     <option value="boolean">Booleano</option>
+                                                    <option value="select">Selec. Única</option>
+                                                    <option value="multiple">Selec. Múltiple</option>
                                                   </select>
+                                                  {(sq.type === 'select' || sq.type === 'multiple' || sq.type === 'boolean') && (
+                                                    <div className="col-span-2 mt-2 space-y-2">
+                                                      <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Opciones de Respuesta</label>
+                                                      <div className="space-y-1.5">
+                                                        {(sq.options?.length ? sq.options : (sq.type === 'boolean' ? ['Sí', 'No'] : [])).map((opt, optIdx) => (
+                                                          <div key={optIdx} className="flex gap-1.5 h-8">
+                                                            <input 
+                                                              type="text"
+                                                              value={opt}
+                                                              onChange={(e) => {
+                                                                const newOpts = [...(sq.options?.length ? sq.options : (sq.type === 'boolean' ? ['Sí', 'No'] : []))];
+                                                                newOpts[optIdx] = e.target.value;
+                                                                const nextSubs = [...(q.subQuestions || [])];
+                                                                nextSubs[i] = { ...sq, options: newOpts };
+                                                                setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
+                                                              }}
+                                                              className="flex-1 bg-white border border-slate-100 rounded-lg px-2 text-[9px] font-bold text-slate-700 outline-none focus:border-indigo-300"
+                                                              placeholder={`Opción ${optIdx + 1}`}
+                                                            />
+                                                            {sq.type !== 'boolean' && (
+                                                              <button 
+                                                                onClick={() => {
+                                                                  const newOpts = (sq.options || []).filter((_, idx) => idx !== optIdx);
+                                                                  const nextSubs = [...(q.subQuestions || [])];
+                                                                  nextSubs[i] = { ...sq, options: newOpts };
+                                                                  setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
+                                                                }}
+                                                                className="text-slate-300 hover:text-rose-500"
+                                                              >
+                                                                <Trash2 size={12} />
+                                                              </button>
+                                                            )}
+                                                          </div>
+                                                        ))}
+                                                        {sq.type !== 'boolean' && (
+                                                          <button
+                                                            onClick={() => {
+                                                              const current = sq.options || [];
+                                                              const nextOpts = [...current, `Opción ${current.length + 1}`];
+                                                              const nextSubs = [...(q.subQuestions || [])];
+                                                              nextSubs[i] = { ...sq, options: nextOpts };
+                                                              setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
+                                                            }}
+                                                            className="text-[8px] font-black text-indigo-500 uppercase flex items-center gap-1 hover:text-indigo-700 mt-1"
+                                                          >
+                                                            <Plus size={10} /> Añadir
+                                                          </button>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  )}
                                                 </div>
                                               </div>
                                             ))}
@@ -1627,7 +1770,20 @@ const SurveyBuilder: React.FC<{
                                             </button>
                                           </div>
                                        </div>
-                                     )}
+                                       <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl mt-4">
+                                          <button 
+                                            onClick={() => setQuestions(questions.map(item => item.id === q.id ? {...item, isRepeater: !item.isRepeater} : item))}
+                                            className={`relative w-12 h-6 rounded-full transition-all flex items-center ${q.isRepeater ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                                          >
+                                            <div className={`absolute w-4 h-4 bg-white rounded-full transition-all ${q.isRepeater ? 'left-7' : 'left-1'}`} />
+                                          </button>
+                                          <div>
+                                            <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest block">Modo Repetidor (Secciones)</span>
+                                            <span className="text-[9px] text-slate-400 font-medium tracking-tight">Permite al encuestador añadir múltiples registros</span>
+                                          </div>
+                                       </div>
+                                     </>
+                                   )}
 
                                      <div>
                                         <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Etiquetas / Metadatos</label>
@@ -1787,8 +1943,36 @@ const SurveyTaker: React.FC<{
   const [capturingCoords, setCapturingCoords] = useState(false);
   const [gridView, setGridView] = useState(false);
   const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [justifications, setJustifications] = useState<Record<string, any>>({});
+  const [audioUrls, setAudioUrls] = useState<Record<string, any>>({});
   const [progress, setProgress] = useState(0);
   const [showMethodology, setShowMethodology] = useState(false);
+
+  const updateJustification = (qid: string, val: any, respondentIndex?: number, option?: string) => {
+    let newJustifications = { ...justifications };
+    const key = option ? `${qid}_${option}` : qid;
+
+    if (survey.isGroupSurvey && respondentIndex !== undefined) {
+      const current = (newJustifications[key] as any[]) || Array(groupRespondents.length).fill('');
+      current[respondentIndex] = val;
+      newJustifications[key] = current;
+    } else {
+      newJustifications[key] = val;
+    }
+    setJustifications(newJustifications);
+  };
+
+  const updateAudioUrl = (qid: string, val: any, respondentIndex?: number) => {
+    let newAudioUrls = { ...audioUrls };
+    if (survey.isGroupSurvey && respondentIndex !== undefined) {
+      const current = (newAudioUrls[qid] as any[]) || Array(groupRespondents.length).fill(null);
+      current[respondentIndex] = val;
+      newAudioUrls[qid] = current;
+    } else {
+      newAudioUrls[qid] = val;
+    }
+    setAudioUrls(newAudioUrls);
+  };
 
   // Identity States
   const [surveyor, setSurveyor] = useState({ fullName: '', idNumber: '', role: 'Encuestador Regional' });
@@ -1907,6 +2091,8 @@ const SurveyTaker: React.FC<{
       coordinates: coordinates || undefined,
       date: new Date().toISOString(),
       answers,
+      justifications,
+      audioUrls,
       territorialComplexity: {
         nbi: territorialMetrics.nbi,
         gini: territorialMetrics.gini,
@@ -1919,32 +2105,25 @@ const SurveyTaker: React.FC<{
   };
 
   const updateAnswer = (qid: string, val: any, respondentIndex?: number) => {
+    let newAnswers = { ...answers };
+
     if (survey.isGroupSurvey && respondentIndex !== undefined) {
       const currentAnswers = (answers[qid] as any[]) || [];
       const newGroupAnswers = [...currentAnswers];
       newGroupAnswers[respondentIndex] = val;
-      const newAnswers = { ...answers, [qid]: newGroupAnswers };
-      setAnswers(newAnswers);
-      const answeredCount = Object.keys(newAnswers).filter(k => 
-        Array.isArray(newAnswers[k]) ? newAnswers[k].some((v: any) => v !== undefined && v !== '') : newAnswers[k]
-      ).length;
-      setProgress(Math.round((answeredCount / survey.questions.length) * 100));
-    } else if (survey.isGroupSurvey && respondentIndex === undefined && Array.isArray(val)) {
-       // Bulk update for current group
-       const newAnswers = { ...answers, [qid]: val };
-       setAnswers(newAnswers);
-       const answeredCount = Object.keys(newAnswers).filter(k => 
-         Array.isArray(newAnswers[k]) ? newAnswers[k].some((v: any) => v !== undefined && v !== '') : newAnswers[k]
-       ).length;
-       setProgress(Math.round((answeredCount / survey.questions.length) * 100));
+      newAnswers[qid] = newGroupAnswers;
     } else {
-      const newAnswers = { ...answers, [qid]: val };
-      setAnswers(newAnswers);
-      const answeredCount = Object.keys(newAnswers).filter(k => 
-         Array.isArray(newAnswers[k]) ? newAnswers[k].some((v: any) => v !== undefined && v !== '') : newAnswers[k]
-      ).length;
-      setProgress(Math.round((answeredCount / survey.questions.length) * 100));
+      newAnswers[qid] = val;
     }
+
+    setAnswers(newAnswers);
+    
+    const answeredCount = Object.keys(newAnswers).filter(k => {
+      const v = newAnswers[k];
+      if (Array.isArray(v)) return v.some(x => x !== undefined && x !== null && x !== '');
+      return v !== undefined && v !== null && v !== '';
+    }).length;
+    setProgress(Math.round((answeredCount / survey.questions.length) * 100));
   };
 
   return (
@@ -2464,35 +2643,48 @@ const SurveyTaker: React.FC<{
                        </div>
                     </div>
 
-                    <div className={gridView ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-4"}>
+                    <div className={gridView ? "grid grid-cols-1 sm:grid-cols-2 gap-4" : "space-y-4"}>
                       {groupRespondents.map((respondent, rIdx) => {
                         if (!respondent.fullName) return null;
                         const currentAnswer = (answers[q.id] || [])[rIdx];
                         return (
-                          <div key={rIdx} className={`p-4 rounded-2xl bg-white border border-slate-100/50 shadow-sm transition-all hover:shadow-md ${gridView ? 'flex flex-col gap-3' : 'flex items-center gap-4'}`}>
-                            <div className={`flex items-center gap-2 ${gridView ? 'border-b border-slate-50 pb-2' : 'min-w-[150px]'}`}>
-                               <div className="w-5 h-5 bg-indigo-50 text-indigo-600 rounded-md flex items-center justify-center text-[10px] font-black">{rIdx+1}</div>
-                               <p className="text-xs font-bold text-slate-700 truncate max-w-[120px]">{respondent.fullName}</p>
+                          <div key={rIdx} className={`p-6 rounded-[32px] bg-white border border-slate-100 shadow-sm transition-all hover:shadow-md ${gridView ? 'flex flex-col gap-4' : 'flex flex-col md:flex-row md:items-center gap-6'}`}>
+                            <div className={`flex items-center justify-between ${gridView ? 'border-b border-slate-50 pb-3' : 'min-w-[180px]'}`}>
+                               <div className="flex items-center gap-3">
+                                 <div className="w-8 h-8 bg-indigo-600 text-white rounded-xl flex items-center justify-center text-xs font-black shadow-lg shadow-indigo-100">{rIdx+1}</div>
+                                 <p className="text-sm font-black text-slate-800 truncate">{respondent.fullName}</p>
+                               </div>
+                               <div className="flex items-center gap-2">
+                                  {q.hasAudioJustification && (
+                                    <button 
+                                      className={`p-2 rounded-lg transition-all ${audioUrls[`${q.id}_res_${rIdx}`] ? 'bg-rose-500 text-white shadow-lg' : 'bg-rose-50 text-rose-500 hover:bg-rose-100'}`}
+                                      onClick={() => {}} // Audio trigger
+                                    >
+                                      <Mic size={14} />
+                                    </button>
+                                  )}
+                               </div>
                             </div>
                             
-                            <div className="flex-1">
+                            <div className="flex-1 space-y-4">
                               {q.type === 'text' && (
-                                <input 
-                                  type="text" 
-                                  value={currentAnswer || ''}
-                                  onChange={(e) => updateAnswer(q.id, e.target.value, rIdx)}
-                                  className="w-full bg-slate-50 rounded-lg px-3 py-2 outline-none transition-all text-xs"
-                                  placeholder="..."
-                                />
+                                <div className="space-y-2">
+                                  <textarea 
+                                    value={currentAnswer || ''}
+                                    onChange={(e) => updateAnswer(q.id, e.target.value, rIdx)}
+                                    className="w-full bg-slate-50 rounded-2xl px-4 py-3 outline-none transition-all text-sm font-medium border border-transparent focus:border-indigo-500 focus:bg-white h-24"
+                                    placeholder="Ingrese observación detallada..."
+                                  />
+                                </div>
                               )}
 
                               {q.type === 'number' && (
-                                <div className="flex gap-1.5 flex-wrap">
-                                  {[1, 2, 3, 4, 5].map(n => (
+                                <div className="flex gap-2 flex-wrap">
+                                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].slice(0, q.options?.length || 5).map(n => (
                                     <button
                                       key={n}
                                       onClick={() => updateAnswer(q.id, n, rIdx)}
-                                      className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-[10px] transition-all ${currentAnswer === n ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400 font-bold'}`}
+                                      className={`min-w-[44px] h-11 rounded-xl flex items-center justify-center font-black text-sm transition-all border-2 ${currentAnswer === n ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-100 text-slate-400'}`}
                                     >
                                       {n}
                                     </button>
@@ -2501,12 +2693,12 @@ const SurveyTaker: React.FC<{
                               )}
 
                               {q.type === 'boolean' && (
-                                <div className="flex gap-2">
+                                <div className="flex gap-3">
                                   {(q.options?.length ? q.options : ['Sí', 'No']).map(opt => (
                                     <button
                                       key={opt}
                                       onClick={() => updateAnswer(q.id, opt, rIdx)}
-                                      className={`px-3 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${currentAnswer === opt ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-400'}`}
+                                      className={`flex-1 min-h-[44px] px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all border-2 ${currentAnswer === opt ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-100 text-slate-500'}`}
                                     >
                                       {opt}
                                     </button>
@@ -2515,33 +2707,68 @@ const SurveyTaker: React.FC<{
                               )}
 
                               {(q.type === 'select' || q.type === 'multiple') && (
-                                <div className="flex flex-col gap-1.5">
+                                <div className="space-y-4">
                                    {q.type === 'select' ? (
-                                     <select 
-                                      value={currentAnswer || ''}
-                                      onChange={(e) => updateAnswer(q.id, e.target.value, rIdx)}
-                                      className="w-full bg-slate-50 rounded-lg px-2 py-2 text-[10px] font-bold outline-none"
-                                     >
-                                       <option value="">Selección...</option>
-                                       {q.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                     </select>
+                                     <div className="space-y-3">
+                                       <select 
+                                        value={currentAnswer || ''}
+                                        onChange={(e) => updateAnswer(q.id, e.target.value, rIdx)}
+                                        className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm font-bold outline-none appearance-none cursor-pointer"
+                                       >
+                                         <option value="">Selección...</option>
+                                         {q.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                       </select>
+                                       
+                                       {currentAnswer && q.optionsWithJustification?.includes(currentAnswer) && (
+                                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="overflow-hidden">
+                                            <label className="text-[9px] font-black text-amber-600 uppercase tracking-[0.15em] mb-1.5 block ml-1">Justificación Obligatoria para "{currentAnswer}"</label>
+                                            <input 
+                                              type="text"
+                                              placeholder="Especifique los detalles..."
+                                              className="w-full bg-amber-50 border-2 border-amber-100 rounded-xl px-4 py-2.5 text-xs font-bold text-amber-900 placeholder:text-amber-300 outline-none focus:border-amber-400"
+                                              value={(justifications[`${q.id}_${currentAnswer}`] || [])[rIdx] || ''}
+                                              onChange={(e) => updateJustification(q.id, e.target.value, rIdx, currentAnswer)}
+                                            />
+                                         </motion.div>
+                                       )}
+                                     </div>
                                    ) : (
-                                     <div className="flex flex-wrap gap-1">
-                                        {q.options?.slice(0, 4).map(opt => (
-                                          <button 
-                                            key={opt}
-                                            onClick={() => {
-                                              const current = (currentAnswer as string[]) || [];
-                                              const next = current.includes(opt) ? current.filter(v => v !== opt) : [...current, opt];
-                                              updateAnswer(q.id, next, rIdx);
-                                            }}
-                                            className={`px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${
-                                              (currentAnswer as string[] || []).includes(opt) ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'
-                                            }`}
-                                          >
-                                            {opt.substring(0, 10)}
-                                          </button>
-                                        ))}
+                                     <div className="space-y-4">
+                                        <div className="flex flex-wrap gap-2">
+                                          {q.options?.map(opt => (
+                                            <button 
+                                              key={opt}
+                                              onClick={() => {
+                                                const current = (currentAnswer as string[]) || [];
+                                                const next = current.includes(opt) ? current.filter(v => v !== opt) : [...current, opt];
+                                                updateAnswer(q.id, next, rIdx);
+                                              }}
+                                              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
+                                                (currentAnswer as string[] || []).includes(opt) ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white border-slate-100 text-slate-500 hover:border-indigo-100'
+                                              }`}
+                                            >
+                                              {opt}
+                                            </button>
+                                          ))}
+                                        </div>
+
+                                        {/* Multi-option justifications */}
+                                        {(currentAnswer as string[] || []).some(opt => q.optionsWithJustification?.includes(opt)) && (
+                                          <div className="space-y-3 p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
+                                            {(currentAnswer as string[] || []).filter(opt => q.optionsWithJustification?.includes(opt)).map(opt => (
+                                              <div key={opt} className="space-y-1.5">
+                                                <label className="text-[9px] font-black text-amber-600 uppercase tracking-widest ml-1">Observación s/ {opt}</label>
+                                                <input 
+                                                  type="text"
+                                                  placeholder={`Escriba sobre ${opt}...`}
+                                                  className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-amber-400"
+                                                  value={(justifications[`${q.id}_${opt}`] || [])[rIdx] || ''}
+                                                  onChange={(e) => updateJustification(q.id, e.target.value, rIdx, opt)}
+                                                />
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
                                      </div>
                                    )}
                                 </div>
@@ -2641,66 +2868,125 @@ const SurveyTaker: React.FC<{
                               )}
 
                               {q.type === 'composite' && (
-                                <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                  {q.subQuestions?.map(sq => (
-                                    <div key={sq.id} className="space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">{sq.text}</label>
-                                      {sq.type === 'text' && (
-                                        <input 
-                                          type="text"
-                                          value={(currentAnswer && currentAnswer[sq.id]) || ''}
-                                          onChange={(e) => {
-                                            const currentVal = currentAnswer || {};
-                                            updateAnswer(q.id, { ...currentVal, [sq.id]: e.target.value }, rIdx);
-                                          }}
-                                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] outline-none"
-                                        />
-                                      )}
-                                      {sq.type === 'number' && (
-                                        <input 
-                                          type="number"
-                                          value={(currentAnswer && currentAnswer[sq.id]) || ''}
-                                          onChange={(e) => {
-                                            const currentVal = currentAnswer || {};
-                                            updateAnswer(q.id, { ...currentVal, [sq.id]: e.target.value }, rIdx);
-                                          }}
-                                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] outline-none"
-                                        />
-                                      )}
-                                      {sq.type === 'boolean' && (
-                                        <div className="flex gap-2">
-                                          {['Sí', 'No'].map(o => (
-                                            <button 
-                                              key={o}
-                                              onClick={() => {
-                                                const currentVal = currentAnswer || {};
-                                                updateAnswer(q.id, { ...currentVal, [sq.id]: o }, rIdx);
-                                              }}
-                                              className={`px-3 py-1 rounded-md text-[9px] font-bold transition-all ${currentAnswer?.[sq.id] === o ? 'bg-indigo-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
-                                            >
-                                              {o}
-                                            </button>
+                                <div className="space-y-4 bg-white/50 p-4 rounded-3xl border border-slate-100 shadow-sm">
+                                  {(() => {
+                                      const repeaterInstances = q.isRepeater ? (Array.isArray(currentAnswer) ? currentAnswer : [{}]) : [currentAnswer || {}];
+                                      return (
+                                        <div className="space-y-6">
+                                          {repeaterInstances.map((instance, instIdx) => (
+                                            <div key={instIdx} className={`relative space-y-4 ${q.isRepeater ? 'p-4 bg-white rounded-3xl border border-slate-100 shadow-sm' : ''}`}>
+                                              {q.isRepeater && (
+                                                <div className="flex justify-between items-center mb-2">
+                                                  <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full">
+                                                    {q.repeaterLabel || 'Registro'} #{instIdx + 1}
+                                                  </span>
+                                                  {repeaterInstances.length > 1 && (
+                                                    <button 
+                                                      onClick={() => {
+                                                        const nextArr = repeaterInstances.filter((_, idx) => idx !== instIdx);
+                                                        updateAnswer(q.id, nextArr, rIdx);
+                                                      }}
+                                                      className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                                    >
+                                                      <Trash2 size={16} />
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              )}
+                                              <div className="grid grid-cols-1 gap-5">
+                                                {q.subQuestions?.map(sq => (
+                                                  <div key={sq.id} className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                      <label className="text-xs font-black text-slate-800 uppercase tracking-tight ml-1">{sq.text}</label>
+                                                      {sq.hasAudio && <button className="p-1 px-2 text-rose-500 bg-rose-50 rounded-lg flex items-center gap-1 text-[9px] font-black uppercase"><Mic size={10} /> Audio</button>}
+                                                    </div>
+                                                    {sq.type === 'text' && (
+                                                      <input 
+                                                        type="text"
+                                                        value={instance[sq.id] || ''}
+                                                        onChange={(e) => {
+                                                          const nextVal = { ...instance, [sq.id]: e.target.value };
+                                                          if (q.isRepeater) {
+                                                            const nextArr = [...repeaterInstances];
+                                                            nextArr[instIdx] = nextVal;
+                                                            updateAnswer(q.id, nextArr, rIdx);
+                                                          } else {
+                                                            updateAnswer(q.id, nextVal, rIdx);
+                                                          }
+                                                        }}
+                                                        className="w-full bg-white border-2 border-slate-100 focus:border-indigo-600 rounded-2xl px-4 py-4 text-base font-bold text-slate-800 outline-none transition-all shadow-sm"
+                                                        placeholder="Respuesta..."
+                                                      />
+                                                    )}
+                                                    {sq.type === 'number' && (
+                                                      <input 
+                                                        type="number"
+                                                        value={instance[sq.id] || ''}
+                                                        onChange={(e) => {
+                                                          const nextVal = { ...instance, [sq.id]: e.target.value };
+                                                          if (q.isRepeater) {
+                                                            const nextArr = [...repeaterInstances];
+                                                            nextArr[instIdx] = nextVal;
+                                                            updateAnswer(q.id, nextArr, rIdx);
+                                                          } else {
+                                                            updateAnswer(q.id, nextVal, rIdx);
+                                                          }
+                                                        }}
+                                                        className="w-full bg-white border-2 border-slate-100 focus:border-indigo-600 rounded-2xl px-4 py-4 text-lg font-bold text-slate-800 outline-none transition-all shadow-sm"
+                                                      />
+                                                    )}
+                                                    {(sq.type === 'boolean' || sq.type === 'select' || sq.type === 'multiple') && (
+                                                      <div className="flex gap-2 flex-wrap">
+                                                        {(sq.type === 'boolean' ? ['Sí', 'No', 'Parcial'] : (sq.options || ['B', 'R', 'M', 'I'])).map(o => {
+                                                           const isSelected = sq.type === 'multiple' ? (instance[sq.id] || []).includes(o) : instance[sq.id] === o;
+                                                           return (
+                                                            <button 
+                                                              key={o}
+                                                              onClick={() => {
+                                                                let nextVal;
+                                                                if (sq.type === 'multiple') {
+                                                                  const current = instance[sq.id] || [];
+                                                                  nextVal = { ...instance, [sq.id]: current.includes(o) ? current.filter((v: string) => v !== o) : [...current, o] };
+                                                                } else {
+                                                                  nextVal = { ...instance, [sq.id]: o };
+                                                                }
+                                                                
+                                                                if (q.isRepeater) {
+                                                                  const nextArr = [...repeaterInstances];
+                                                                  nextArr[instIdx] = nextVal;
+                                                                  updateAnswer(q.id, nextArr, rIdx);
+                                                                } else {
+                                                                  updateAnswer(q.id, nextVal, rIdx);
+                                                                }
+                                                              }}
+                                                              className={`min-h-[48px] px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border-2 ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                                                            >
+                                                              {o}
+                                                            </button>
+                                                           );
+                                                        })}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
                                           ))}
-                                        </div>
-                                      )}
-                                      {sq.type === 'select' && (
-                                        <div className="flex gap-1.5 flex-wrap">
-                                          {(sq.options || ['B', 'R', 'M', 'I']).map(o => (
+                                          {q.isRepeater && (
                                             <button 
-                                              key={o}
                                               onClick={() => {
-                                                const currentVal = currentAnswer || {};
-                                                updateAnswer(q.id, { ...currentVal, [sq.id]: o }, rIdx);
+                                                const nextArr = [...repeaterInstances, {}];
+                                                updateAnswer(q.id, nextArr, rIdx);
                                               }}
-                                              className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase transition-all border-2 ${currentAnswer?.[sq.id] === o ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400'}`}
+                                              className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-100"
                                             >
-                                              {o}
+                                              <Plus size={20} />
+                                              Añadir {q.repeaterLabel || 'Registro'}
                                             </button>
-                                          ))}
+                                          )}
                                         </div>
-                                      )}
-                                    </div>
-                                  ))}
+                                      );
+                                  })()}
                                 </div>
                               )}
                             </div>
@@ -3004,68 +3290,108 @@ const SurveyTaker: React.FC<{
                     )}
 
                     {q.type === 'composite' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-8 rounded-[40px] border-2 border-slate-100 shadow-inner">
-                        {q.subQuestions?.map(sq => (
-                          <div key={sq.id} className="space-y-2">
-                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">{sq.text}</label>
-                             {sq.type === 'text' && (
-                               <input 
-                                 type="text"
-                                 value={answers[q.id]?.[sq.id] || ''}
-                                 onChange={(e) => {
-                                   const current = answers[q.id] || {};
-                                   updateAnswer(q.id, { ...current, [sq.id]: e.target.value });
-                                 }}
-                                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
-                                 placeholder={`Ingresa ${sq.text.toLowerCase()}...`}
-                               />
-                             )}
-                             {sq.type === 'number' && (
-                               <input 
-                                 type="number"
-                                 value={answers[q.id]?.[sq.id] || ''}
-                                 onChange={(e) => {
-                                   const current = answers[q.id] || {};
-                                   updateAnswer(q.id, { ...current, [sq.id]: e.target.value });
-                                 }}
-                                 className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
-                                 placeholder="0"
-                               />
-                             )}
-                             {sq.type === 'boolean' && (
-                               <div className="flex gap-2">
-                                 {['Sí', 'No'].map(o => (
-                                   <button 
-                                     key={o}
-                                     onClick={() => {
-                                       const current = answers[q.id] || {};
-                                       updateAnswer(q.id, { ...current, [sq.id]: o });
-                                     }}
-                                     className={`flex-1 py-4 rounded-xl font-black text-xs uppercase transition-all ${answers[q.id]?.[sq.id] === o ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}
-                                   >
-                                     {o}
-                                   </button>
-                                 ))}
+                      <div className="space-y-6">
+                        {(q.isRepeater ? (answers[q.id] || [{}]) : [answers[q.id] || {}]).map((entry: any, index: number) => (
+                           <div key={index} className="relative bg-slate-50 p-6 md:p-8 rounded-[32px] md:rounded-[40px] border-2 border-slate-100 shadow-inner group">
+                             {q.isRepeater && (
+                               <div className="absolute top-4 right-4 flex items-center gap-2">
+                                 <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">#{index + 1}</span>
+                                 <button 
+                                   onClick={() => {
+                                     const current = answers[q.id] || [{}];
+                                     const next = current.filter((_: any, i: number) => i !== index);
+                                     updateAnswer(q.id, next.length ? next : [{}]);
+                                   }}
+                                   className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                                 >
+                                   <Trash2 size={16} />
+                                 </button>
                                </div>
                              )}
-                             {sq.type === 'select' && (
-                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                 {(sq.options || ['B', 'R', 'M', 'I']).map(o => (
-                                   <button 
-                                     key={o}
-                                     onClick={() => {
-                                       const current = answers[q.id] || {};
-                                       updateAnswer(q.id, { ...current, [sq.id]: o });
-                                     }}
-                                     className={`py-4 rounded-xl font-black text-xs uppercase transition-all border-2 ${answers[q.id]?.[sq.id] === o ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400 font-bold'}`}
-                                   >
-                                     {o}
-                                   </button>
-                                 ))}
-                               </div>
-                             )}
-                          </div>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                                {q.subQuestions?.map(sq => {
+                                  const updateEntry = (val: any) => {
+                                    if (q.isRepeater) {
+                                      const current = [...(answers[q.id] || [{}])];
+                                      current[index] = { ...current[index], [sq.id]: val };
+                                      updateAnswer(q.id, current);
+                                    } else {
+                                      updateAnswer(q.id, { ...entry, [sq.id]: val });
+                                    }
+                                  };
+
+                                  return (
+                                    <div key={sq.id} className="space-y-2">
+                                       <label className="block text-[10px] md:text-[11px] font-black text-slate-500 uppercase tracking-widest ml-1">{sq.text}</label>
+                                       {sq.type === 'text' && (
+                                         <input 
+                                           type="text"
+                                           value={entry[sq.id] || ''}
+                                           onChange={(e) => updateEntry(e.target.value)}
+                                           className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                                           placeholder="Escriba aquí..."
+                                         />
+                                       )}
+                                       {sq.type === 'number' && (
+                                         <input 
+                                           type="number"
+                                           value={entry[sq.id] || ''}
+                                           onChange={(e) => updateEntry(e.target.value)}
+                                           className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                                           placeholder="0"
+                                         />
+                                       )}
+                                       {(sq.type === 'boolean' || sq.type === 'select') && (
+                                         <div className="flex flex-wrap gap-2">
+                                           {(sq.options?.length ? sq.options : (sq.type === 'boolean' ? ['Sí', 'No'] : ['B', 'R', 'M', 'I'])).map(o => (
+                                             <button 
+                                               key={o}
+                                               onClick={() => updateEntry(o)}
+                                               className={`flex-1 min-w-[80px] py-3.5 md:py-4 rounded-xl font-black text-[10px] md:text-xs uppercase transition-all border-2 ${entry[sq.id] === o ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400 font-bold'}`}
+                                             >
+                                               {o}
+                                             </button>
+                                           ))}
+                                         </div>
+                                       )}
+                                       {sq.type === 'multiple' && (
+                                          <div className="flex flex-wrap gap-2">
+                                            {(sq.options || ['Opción A', 'Opción B']).map(o => {
+                                              const current = entry[sq.id] || [];
+                                              const isSelected = current.includes(o);
+                                              return (
+                                                <button 
+                                                  key={o}
+                                                  onClick={() => {
+                                                    const next = isSelected ? current.filter((i: string) => i !== o) : [...current, o];
+                                                    updateEntry(next);
+                                                  }}
+                                                  className={`px-4 py-3 rounded-xl font-black text-[10px] md:text-xs uppercase transition-all border-2 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-100 text-slate-400'}`}
+                                                >
+                                                  {o}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                       )}
+                                    </div>
+                                  );
+                                })}
+                             </div>
+                           </div>
                         ))}
+                        {q.isRepeater && (
+                          <button 
+                             onClick={() => {
+                               const current = answers[q.id] || [{}];
+                               updateAnswer(q.id, [...current, {}]);
+                             }}
+                             className="w-full py-6 border-2 border-dashed border-indigo-200 rounded-[32px] md:rounded-[40px] text-xs font-black text-indigo-500 uppercase flex items-center justify-center gap-3 hover:bg-indigo-50 transition-all font-black shadow-sm"
+                          >
+                            <Plus size={20} />
+                            {q.repeaterLabel || "Añadir otra sección"}
+                          </button>
+                        )}
                       </div>
                     )}
 
@@ -3232,6 +3558,7 @@ const SurveyAnalysisEngine: React.FC<{
   onAddAnalysis: (a: SurveyAnalysis) => void
 }> = ({ survey, responses, analyses, onAddAnalysis }) => {
   const [analyzing, setAnalyzing] = useState(false);
+  const [viewingResponse, setViewingResponse] = useState<SurveyResponse | null>(null);
 
   const performAIAnalysis = async () => {
     if (responses.length === 0) {
@@ -3571,7 +3898,10 @@ const SurveyAnalysisEngine: React.FC<{
                                 {resp.date ? new Date(resp.date).toLocaleDateString() : 'N/A'}
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 rounded-xl transition-all">
+                                <button 
+                                  onClick={() => setViewingResponse(resp)}
+                                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 rounded-xl transition-all"
+                                >
                                   <FileSearch size={16} />
                                 </button>
                               </td>
@@ -3587,6 +3917,129 @@ const SurveyAnalysisEngine: React.FC<{
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Response Detail Modal */}
+      <AnimatePresence>
+        {viewingResponse && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 md:p-6 bg-slate-900/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white rounded-[40px] w-full max-w-4xl shadow-2xl relative max-h-[90vh] overflow-hidden flex flex-col"
+            >
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                    <FileSearch size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 leading-tight">Detalle del Registro</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: {viewingResponse.id}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setViewingResponse(null)}
+                  className="p-3 hover:bg-slate-100 rounded-full transition-all text-slate-400"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-12">
+                {/* Respondent Info Header */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Respondiente</p>
+                      <p className="font-bold text-slate-800">{viewingResponse.respondentInfo?.fullName || (viewingResponse.groupRespondents ? `${viewingResponse.groupRespondents.length} Líderes` : 'Anónimo')}</p>
+                      <p className="text-xs text-slate-500 font-medium">{viewingResponse.respondentInfo?.idNumber || 'Sin Id'}</p>
+                   </div>
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Territorio</p>
+                      <p className="font-bold text-slate-800">{viewingResponse.departamentoId} - {viewingResponse.municipioId}</p>
+                      <p className="text-xs text-slate-500 font-medium">Zona: {viewingResponse.zonaAfectacion || 'N/A'}</p>
+                   </div>
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Metadata</p>
+                      <p className="font-bold text-slate-800">{new Date(viewingResponse.date).toLocaleString()}</p>
+                      <p className="text-xs text-slate-500 font-medium">Encuestador: {viewingResponse.surveyorInfo?.fullName}</p>
+                   </div>
+                </div>
+
+                {/* Answers Breakdown */}
+                <div className="space-y-8">
+                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                    <Database size={18} className="text-indigo-600" />
+                    Respuestas Capturadas
+                  </h4>
+                  
+                  <div className="space-y-6">
+                    {survey.questions.map((q, qIdx) => {
+                      const answer = viewingResponse.answers[q.id];
+                      return (
+                        <div key={q.id} className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex flex-col md:flex-row gap-6 relative group overflow-hidden">
+                          <div className="w-10 h-10 bg-white rounded-xl border border-slate-100 flex items-center justify-center font-black text-slate-300 text-sm shrink-0 group-hover:text-indigo-600 transition-colors">
+                            {qIdx + 1}
+                          </div>
+                          <div className="flex-1 space-y-3">
+                            <p className="font-bold text-slate-800 text-sm">{q.text}</p>
+                            
+                            {/* Individual or Single Answer */}
+                            {!survey.isGroupSurvey ? (
+                              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                                {typeof answer === 'object' && !Array.isArray(answer) && answer !== null ? (
+                                  <pre className="text-xs font-mono text-slate-600 whitespace-pre-wrap">{JSON.stringify(answer, null, 2)}</pre>
+                                ) : (
+                                  <p className="text-sm font-black text-indigo-600">{String(answer || 'Sin respuesta')}</p>
+                                )}
+                                
+                                {/* Justification for individual */}
+                                {(viewingResponse.answers[q.id + '_justification'] || viewingResponse.justifications?.[q.id]) && (
+                                  <div className="mt-3 pt-3 border-t border-slate-50 italic text-xs text-slate-500">
+                                    <span className="font-black uppercase text-[8px] text-slate-400 block mb-1">Observaciones / Relato:</span>
+                                    {viewingResponse.answers[q.id + '_justification'] || viewingResponse.justifications?.[q.id]}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              /* Group Answers Breakdown */
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {(viewingResponse.groupRespondents || []).map((leader, lIdx) => {
+                                  const lAnswer = (answer as any[])?.[lIdx];
+                                  return (
+                                    <div key={lIdx} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-1">
+                                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest truncate">{leader.fullName || `Líder ${lIdx+1}`}</p>
+                                      <p className="text-xs font-bold text-slate-800">{String(lAnswer || 'NR')}</p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end shrink-0">
+                <button 
+                  onClick={() => setViewingResponse(null)}
+                  className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all"
+                >
+                  Cerrar Vista
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
