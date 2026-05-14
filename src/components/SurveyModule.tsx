@@ -194,7 +194,6 @@ export const SurveyModule: React.FC<{ onExit?: () => void }> = ({ onExit }) => {
               onEdit={(s) => { setEditingSurveyId(s.id); setView('create'); }}
               onFill={(s) => { setSelectedSurvey(s); setView('fill'); }}
               onAnalyze={(s) => { setSelectedSurvey(s); setView('analysis'); }}
-              onDelete={(s) => deleteSurvey(s.id)}
             />
           )}
 
@@ -561,9 +560,8 @@ const SurveyList: React.FC<{
   onCreate: () => void, 
   onEdit: (s: Survey) => void,
   onFill: (s: Survey) => void,
-  onAnalyze: (s: Survey) => void,
-  onDelete: (s: Survey) => void
-}> = ({ surveys, responses, departments, getMunicipalities, onCreate, onEdit, onFill, onAnalyze, onDelete }) => {
+  onAnalyze: (s: Survey) => void
+}> = ({ surveys, responses, departments, getMunicipalities, onCreate, onEdit, onFill, onAnalyze }) => {
   const [tab, setTab] = useState<'cards' | 'territory'>('cards');
 
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>('all');
@@ -623,33 +621,33 @@ const SurveyList: React.FC<{
       exit={{ opacity: 0, y: -20 }}
       className="space-y-6"
     >
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Instrumentos y Territorio</h2>
-          <p className="text-slate-500 text-sm font-medium">Gestión jerárquica de la operación estadística</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="w-full sm:w-auto">
+          <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">Instrumentos y Territorio</h2>
+          <p className="text-slate-500 text-xs md:text-sm font-medium">Gestión jerárquica de la operación estadística</p>
         </div>
         
-        <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
+        <div className="flex w-full sm:w-auto bg-slate-100 p-1.5 rounded-2xl gap-1">
           <button 
             onClick={() => setTab('cards')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${tab === 'cards' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-black transition-all ${tab === 'cards' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
           >
             ENCUESTAS
           </button>
           <button 
             onClick={() => setTab('territory')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${tab === 'territory' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-black transition-all ${tab === 'territory' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
           >
-            DESAGREGACIÓN TERRITORIAL
+            TERRITORIO
           </button>
         </div>
 
         <button 
           onClick={onCreate}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-slate-900 text-white px-5 py-3 rounded-2xl transition-all shadow-xl shadow-indigo-100 font-bold text-sm"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-600 hover:bg-slate-900 text-white px-5 py-3 md:py-3.5 rounded-2xl transition-all shadow-xl shadow-indigo-100 font-extrabold text-sm"
         >
           <Plus size={18} />
-          Nueva Operación
+          Nueva Op.
         </button>
       </div>
 
@@ -841,19 +839,13 @@ const SurveyList: React.FC<{
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-3 pt-6 border-t border-slate-100">
+                    <div className="grid grid-cols-3 gap-3 pt-6 border-t border-slate-100">
                       <button 
                         onClick={() => onEdit(survey)}
                         className="flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all"
                         title="Editar Encuesta"
                       >
                         <Settings2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => onDelete(survey)}
-                        className="flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-all"
-                      >
-                        <Trash2 size={16} />
                       </button>
                       <button 
                         onClick={() => onFill(survey)}
@@ -974,6 +966,44 @@ const SurveyBuilder: React.FC<{
       'Eventos hidrometeorológicos en laderas'
     ], columns: ['Aplica', 'Beneficia', 'Habitable', 'Observación'], required: true, category: 'Afectación', tags: ['Sector Ambiente (POMCAS)'], supportsAudioRows: true, hasJustification: true, justificationLabel: 'Justificación o Relato Ampliado de la Dinámica' },
     { id: 'q-aud-1', text: '20. ¿Qué actividades, prácticas y formas de vida deben mantenerse en el territorio para vivir en armonía con las dinámicas de la naturaleza?', type: 'audio', required: false, category: 'Saberes', hasJustification: true, justificationLabel: 'Detalles adicionales del relato' },
+    { 
+      id: 'q-serv-1', 
+      text: 'Servicios Básicos y Afectación', 
+      type: 'matrix', 
+      rows: [
+        'Acueducto / agua potable', 
+        'Alcantarillado / Saneamiento', 
+        'Energía Eléctrica', 
+        'Gas Natural / GLP', 
+        'Comunicaciones (Voz/Datos)', 
+        'Recolección de Residuos',
+        'Vías de Acceso'
+      ], 
+      columns: ['Existía', 'Calidad antes', 'Afectado', 'Días sin servicio', 'Tipo solución'], 
+      matrixColumnTypes: {
+        'Existía': 'boolean',
+        'Calidad antes': 'radio',
+        'Afectado': 'boolean',
+        'Días sin servicio': 'number',
+        'Tipo solución': 'text'
+      },
+      matrixColumnOptions: {
+        'Calidad antes': ['B', 'R', 'M', 'I']
+      },
+      required: true, 
+      category: 'Servicios',
+      supportsAudioRows: true
+    },
+    { 
+      id: 'q-serv-2', 
+      text: 'Si no hay agua potable, ¿cómo se está supliendo el servicio?', 
+      type: 'multiple', 
+      options: ['Carrotanque', 'Agua lluvia', 'Fuente superficial (río/quebrada)', 'Compra de bolsas/botellones', 'Otro'],
+      hasOther: true,
+      required: false,
+      category: 'Servicios'
+    },
+    { id: 'q-rel-1', text: '17. Relación entre actividades productivas y dinámicas naturales del territorio', type: 'matrix', rows: ['Periodos normales de lluvia', 'Verano (Periodo seco)', 'Vientos fuertes'], columns: ['Aplica', 'Beneficia', 'Habitable'], matrixColumnTypes: { 'Aplica': 'boolean', 'Beneficia': 'boolean', 'Habitable': 'boolean' }, required: true, category: 'Territorio', tags: ['Dinámicas Naturales'], hasJustification: true, hasAudioJustification: true },
     { id: 'q-dam-1', text: '29. Inventario cuantitativo de daños', type: 'matrix', rows: ['Predios inundados (predios)', 'Viviendas destruidas totalmente (viviendas)', 'Cultivos perdidos (hectáreas)', 'Animales perdidos (cabezas)', 'Pérdida de vidas humanas (personas)'], columns: ['Aplica', 'Cantidad'], required: true, category: 'Afectación', tags: ['Sector Vivienda + Agricultura + Salud'], hasJustification: true, hasAudioJustification: true }
   ]);
 
@@ -1296,16 +1326,20 @@ const SurveyBuilder: React.FC<{
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm"
+                        className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-6 bg-slate-900/60 backdrop-blur-sm"
                       >
                          <motion.div 
-                           initial={{ scale: 0.9, y: 20 }}
-                           animate={{ scale: 1, y: 0 }}
-                           className="bg-white rounded-[40px] w-full max-w-2xl shadow-2xl p-8 md:p-10 relative max-h-[90vh] overflow-y-auto custom-scrollbar"
+                           initial={{ y: "100%" }}
+                           animate={{ y: 0 }}
+                           exit={{ y: "100%" }}
+                           transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                           className="bg-white rounded-t-[40px] md:rounded-[40px] w-full max-w-2xl shadow-2xl p-6 md:p-10 relative h-[92vh] md:h-auto md:max-h-[90vh] overflow-y-auto custom-scrollbar"
                          >
+                            <div className="md:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
+                            
                             <button 
                               onClick={() => setEditingQuestionId(null)}
-                              className="absolute top-8 right-8 p-3 hover:bg-slate-100 rounded-full transition-all text-slate-400"
+                              className="absolute top-6 md:top-8 right-6 md:right-8 p-3 hover:bg-slate-100 rounded-full transition-all text-slate-400"
                             >
                               <X size={24} />
                             </button>
@@ -1352,7 +1386,7 @@ const SurveyBuilder: React.FC<{
                                         />
                                      </div>
 
-                                     <div className="grid grid-cols-2 gap-4">
+                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                            <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Tipo de Captura</label>
                                            <select 
@@ -1360,7 +1394,7 @@ const SurveyBuilder: React.FC<{
                                              onChange={(e) => {
                                                setQuestions(questions.map(item => item.id === q.id ? {...item, type: e.target.value as any} : item));
                                              }}
-                                             className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800"
+                                             className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800 text-sm appearance-none"
                                            >
                                               <option value="text">Texto (Abierta)</option>
                                               <option value="number">Numérica (Cantidad / Escala)</option>
@@ -1381,7 +1415,7 @@ const SurveyBuilder: React.FC<{
                                              onChange={(e) => {
                                                setQuestions(questions.map(item => item.id === q.id ? {...item, category: e.target.value} : item));
                                              }}
-                                             className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800"
+                                             className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-800 text-sm"
                                              placeholder="Ej: Infraestructura"
                                            />
                                         </div>
@@ -1630,8 +1664,8 @@ const SurveyBuilder: React.FC<{
                                         </div>
                                      </div>
 
-                                     <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[32px] flex-wrap">
-                                        <div className="flex items-center gap-3">
+                                     <div className="flex items-center gap-2 md:gap-4 p-5 bg-slate-50 rounded-[32px] flex-wrap">
+                                        <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100 mb-2 md:mb-0">
                                           <button 
                                             onClick={() => {
                                               setQuestions(questions.map(item => item.id === q.id ? {...item, required: !item.required} : item));
@@ -1640,7 +1674,7 @@ const SurveyBuilder: React.FC<{
                                           >
                                              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${q.required ? 'left-7' : 'left-1'}`} />
                                           </button>
-                                          <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Obligatoria</span>
+                                          <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Obligatoria</span>
                                         </div>
 
                                         <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
@@ -1996,17 +2030,17 @@ const SurveyTaker: React.FC<{
         </div>
       )}
 
-      <div className="p-8 lg:p-12 space-y-10">
+      <div className="p-4 md:p-8 lg:p-12 space-y-10">
         {/* Geographic Context (Mandatory for Surveyor) - Block 1.1 */}
-        <div className="space-y-6 bg-slate-50 p-8 rounded-[32px] border border-slate-100">
+        <div className="space-y-6 bg-slate-50 p-6 md:p-8 rounded-[32px] border border-slate-100">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4 mb-4">
-             <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+             <h3 className="text-[10px] md:text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
                <MapPin size={16} />
                Bloque 1.1 — Identificación Territorial
              </h3>
              <div className="flex items-center gap-3">
-               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cód. Cuestionario:</span>
-               <span className="px-3 py-1 bg-slate-200 text-slate-600 rounded-lg text-xs font-black">{surveyCode}</span>
+               <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cód. Cuestionario:</span>
+               <span className="px-3 py-1 bg-slate-200 text-slate-600 rounded-lg text-[10px] md:text-xs font-black">{surveyCode}</span>
              </div>
           </div>
 
@@ -2319,11 +2353,11 @@ const SurveyTaker: React.FC<{
                       placeholder="Nombre completo del ciudadano"
                       className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <select
                         value={respondent.documentType || 'CC'}
                         onChange={(e) => setRespondent({...respondent, documentType: e.target.value})}
-                        className="bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                        className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all appearance-none"
                       >
                         <option value="CC">Cédula de Ciudadanía</option>
                         <option value="TI">Tarjeta de Identidad</option>
@@ -2339,7 +2373,7 @@ const SurveyTaker: React.FC<{
                         className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <input 
                         type="text" 
                         value={respondent.contact || ''}
@@ -2649,6 +2683,22 @@ const SurveyTaker: React.FC<{
                                           ))}
                                         </div>
                                       )}
+                                      {sq.type === 'select' && (
+                                        <div className="flex gap-1.5 flex-wrap">
+                                          {(sq.options || ['B', 'R', 'M', 'I']).map(o => (
+                                            <button 
+                                              key={o}
+                                              onClick={() => {
+                                                const currentVal = currentAnswer || {};
+                                                updateAnswer(q.id, { ...currentVal, [sq.id]: o }, rIdx);
+                                              }}
+                                              className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase transition-all border-2 ${currentAnswer?.[sq.id] === o ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400'}`}
+                                            >
+                                              {o}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -2685,12 +2735,16 @@ const SurveyTaker: React.FC<{
                     )}
 
                     {q.type === 'boolean' && (
-                      <div className="flex flex-wrap gap-4">
+                      <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
                         {(q.options?.length ? q.options : ['Sí', 'No']).map(opt => (
                           <button
                             key={opt}
                             onClick={() => updateAnswer(q.id, opt)}
-                            className={`flex-1 min-w-[200px] px-8 py-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${answers[q.id] === opt ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-200' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                            className={`flex-1 min-w-[200px] px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all border-2 ${
+                              answers[q.id] === opt 
+                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-200 scale-[1.02]' 
+                              : 'bg-white border-slate-100 text-slate-400 hover:border-indigo-200'
+                            }`}
                           >
                             {opt}
                           </button>
@@ -2819,8 +2873,8 @@ const SurveyTaker: React.FC<{
                       <div className="space-y-6">
                         {q.rows?.map((row, rIdx) => (
                            <div key={row} className="bg-white border-2 border-slate-100 rounded-[32px] overflow-hidden shadow-sm hover:shadow-md transition-all">
-                              <div className="bg-slate-50/50 px-8 py-5 border-b border-slate-100 flex items-center justify-between">
-                                 <span className="text-sm font-black text-slate-800 uppercase tracking-tight">{row}</span>
+                              <div className="bg-slate-50/50 px-6 md:px-8 py-4 md:py-5 border-b border-slate-100 flex items-center justify-between">
+                                 <span className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-tight">{row}</span>
                                  {q.supportsAudioRows && (
                                    <div className="flex items-center gap-2">
                                       {(answers[q.id + '_audio_' + row]) ? (
@@ -2841,11 +2895,16 @@ const SurveyTaker: React.FC<{
                                    </div>
                                  )}
                               </div>
-                              <div className="p-8 space-y-8">
-                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {q.columns?.filter(c => c.toLowerCase() !== 'observación').map(col => {
-                                      const isBoolean = col.toLowerCase().includes('aplica') || col.toLowerCase().includes('beneficia') || col.toLowerCase().includes('habitable') || col.toLowerCase().includes('sí/no');
+                              <div className="p-4 md:p-8 space-y-6 md:space-y-8">
+                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                                    {q.columns?.filter(c => c.toLowerCase() !== 'observación' && c.toLowerCase() !== 'observaciones').map(col => {
+                                      const colType = q.matrixColumnTypes?.[col];
+                                      const isBoolean = colType === 'boolean' || col.toLowerCase().includes('aplica') || col.toLowerCase().includes('beneficia') || col.toLowerCase().includes('habitable') || col.toLowerCase().includes('existía') || col.toLowerCase().includes('afectado') || col.toLowerCase().includes('sí/no');
+                                      const isRadio = colType === 'radio' || col.toLowerCase().includes('calidad');
+                                      const isNumber = colType === 'number' || col.toLowerCase().includes('días') || col.toLowerCase().includes('cantidad');
+                                      
                                       const val = (answers[q.id] && answers[q.id][row] && answers[q.id][row][col]);
+                                      const radioOptions = q.matrixColumnOptions?.[col] || (col.toLowerCase().includes('calidad') ? ['B', 'R', 'M', 'I'] : []);
                                       
                                       return (
                                         <div key={col} className="space-y-3">
@@ -2873,9 +2932,33 @@ const SurveyTaker: React.FC<{
                                                 </button>
                                               ))}
                                             </div>
+                                          ) : isRadio ? (
+                                            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                                              {radioOptions.map(choice => (
+                                                <button
+                                                  key={choice}
+                                                  onClick={() => {
+                                                    const currentMat = answers[q.id] || {};
+                                                    const currentRow = currentMat[row] || {};
+                                                    updateAnswer(q.id, {
+                                                      ...currentMat,
+                                                      [row]: { ...currentRow, [col]: choice }
+                                                    });
+                                                  }}
+                                                  className={`min-w-[42px] h-[42px] flex items-center justify-center rounded-xl text-xs font-black uppercase transition-all border-2 ${
+                                                    val === choice 
+                                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                                                    : 'bg-slate-50 border-transparent text-slate-400 hover:border-slate-200'
+                                                  }`}
+                                                  title={choice === 'B' ? 'Buena' : choice === 'R' ? 'Regular' : choice === 'M' ? 'Mala' : choice === 'I' ? 'Inexistente' : choice}
+                                                >
+                                                  {choice}
+                                                </button>
+                                              ))}
+                                            </div>
                                           ) : (
                                             <input 
-                                              type={col.toLowerCase().includes('cantidad') || col.toLowerCase().includes('valor') ? 'number' : 'text'}
+                                              type={isNumber ? 'number' : 'text'}
                                               value={val || ''}
                                               onChange={(e) => {
                                                 const currentMat = answers[q.id] || {};
@@ -2886,7 +2969,7 @@ const SurveyTaker: React.FC<{
                                                 });
                                               }}
                                               className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-300"
-                                              placeholder="Escribe aquí..."
+                                              placeholder={isNumber ? '0' : '...'}
                                             />
                                           )}
                                         </div>
@@ -2894,17 +2977,18 @@ const SurveyTaker: React.FC<{
                                     })}
                                  </div>
 
-                                 {q.columns?.includes('Observación') && (
+                                 {(q.columns?.includes('Observación') || q.columns?.includes('Observaciones')) && (
                                    <div className="pt-6 border-t border-slate-100 space-y-3">
                                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Observaciones / Detalles</label>
                                       <textarea 
-                                        value={(answers[q.id] && answers[q.id][row] && answers[q.id][row]['Observación']) || ''}
+                                        value={(answers[q.id] && answers[q.id][row] && (answers[q.id][row]['Observación'] || answers[q.id][row]['Observaciones'])) || ''}
                                         onChange={(e) => {
                                           const currentMat = answers[q.id] || {};
                                           const currentRow = currentMat[row] || {};
+                                          const colName = q.columns?.find(c => c.toLowerCase().includes('observación')) || 'Observación';
                                           updateAnswer(q.id, {
                                             ...currentMat,
-                                            [row]: { ...currentRow, ['Observación']: e.target.value }
+                                            [row]: { ...currentRow, [colName]: e.target.value }
                                           });
                                         }}
                                         className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-300"
@@ -2958,6 +3042,22 @@ const SurveyTaker: React.FC<{
                                        updateAnswer(q.id, { ...current, [sq.id]: o });
                                      }}
                                      className={`flex-1 py-4 rounded-xl font-black text-xs uppercase transition-all ${answers[q.id]?.[sq.id] === o ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}
+                                   >
+                                     {o}
+                                   </button>
+                                 ))}
+                               </div>
+                             )}
+                             {sq.type === 'select' && (
+                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                 {(sq.options || ['B', 'R', 'M', 'I']).map(o => (
+                                   <button 
+                                     key={o}
+                                     onClick={() => {
+                                       const current = answers[q.id] || {};
+                                       updateAnswer(q.id, { ...current, [sq.id]: o });
+                                     }}
+                                     className={`py-4 rounded-xl font-black text-xs uppercase transition-all border-2 ${answers[q.id]?.[sq.id] === o ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400 font-bold'}`}
                                    >
                                      {o}
                                    </button>
