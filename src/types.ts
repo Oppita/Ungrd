@@ -1911,7 +1911,8 @@ export interface SurveyQuestion {
   hasAudioJustification?: boolean;
   optionsWithJustification?: string[];
   optionsWithAudio?: string[];
-  matrixColumnTypes?: Record<string, 'radio' | 'boolean' | 'text' | 'audio'>;
+  matrixColumnTypes?: Record<string, 'radio' | 'boolean' | 'text' | 'audio' | 'select' | 'number'>;
+  matrixColumnOptions?: Record<string, string[]>;
   required: boolean;
   category: string;
   placeholder?: string;
