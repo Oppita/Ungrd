@@ -1706,10 +1706,10 @@ const SurveyBuilder: React.FC<{
                                                   </select>
                                                   {(sq.type === 'select' || sq.type === 'multiple' || sq.type === 'boolean') && (
                                                     <div className="col-span-2 mt-2 space-y-2">
-                                                      <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Opciones de Respuesta</label>
+                                                      <label className="text-[8px] font-black uppercase text-indigo-400 block mb-1">Opciones de Respuesta</label>
                                                       <div className="space-y-1.5">
                                                         {(sq.options?.length ? sq.options : (sq.type === 'boolean' ? ['Sí', 'No'] : [])).map((opt, optIdx) => (
-                                                          <div key={optIdx} className="flex gap-1.5 h-8">
+                                                          <div key={optIdx} className="flex gap-1.5 items-center bg-slate-50 rounded-xl p-1 pr-2">
                                                             <input 
                                                               type="text"
                                                               value={opt}
@@ -1720,7 +1720,7 @@ const SurveyBuilder: React.FC<{
                                                                 nextSubs[i] = { ...sq, options: newOpts };
                                                                 setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
                                                               }}
-                                                              className="flex-1 bg-white border border-slate-100 rounded-lg px-2 text-[9px] font-bold text-slate-700 outline-none focus:border-indigo-300"
+                                                              className="flex-1 bg-transparent border-none rounded-lg px-3 py-2 text-[10px] font-bold text-slate-800 outline-none"
                                                               placeholder={`Opción ${optIdx + 1}`}
                                                             />
                                                             {sq.type !== 'boolean' && (
@@ -1731,7 +1731,7 @@ const SurveyBuilder: React.FC<{
                                                                   nextSubs[i] = { ...sq, options: newOpts };
                                                                   setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
                                                                 }}
-                                                                className="text-slate-300 hover:text-rose-500"
+                                                                className="text-slate-300 hover:text-rose-500 p-1"
                                                               >
                                                                 <Trash2 size={12} />
                                                               </button>
@@ -1747,9 +1747,9 @@ const SurveyBuilder: React.FC<{
                                                               nextSubs[i] = { ...sq, options: nextOpts };
                                                               setQuestions(questions.map(item => item.id === q.id ? {...item, subQuestions: nextSubs} : item));
                                                             }}
-                                                            className="text-[8px] font-black text-indigo-500 uppercase flex items-center gap-1 hover:text-indigo-700 mt-1"
+                                                            className="w-full mt-1 flex items-center justify-center gap-2 text-[8px] font-black text-indigo-500 uppercase px-3 py-2 hover:bg-indigo-50 rounded-xl transition-all border-2 border-dashed border-indigo-100"
                                                           >
-                                                            <Plus size={10} /> Añadir
+                                                            <Plus size={12} /> Añadir Opción
                                                           </button>
                                                         )}
                                                       </div>
