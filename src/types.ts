@@ -1903,6 +1903,15 @@ export interface SurveyQuestion {
   rows?: string[];
   columns?: string[];
   subQuestions?: SurveyQuestion[];
+  hasOther?: boolean;
+  otherLabel?: string;
+  supportsAudioRows?: boolean;
+  hasJustification?: boolean;
+  justificationLabel?: string;
+  hasAudioJustification?: boolean;
+  optionsWithJustification?: string[];
+  optionsWithAudio?: string[];
+  matrixColumnTypes?: Record<string, 'radio' | 'boolean' | 'text' | 'audio'>;
   required: boolean;
   category: string;
   placeholder?: string;
@@ -1945,7 +1954,10 @@ export interface Survey {
   municipioId: string;
   questions: SurveyQuestion[];
   createdAt: string;
-  expertContext?: string;
+  expertsContext?: string; // Existing typo in some files?
+  purpose?: string;
+  scope?: string;
+  procedure?: string;
   technicalSheet?: TechnicalSheet;
   isGroupSurvey?: boolean;
   defaultGroupSize?: number;
@@ -1962,7 +1974,9 @@ export interface SurveyResponse {
   respondentInfo: {
     fullName: string;
     idNumber: string;
+    documentType?: string;
     contact?: string;
+    yearsInTerritory?: number;
     age?: number;
     gender?: string;
   };
