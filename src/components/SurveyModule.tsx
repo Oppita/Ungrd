@@ -23,6 +23,7 @@ import {
   Type,
   List,
   CheckSquare,
+  AlertCircle,
   LogOut,
   ShieldCheck,
   CalendarDays,
@@ -892,8 +893,11 @@ const SurveyBuilder: React.FC<{
   onSave: (s: Survey) => void 
 }> = ({ departments, getMunicipalities, initialSurvey, onSave }) => {
   const [step, setStep] = useState<'ficha' | 'preguntas'>('ficha');
-  const [title, setTitle] = useState(initialSurvey?.title || 'Encuesta Modelo de Ocupación Frente Frío – Construcción Social del Riesgo');
-  const [description, setDescription] = useState(initialSurvey?.description || 'Caracterizar las dinámicas de ocupación del territorio, condiciones socioeconómicas y percepción del riesgo.');
+  const [title, setTitle] = useState(initialSurvey?.title || 'Instrumento de Recolección - Plan de Recuperación Temprana Frente Frío');
+  const [description, setDescription] = useState(initialSurvey?.description || 'Recoger información de las comunidades en los diferentes territorios afectados por el Frente Frío.');
+  const [purpose, setPurpose] = useState(initialSurvey?.purpose || 'El presente instrumento tiene por objeto recoger información de las comunidades en los diferentes territorios afectados por el Frente Frío con el fin de generar insumos para la formulación, priorización y estructuración de proyectos de la Fase 1 y 2 del Plan de Recuperación Temprana.');
+  const [scope, setScope] = useState(initialSurvey?.scope || '● Describir el contexto geográfico donde se asienta una población, las razones de porque se asienta la población, las relaciones y roles que se establecen a su interior y con sus vecindades y que actividades sociales y económicas determinan que un evento natural o socionatural se convierte en una amenaza. Conflictos y asociaciones políticas, sociales, económicas y geográficas.\n\n● Determinar la forma cómo se materializó el riesgo durante el periodo de duración del Frente Frio, los daños ocasionados (materiales e inmateriales) y los efectos posteriores del evento, la magnitud del impacto con relación a la posibilidad de permanencia en el área y el tipo de transformaciones que se requieren para recuperarse.\n\n● Consolidar y describir las iniciativas de las comunidades para la recuperación temprana, las capacidades existentes y los aspectos a fortalecer. Cada iniciativa debe ser descrita: Identificación de problemática, que se quiere resolver (estrategias y líneas de la RT), la identificación o georeferenciación del aspecto a recuperar o crear, la población beneficiada, la forma de realizarlo.');
+  const [procedure, setProcedure] = useState(initialSurvey?.procedure || 'La instrumento se realiza en las áreas afectadas de cada uno de los municipios que aplica el Decreto 150 de 2026. La recolección de la información se realiza a través de la convocatoria a las organizaciones de base, en espacios comunitarios de cada una de las áreas afectadas. El equipo responsable de la aplicación del instrumento estará conformado por grupos de cinco personas: cuatro aplicadores y una persona encargada del soporte técnico.');
   const [isGroupSurvey, setIsGroupSurvey] = useState(initialSurvey?.isGroupSurvey || false);
   const [defaultGroupSize, setDefaultGroupSize] = useState(initialSurvey?.defaultGroupSize || 20);
   
@@ -950,10 +954,27 @@ const SurveyBuilder: React.FC<{
     { id: 'q-pop-2', text: 'Número de personas con discapacidad', type: 'number', required: true, category: 'Organización', tags: ['Sector Igualdad y Equidad (ICBF) + Salud'] },
     { id: 'q-eth-1', text: '13. Pertenencia étnica y poblacional', type: 'multiple', options: ['Campesinado', 'Comunidad indígena', 'Comunidad afrocolombiana, negra, raizal o palenquera', 'Pueblo Rrom (gitano)', 'Pescadores artesanales', 'Productores agropecuarios', 'Comerciantes', 'Población migrante extranjera', 'Población víctima de desplazamiento forzado', 'Población reasentada'], required: true, category: 'Población', tags: ['Enfoque diferencial transversal'] },
     { id: 'q-geo-1', text: '14. Tipo de área geográfica donde se asienta la comunidad', type: 'multiple', options: ['Marino-costero', 'Ciénagas, humedales o playones', 'Áreas planas — playones de río', 'Laderas de pendiente moderada', 'Colinas suaves', 'Llanura aluvial', 'Zona urbana consolidada', 'Borde periurbano'], required: true, category: 'Territorio', tags: ['Sector Ambiente + Vivienda + UNGRD-SRR'] },
+    { 
+      id: 'q-extent-1', 
+      text: '24. ¿La afectación del Frente Frío cubrió la totalidad del territorio?', 
+      type: 'select', 
+      options: ['Sí, todo el territorio fue afectado', 'No, solo algunas zonas — describa cuáles'], 
+      optionsWithJustification: ['No, solo algunas zonas — describa cuáles'],
+      optionsWithAudio: ['No, solo algunas zonas — describa cuáles'],
+      required: true, 
+      category: 'Afectación' 
+    },
     { id: 'q-pol-1', text: '24. Zonas afectadas (polígonos)', type: 'geopolygon', required: false, category: 'Afectación' },
-    { id: 'q-dyn-1', text: '17. Relación entre actividades productivas y dinámicas naturales', type: 'matrix', rows: ['Periodos normales de lluvia / verano', 'Inundaciones anuales en zonas de río', 'Crecientes rápidas de arroyos', 'Ascensos/descensos en ciénagas', 'Vientos y dinámica costera'], columns: ['Aplica', 'Beneficia', 'Habitable', 'Observación'], required: true, category: 'Afectación', tags: ['Sector Ambiente (POMCAS)'] },
-    { id: 'q-aud-1', text: '20. ¿Qué actividades, prácticas y formas de vida deben mantenerse en el territorio para vivir en armonía con las dinámicas de la naturaleza?', type: 'audio', required: false, category: 'Saberes' },
-    { id: 'q-dam-1', text: '29. Inventario cuantitativo de daños', type: 'matrix', rows: ['Predios inundados (predios)', 'Viviendas destruidas totalmente (viviendas)', 'Cultivos perdidos (hectáreas)', 'Animales perdidos (cabezas)', 'Pérdida de vidas humanas (personas)'], columns: ['Aplica', 'Cantidad'], required: true, category: 'Afectación', tags: ['Sector Vivienda + Agricultura + Salud'] }
+    { id: 'q-dyn-1', text: '17. Relación entre actividades productivas y dinámicas naturales', type: 'matrix', rows: [
+      'Periodos normales de lluvia / verano', 
+      'Inundaciones anuales en zonas de río', 
+      'Crecientes rápidas de arroyos', 
+      'Ascensos/descensos en ciénagas y caños', 
+      'Vientos y dinámica costera (mar-continente)', 
+      'Eventos hidrometeorológicos en laderas'
+    ], columns: ['Aplica', 'Beneficia', 'Habitable', 'Observación'], required: true, category: 'Afectación', tags: ['Sector Ambiente (POMCAS)'], supportsAudioRows: true, hasJustification: true, justificationLabel: 'Justificación o Relato Ampliado de la Dinámica' },
+    { id: 'q-aud-1', text: '20. ¿Qué actividades, prácticas y formas de vida deben mantenerse en el territorio para vivir en armonía con las dinámicas de la naturaleza?', type: 'audio', required: false, category: 'Saberes', hasJustification: true, justificationLabel: 'Detalles adicionales del relato' },
+    { id: 'q-dam-1', text: '29. Inventario cuantitativo de daños', type: 'matrix', rows: ['Predios inundados (predios)', 'Viviendas destruidas totalmente (viviendas)', 'Cultivos perdidos (hectáreas)', 'Animales perdidos (cabezas)', 'Pérdida de vidas humanas (personas)'], columns: ['Aplica', 'Cantidad'], required: true, category: 'Afectación', tags: ['Sector Vivienda + Agricultura + Salud'], hasJustification: true, hasAudioJustification: true }
   ]);
 
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
@@ -968,6 +989,9 @@ const SurveyBuilder: React.FC<{
       id: initialSurvey?.id || crypto.randomUUID(),
       title,
       description,
+      purpose,
+      scope,
+      procedure,
       departamentoId: initialSurvey?.departamentoId || 'global',
       municipioId: initialSurvey?.municipioId || 'nacional',
       questions,
@@ -1028,11 +1052,38 @@ const SurveyBuilder: React.FC<{
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Objetivo General</label>
+                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Descripción</label>
                     <textarea 
-                      value={techSheet.generalObjective ?? ""}
-                      onChange={(e) => setTechSheet({...techSheet, generalObjective: e.target.value})}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={2}
+                      className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-medium text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Propósito del Instrumento</label>
+                    <textarea 
+                      value={purpose}
+                      onChange={(e) => setPurpose(e.target.value)}
                       rows={3}
+                      className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-medium text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Alcance</label>
+                    <textarea 
+                      value={scope}
+                      onChange={(e) => setScope(e.target.value)}
+                      rows={4}
+                      className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-medium text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-2">Procedimiento</label>
+                    <textarea 
+                      value={procedure}
+                      onChange={(e) => setProcedure(e.target.value)}
+                      rows={4}
                       className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-medium text-slate-700"
                     />
                   </div>
@@ -1341,31 +1392,55 @@ const SurveyBuilder: React.FC<{
                                           <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Opciones de Respuesta</label>
                                           <div className="space-y-2">
                                             {(q.options?.length ? q.options : (q.type === 'boolean' ? ['Sí', 'No'] : [])).map((opt, i) => (
-                                              <div key={i} className="flex gap-2 relative group items-center">
-                                                <input 
-                                                  type="text"
-                                                  value={opt}
-                                                  onChange={(e) => {
-                                                    const newOpts = [...(q.options?.length ? q.options : (q.type === 'boolean' ? ['Sí', 'No'] : []))];
-                                                    newOpts[i] = e.target.value;
-                                                    setQuestions(questions.map(item => item.id === q.id ? {...item, options: newOpts} : item));
-                                                  }}
-                                                  className="w-full bg-slate-50 border-none rounded-xl px-6 py-4 font-bold text-slate-800"
-                                                  placeholder={`Opción ${i + 1}`}
-                                                />
-                                                {q.type !== 'boolean' && (
-                                                  <button 
-                                                    onClick={() => {
-                                                      const newOpts = (q.options || []).filter((_, idx) => idx !== i);
+                                                <div key={i} className="flex gap-2 relative group items-center bg-slate-50 rounded-xl p-1 pr-3">
+                                                  <input 
+                                                    type="text"
+                                                    value={opt}
+                                                    onChange={(e) => {
+                                                      const newOpts = [...(q.options?.length ? q.options : (q.type === 'boolean' ? ['Sí', 'No'] : []))];
+                                                      newOpts[i] = e.target.value;
                                                       setQuestions(questions.map(item => item.id === q.id ? {...item, options: newOpts} : item));
                                                     }}
-                                                    className="p-3 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                                                    title="Eliminar opción"
-                                                  >
-                                                    <X size={16} />
-                                                  </button>
-                                                )}
-                                              </div>
+                                                    className="flex-1 bg-transparent border-none rounded-lg px-4 py-3 font-bold text-slate-800 text-sm"
+                                                    placeholder={`Opción ${i + 1}`}
+                                                  />
+                                                  <div className="flex items-center gap-1">
+                                                    <button 
+                                                      onClick={() => {
+                                                        const current = q.optionsWithJustification || [];
+                                                        const next = current.includes(opt) ? current.filter(o => o !== opt) : [...current, opt];
+                                                        setQuestions(questions.map(item => item.id === q.id ? {...item, optionsWithJustification: next} : item));
+                                                      }}
+                                                      className={`p-2 rounded-lg transition-all ${q.optionsWithJustification?.includes(opt) ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-slate-500'}`}
+                                                      title="Requiere Justificación"
+                                                    >
+                                                      <FileText size={14} />
+                                                    </button>
+                                                    <button 
+                                                      onClick={() => {
+                                                        const current = q.optionsWithAudio || [];
+                                                        const next = current.includes(opt) ? current.filter(o => o !== opt) : [...current, opt];
+                                                        setQuestions(questions.map(item => item.id === q.id ? {...item, optionsWithAudio: next} : item));
+                                                      }}
+                                                      className={`p-2 rounded-lg transition-all ${q.optionsWithAudio?.includes(opt) ? 'bg-rose-100 text-rose-600' : 'text-slate-300 hover:text-slate-500'}`}
+                                                      title="Requiere Audio"
+                                                    >
+                                                      <Mic size={14} />
+                                                    </button>
+                                                    {q.type !== 'boolean' && (
+                                                      <button 
+                                                        onClick={() => {
+                                                          const newOpts = (q.options || []).filter((_, idx) => idx !== i);
+                                                          setQuestions(questions.map(item => item.id === q.id ? {...item, options: newOpts} : item));
+                                                        }}
+                                                        className="p-2 text-slate-300 hover:text-rose-500 transition-all ml-1"
+                                                        title="Eliminar opción"
+                                                      >
+                                                        <Trash2 size={14} />
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                </div>
                                             ))}
                                             {q.type !== 'boolean' && (
                                               <button
@@ -1555,7 +1630,7 @@ const SurveyBuilder: React.FC<{
                                         </div>
                                      </div>
 
-                                     <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[32px]">
+                                     <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[32px] flex-wrap">
                                         <div className="flex items-center gap-3">
                                           <button 
                                             onClick={() => {
@@ -1565,8 +1640,62 @@ const SurveyBuilder: React.FC<{
                                           >
                                              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${q.required ? 'left-7' : 'left-1'}`} />
                                           </button>
-                                          <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Respuesta Obligatoria</span>
+                                          <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Obligatoria</span>
                                         </div>
+
+                                        <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+                                          <button 
+                                            onClick={() => {
+                                              setQuestions(questions.map(item => item.id === q.id ? {...item, hasOther: !item.hasOther} : item));
+                                            }}
+                                            className={`w-12 h-6 rounded-full relative transition-colors ${q.hasOther ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                                          >
+                                             <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${q.hasOther ? 'left-7' : 'left-1'}`} />
+                                          </button>
+                                          <span className="text-xs font-black text-indigo-600 uppercase tracking-widest">Opción "Otro"</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+                                          <button 
+                                            onClick={() => {
+                                              setQuestions(questions.map(item => item.id === q.id ? {...item, hasJustification: !item.hasJustification} : item));
+                                            }}
+                                            className={`w-12 h-6 rounded-full relative transition-colors ${q.hasJustification ? 'bg-amber-600' : 'bg-slate-200'}`}
+                                          >
+                                              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${q.hasJustification ? 'left-7' : 'left-1'}`} />
+                                          </button>
+                                          <span className="text-xs font-black text-amber-600 uppercase tracking-widest">Justificar</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+                                          <button 
+                                            onClick={() => {
+                                              setQuestions(questions.map(item => item.id === q.id ? {...item, hasAudioJustification: !item.hasAudioJustification} : item));
+                                            }}
+                                            className={`w-12 h-6 rounded-full relative transition-colors ${q.hasAudioJustification ? 'bg-rose-500' : 'bg-slate-200'}`}
+                                          >
+                                              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${q.hasAudioJustification ? 'left-7' : 'left-1'}`} />
+                                          </button>
+                                          <span className="text-xs font-black text-rose-500 uppercase tracking-widest flex items-center gap-1">
+                                            <Mic size={12} /> Audio
+                                          </span>
+                                        </div>
+
+                                        {q.type === 'matrix' && (
+                                          <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+                                            <button 
+                                              onClick={() => {
+                                                setQuestions(questions.map(item => item.id === q.id ? {...item, supportsAudioRows: !item.supportsAudioRows} : item));
+                                              }}
+                                              className={`w-12 h-6 rounded-full relative transition-colors ${q.supportsAudioRows ? 'bg-red-600' : 'bg-slate-200'}`}
+                                            >
+                                              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${q.supportsAudioRows ? 'left-7' : 'left-1'}`} />
+                                            </button>
+                                            <span className="text-xs font-black text-red-600 uppercase tracking-widest flex items-center gap-1">
+                                              <Mic size={12} /> Audio/Fila
+                                            </span>
+                                          </div>
+                                        )}
                                      </div>
 
                                      <div className="pt-6">
@@ -1625,10 +1754,19 @@ const SurveyTaker: React.FC<{
   const [gridView, setGridView] = useState(false);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [progress, setProgress] = useState(0);
+  const [showMethodology, setShowMethodology] = useState(false);
 
   // Identity States
   const [surveyor, setSurveyor] = useState({ fullName: '', idNumber: '', role: 'Encuestador Regional' });
-  const [respondent, setRespondent] = useState({ fullName: '', idNumber: '', contact: '', age: 18, gender: 'Otro' });
+  const [respondent, setRespondent] = useState({ 
+    fullName: '', 
+    idNumber: '', 
+    documentType: 'CC',
+    contact: '', 
+    yearsInTerritory: 0,
+    age: 18, 
+    gender: 'Otro' 
+  });
   const [groupRespondents, setGroupRespondents] = useState<{ fullName: string, idNumber: string, contact: string }[]>(
     survey.isGroupSurvey ? Array(survey.defaultGroupSize || 5).fill(null).map(() => ({ fullName: '', idNumber: '', contact: '' })) : []
   );
@@ -1793,9 +1931,70 @@ const SurveyTaker: React.FC<{
             <span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-bold text-white uppercase tracking-widest backdrop-blur-md">
               Encuesta de Territorio
             </span>
+            <button 
+              onClick={() => setShowMethodology(true)}
+              className="px-3 py-1 bg-indigo-500/40 hover:bg-indigo-500/60 rounded-full text-[10px] font-bold text-white uppercase tracking-widest backdrop-blur-md transition-colors flex items-center gap-1.5"
+            >
+              <FileText size={10} />
+              Ver Ficha Técnica
+            </button>
           </div>
         </div>
       </div>
+
+      {showMethodology && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-[40px] max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
+          >
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-indigo-50/50">
+              <h3 className="text-xl font-black text-indigo-900 tracking-tight">Ficha Técnica e Instrumentación</h3>
+              <button onClick={() => setShowMethodology(false)} className="p-2 hover:bg-white rounded-full transition-colors">
+                <X size={20} className="text-indigo-900" />
+              </button>
+            </div>
+            <div className="p-10 overflow-y-auto space-y-8 custom-scrollbar">
+              {survey.purpose && (
+                <section className="space-y-3">
+                  <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">Propósito</h4>
+                  <p className="text-sm font-medium text-slate-600 leading-relaxed bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    {survey.purpose}
+                  </p>
+                </section>
+              )}
+              {survey.scope && (
+                <section className="space-y-3">
+                  <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">Alcance y Objetivos</h4>
+                  <div className="text-sm font-medium text-slate-600 leading-relaxed bg-slate-50 p-6 rounded-3xl border border-slate-100 whitespace-pre-wrap">
+                    {survey.scope}
+                  </div>
+                </section>
+              )}
+              {survey.procedure && (
+                <section className="space-y-3">
+                  <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">Procedimiento de Aplicación</h4>
+                  <div className="text-sm font-medium text-slate-600 leading-relaxed bg-slate-50 p-6 rounded-3xl border border-slate-100 whitespace-pre-wrap">
+                    {survey.procedure}
+                  </div>
+                </section>
+              )}
+              <div className="p-6 bg-amber-50 rounded-3xl border border-amber-100 flex gap-4">
+                <div className="w-10 h-10 bg-amber-200 rounded-full flex items-center justify-center text-amber-700 shrink-0">
+                  <AlertCircle size={20} />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Aviso Legal y Consentimiento</span>
+                  <p className="text-[11px] font-bold text-amber-800/70 leading-normal">
+                    La información recolectada es confidencial y se utilizará exclusivamente para fines estadísticos y de formulación de política pública en el marco del PRT. Al continuar con el diligenciamiento, el respondiente otorga su consentimiento informado.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       <div className="p-8 lg:p-12 space-y-10">
         {/* Geographic Context (Mandatory for Surveyor) - Block 1.1 */}
@@ -2112,7 +2311,7 @@ const SurveyTaker: React.FC<{
                     </div>
                  </div>
                ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     <input 
                       type="text" 
                       value={respondent.fullName}
@@ -2120,13 +2319,42 @@ const SurveyTaker: React.FC<{
                       placeholder="Nombre completo del ciudadano"
                       className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     />
-                    <input 
-                      type="text" 
-                      value={respondent.idNumber}
-                      onChange={(e) => setRespondent({...respondent, idNumber: e.target.value})}
-                      placeholder="Número de identidad"
-                      className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <select
+                        value={respondent.documentType || 'CC'}
+                        onChange={(e) => setRespondent({...respondent, documentType: e.target.value})}
+                        className="bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                      >
+                        <option value="CC">Cédula de Ciudadanía</option>
+                        <option value="TI">Tarjeta de Identidad</option>
+                        <option value="CE">Cédula de Extranjería</option>
+                        <option value="PA">Pasaporte</option>
+                        <option value="PPT">PPT</option>
+                      </select>
+                      <input 
+                        type="text" 
+                        value={respondent.idNumber}
+                        onChange={(e) => setRespondent({...respondent, idNumber: e.target.value})}
+                        placeholder="Número de identidad"
+                        className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <input 
+                        type="text" 
+                        value={respondent.contact || ''}
+                        onChange={(e) => setRespondent({...respondent, contact: e.target.value})}
+                        placeholder="Teléfono de contacto"
+                        className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      />
+                      <input 
+                        type="number" 
+                        value={respondent.yearsInTerritory || ''}
+                        onChange={(e) => setRespondent({...respondent, yearsInTerritory: Number(e.target.value)})}
+                        placeholder="Año desde el que reside"
+                        className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      />
+                    </div>
                 </div>
                )}
             </div>
@@ -2472,90 +2700,222 @@ const SurveyTaker: React.FC<{
 
                     {(q.type === 'select' || q.type === 'multiple') && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {q.options?.map(opt => (
-                          <button
-                            key={opt}
-                            onClick={() => {
-                              if (q.type === 'multiple') {
-                                const current = answers[q.id] || [];
-                                const next = current.includes(opt) ? current.filter((i: string) => i !== opt) : [...current, opt];
-                                updateAnswer(q.id, next);
-                              } else {
-                                updateAnswer(q.id, opt);
-                              }
-                            }}
-                            className={`flex items-center gap-4 px-6 py-4 rounded-3xl text-left font-bold transition-all ${
-                              (q.type === 'multiple' ? (answers[q.id] || []).includes(opt) : answers[q.id] === opt) 
-                              ? 'bg-indigo-50 border-2 border-indigo-200 text-indigo-700 shadow-sm' 
-                              : 'bg-white border-2 border-slate-100 text-slate-500 hover:border-slate-200'
-                            }`}
-                          >
-                            <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
-                                (q.type === 'multiple' ? (answers[q.id] || []).includes(opt) : answers[q.id] === opt) 
-                                ? 'bg-indigo-600 border-indigo-600' 
-                                : 'border-slate-200'
-                            }`}>
-                              { (q.type === 'multiple' ? (answers[q.id] || []).includes(opt) : answers[q.id] === opt) && <Plus size={14} className="text-white rotate-45" /> }
+                        {q.options?.map(opt => {
+                          const isSelected = q.type === 'multiple' ? (answers[q.id] || []).includes(opt) : answers[q.id] === opt;
+                          const needsJustification = q.optionsWithJustification?.includes(opt);
+                          const needsAudio = q.optionsWithAudio?.includes(opt);
+
+                          return (
+                            <div key={opt} className="space-y-3">
+                              <button
+                                onClick={() => {
+                                  if (q.type === 'multiple') {
+                                    const current = answers[q.id] || [];
+                                    const next = current.includes(opt) ? current.filter((i: string) => i !== opt) : [...current, opt];
+                                    updateAnswer(q.id, next);
+                                  } else {
+                                    updateAnswer(q.id, opt);
+                                  }
+                                }}
+                                className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl text-left font-bold transition-all ${
+                                  isSelected 
+                                  ? 'bg-indigo-50 border-2 border-indigo-200 text-indigo-700 shadow-sm' 
+                                  : 'bg-white border-2 border-slate-100 text-slate-500 hover:border-slate-200'
+                                }`}
+                              >
+                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                                    isSelected 
+                                    ? 'bg-indigo-600 border-indigo-600' 
+                                    : 'border-slate-200'
+                                }`}>
+                                  { isSelected && <Plus size={14} className="text-white rotate-45" /> }
+                                </div>
+                                {opt}
+                              </button>
+
+                              {isSelected && (needsJustification || needsAudio) && (
+                                <div className="ml-6 p-6 bg-slate-50 rounded-[32px] border border-slate-100 space-y-4 shadow-inner">
+                                   <div className="flex items-center justify-between">
+                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                                        <FileText size={12} />
+                                        Justificación / Detalles para: {opt}
+                                      </label>
+                                      {needsAudio && (
+                                        <div className="flex items-center gap-2">
+                                          {(answers[q.id + '_' + opt + '_audio']) ? (
+                                            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] uppercase font-black border border-emerald-100">
+                                              <Mic size={10} />
+                                              Audio Adjunto
+                                              <button onClick={() => updateAnswer(q.id + '_' + opt + '_audio', null)} className="ml-1 hover:text-rose-500"><X size={10}/></button>
+                                            </div>
+                                          ) : (
+                                            <button 
+                                              onClick={() => updateAnswer(q.id + '_' + opt + '_audio', { type: 'audio', url: 'blob:fake' })}
+                                              className="flex items-center gap-2 px-3 py-1 bg-white text-slate-400 rounded-full text-[10px] uppercase font-black border border-slate-200 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                            >
+                                              <Mic size={10} />
+                                              Grabar Audio
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                   </div>
+                                   {needsJustification && (
+                                     <textarea 
+                                       value={answers[q.id + '_' + opt + '_justification'] || ''}
+                                       onChange={(e) => updateAnswer(q.id + '_' + opt + '_justification', e.target.value)}
+                                       className="w-full bg-white border-none rounded-2xl px-5 py-4 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all shadow-sm"
+                                       placeholder="Escribe aquí los detalles..."
+                                       rows={2}
+                                     />
+                                   )}
+                                </div>
+                              )}
                             </div>
-                            {opt}
-                          </button>
-                        ))}
+                          );
+                        })}
+                        {q.hasOther && (
+                          <div className={`col-span-1 md:col-span-2 flex flex-col gap-3 p-6 rounded-3xl border-2 transition-all ${
+                            (q.type === 'multiple' ? (answers[q.id] || []).includes('Otro') : answers[q.id] === 'Otro') 
+                            ? 'bg-indigo-50 border-indigo-200 shadow-sm' 
+                            : 'bg-white border-slate-100'
+                          }`}>
+                            <button
+                              onClick={() => {
+                                if (q.type === 'multiple') {
+                                  const current = answers[q.id] || [];
+                                  const next = current.includes('Otro') ? current.filter((i: string) => i !== 'Otro') : [...current, 'Otro'];
+                                  updateAnswer(q.id, next);
+                                } else {
+                                  updateAnswer(q.id, 'Otro');
+                                }
+                              }}
+                              className="flex items-center gap-4 text-left font-bold text-slate-500"
+                            >
+                              <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                                  (q.type === 'multiple' ? (answers[q.id] || []).includes('Otro') : answers[q.id] === 'Otro') 
+                                  ? 'bg-indigo-600 border-indigo-600' 
+                                  : 'border-slate-200'
+                              }`}>
+                                { (q.type === 'multiple' ? (answers[q.id] || []).includes('Otro') : answers[q.id] === 'Otro') && <Plus size={14} className="text-white rotate-45" /> }
+                              </div>
+                              Otro (¿Cuál?)
+                            </button>
+                            {(q.type === 'multiple' ? (answers[q.id] || []).includes('Otro') : answers[q.id] === 'Otro') && (
+                              <input 
+                                type="text"
+                                placeholder="Especifique..."
+                                value={answers[q.id + '_other'] || ''}
+                                onChange={(e) => updateAnswer(q.id + '_other', e.target.value)}
+                                className="w-full bg-white border-b-2 border-indigo-200 py-2 outline-none font-bold text-indigo-700"
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {q.type === 'matrix' && (
-                      <div className="overflow-x-auto border-2 border-slate-100 rounded-2xl bg-white shadow-sm">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="bg-slate-50 border-b-2 border-slate-100">
-                              <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">Variable / Condición</th>
-                              {q.columns?.map(col => (
-                                <th key={col} className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-center">{col}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {q.rows?.map((row, rIdx) => (
-                              <tr key={row} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                <td className="p-4 text-sm font-bold text-slate-700 min-w-[200px]">{row}</td>
-                                {q.columns?.map((col, cIdx) => (
-                                  <td key={col} className="p-2 text-center align-middle">
-                                    {col.toLowerCase().includes('aplica') || col.toLowerCase().includes('sí/no') ? (
-                                      <input 
-                                        type="checkbox" 
-                                        checked={(answers[q.id] && answers[q.id][row] && answers[q.id][row][col]) || false}
+                      <div className="space-y-6">
+                        {q.rows?.map((row, rIdx) => (
+                           <div key={row} className="bg-white border-2 border-slate-100 rounded-[32px] overflow-hidden shadow-sm hover:shadow-md transition-all">
+                              <div className="bg-slate-50/50 px-8 py-5 border-b border-slate-100 flex items-center justify-between">
+                                 <span className="text-sm font-black text-slate-800 uppercase tracking-tight">{row}</span>
+                                 {q.supportsAudioRows && (
+                                   <div className="flex items-center gap-2">
+                                      {(answers[q.id + '_audio_' + row]) ? (
+                                        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] uppercase font-black border border-emerald-100">
+                                          <Mic size={10} />
+                                          Grabado
+                                          <button onClick={() => updateAnswer(q.id + '_audio_' + row, null)} className="ml-1 hover:text-rose-500"><X size={10}/></button>
+                                        </div>
+                                      ) : (
+                                        <button 
+                                          onClick={() => updateAnswer(q.id + '_audio_' + row, { type: 'audio', url: 'blob:fake' })}
+                                          className="flex items-center gap-1.5 px-3 py-1 bg-white text-slate-400 rounded-full text-[10px] uppercase font-black border border-slate-200 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                        >
+                                          <Mic size={10} />
+                                          Audio
+                                        </button>
+                                      )}
+                                   </div>
+                                 )}
+                              </div>
+                              <div className="p-8 space-y-8">
+                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {q.columns?.filter(c => c.toLowerCase() !== 'observación').map(col => {
+                                      const isBoolean = col.toLowerCase().includes('aplica') || col.toLowerCase().includes('beneficia') || col.toLowerCase().includes('habitable') || col.toLowerCase().includes('sí/no');
+                                      const val = (answers[q.id] && answers[q.id][row] && answers[q.id][row][col]);
+                                      
+                                      return (
+                                        <div key={col} className="space-y-3">
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{col}</label>
+                                          {isBoolean ? (
+                                            <div className="flex gap-2">
+                                              {['Sí', 'No'].map(choice => (
+                                                <button
+                                                  key={choice}
+                                                  onClick={() => {
+                                                    const currentMat = answers[q.id] || {};
+                                                    const currentRow = currentMat[row] || {};
+                                                    updateAnswer(q.id, {
+                                                      ...currentMat,
+                                                      [row]: { ...currentRow, [col]: choice }
+                                                    });
+                                                  }}
+                                                  className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all border-2 ${
+                                                    val === choice 
+                                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' 
+                                                    : 'bg-slate-50 border-transparent text-slate-400 hover:border-slate-200'
+                                                  }`}
+                                                >
+                                                  {choice}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <input 
+                                              type={col.toLowerCase().includes('cantidad') || col.toLowerCase().includes('valor') ? 'number' : 'text'}
+                                              value={val || ''}
+                                              onChange={(e) => {
+                                                const currentMat = answers[q.id] || {};
+                                                const currentRow = currentMat[row] || {};
+                                                updateAnswer(q.id, {
+                                                  ...currentMat,
+                                                  [row]: { ...currentRow, [col]: e.target.value }
+                                                });
+                                              }}
+                                              className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-300"
+                                              placeholder="Escribe aquí..."
+                                            />
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                 </div>
+
+                                 {q.columns?.includes('Observación') && (
+                                   <div className="pt-6 border-t border-slate-100 space-y-3">
+                                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Observaciones / Detalles</label>
+                                      <textarea 
+                                        value={(answers[q.id] && answers[q.id][row] && answers[q.id][row]['Observación']) || ''}
                                         onChange={(e) => {
                                           const currentMat = answers[q.id] || {};
                                           const currentRow = currentMat[row] || {};
                                           updateAnswer(q.id, {
                                             ...currentMat,
-                                            [row]: { ...currentRow, [col]: e.target.checked }
+                                            [row]: { ...currentRow, ['Observación']: e.target.value }
                                           });
                                         }}
-                                        className="w-6 h-6 rounded-md border-2 border-slate-200 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                        className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-300"
+                                        placeholder="Descripción de la observación..."
+                                        rows={2}
                                       />
-                                    ) : (
-                                      <input 
-                                        type={col.toLowerCase().includes('cantidad') || col.toLowerCase().includes('número') || col.toLowerCase().includes('total') ? 'number' : 'text'}
-                                        value={(answers[q.id] && answers[q.id][row] && answers[q.id][row][col]) || ''}
-                                        onChange={(e) => {
-                                          const currentMat = answers[q.id] || {};
-                                          const currentRow = currentMat[row] || {};
-                                          updateAnswer(q.id, {
-                                            ...currentMat,
-                                            [row]: { ...currentRow, [col]: e.target.value }
-                                          });
-                                        }}
-                                        className="w-full bg-slate-100/50 border-2 border-transparent focus:bg-white focus:border-indigo-200 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 outline-none transition-all placeholder:text-slate-300"
-                                        placeholder="..."
-                                      />
-                                    )}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                   </div>
+                                 )}
+                              </div>
+                           </div>
+                        ))}
                       </div>
                     )}
 
@@ -2710,6 +3070,42 @@ const SurveyTaker: React.FC<{
                         </div>
                       </div>
                     )}
+                    {q.hasJustification && (
+                      <div className="mt-8 pt-8 border-t border-slate-100 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-2 ml-1">
+                             <FileText size={12} />
+                             {q.justificationLabel || (q.hasOther ? 'Justifique su respuesta' : 'Observaciones y Relatos')}
+                          </label>
+                          {q.hasAudioJustification && (
+                            <div className="flex items-center gap-2">
+                              {(answers[q.id + '_justification_audio']) ? (
+                                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] uppercase font-black border border-emerald-100">
+                                  <Mic size={10} />
+                                  Audio Adjunto
+                                  <button onClick={() => updateAnswer(q.id + '_justification_audio', null)} className="ml-1 hover:text-rose-500"><X size={10}/></button>
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={() => updateAnswer(q.id + '_justification_audio', { type: 'audio', url: 'blob:fake' })}
+                                  className="flex items-center gap-2 px-3 py-1 bg-slate-100 text-slate-400 rounded-full text-[10px] uppercase font-black border border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-colors"
+                                >
+                                  <Mic size={10} />
+                                  Grabar Relato
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <textarea 
+                          value={answers[q.id + '_justification'] || ''}
+                          onChange={(e) => updateAnswer(q.id + '_justification', e.target.value)}
+                          placeholder="Espacio para descripción detallada, justificación técnica o relatos de la comunidad..."
+                          rows={2}
+                          className="w-full bg-slate-50 border-none rounded-3xl px-6 py-5 text-sm font-medium text-slate-700 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                        />
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -2760,7 +3156,7 @@ const SurveyAnalysisEngine: React.FC<{
         - Municipio: ${survey.municipioId}
         
         ENCUESTA: ${survey.title}
-        CONTEXTO EXPERTO: ${survey.expertContext || 'Ficha Técnica parametrizada'}
+        CONTEXTO EXPERTO: ${survey.expertsContext || 'Ficha Técnica parametrizada'}
         
         ENFOQUE GRUPAL: ¿Es encuesta a líderes? ${survey.isGroupSurvey ? 'SÍ' : 'NO'}
         ${survey.isGroupSurvey ? `Tamaño del grupo entrevistado: ${responses[0]?.groupRespondents?.length} líderes.` : ''}
