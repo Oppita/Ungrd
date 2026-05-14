@@ -1911,8 +1911,10 @@ export interface SurveyQuestion {
   hasAudioJustification?: boolean;
   optionsWithJustification?: string[];
   optionsWithAudio?: string[];
-  matrixColumnTypes?: Record<string, 'radio' | 'boolean' | 'text' | 'audio' | 'select' | 'number'>;
+  matrixColumnTypes?: Record<string, 'radio' | 'boolean' | 'text' | 'audio' | 'select' | 'number' | 'multiple'>;
   matrixColumnOptions?: Record<string, string[]>;
+  isRepeater?: boolean;
+  repeaterLabel?: string;
   required: boolean;
   category: string;
   placeholder?: string;
@@ -1993,6 +1995,8 @@ export interface SurveyResponse {
   coordinates?: { lat: number, lng: number };
   date: string;
   answers: Record<string, any | any[]>;
+  justifications?: Record<string, any | any[]>;
+  audioUrls?: Record<string, any | any[]>;
   territorialComplexity?: {
     nbi: number;
     gini: number;
