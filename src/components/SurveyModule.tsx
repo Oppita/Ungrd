@@ -194,6 +194,7 @@ export const SurveyModule: React.FC<{ onExit?: () => void }> = ({ onExit }) => {
               onEdit={(s) => { setEditingSurveyId(s.id); setView('create'); }}
               onFill={(s) => { setSelectedSurvey(s); setView('fill'); }}
               onAnalyze={(s) => { setSelectedSurvey(s); setView('analysis'); }}
+              onDelete={deleteSurvey}
             />
           )}
 
@@ -560,8 +561,9 @@ const SurveyList: React.FC<{
   onCreate: () => void, 
   onEdit: (s: Survey) => void,
   onFill: (s: Survey) => void,
-  onAnalyze: (s: Survey) => void
-}> = ({ surveys, responses, departments, getMunicipalities, onCreate, onEdit, onFill, onAnalyze }) => {
+  onAnalyze: (s: Survey) => void,
+  onDelete: (id: string) => void
+}> = ({ surveys, responses, departments, getMunicipalities, onCreate, onEdit, onFill, onAnalyze, onDelete }) => {
   const [tab, setTab] = useState<'cards' | 'territory'>('cards');
 
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>('all');
@@ -872,7 +874,7 @@ const SurveyList: React.FC<{
                         <button 
                           onClick={() => {
                             if (window.confirm('¿Está seguro de eliminar esta operación estadística? SE PERDERÁN TODAS LAS RESPUESTAS ASOCIADAS.')) {
-                              deleteSurvey(survey.id);
+                              onDelete(survey.id);
                             }
                           }}
                           className="flex-1 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-2xl transition-all py-3 border border-rose-100"
