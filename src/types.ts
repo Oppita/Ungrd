@@ -1915,6 +1915,7 @@ export interface SurveyQuestion {
   matrixColumnOptions?: Record<string, string[]>;
   isRepeater?: boolean;
   repeaterLabel?: string;
+  hasAudio?: boolean;
   required: boolean;
   category: string;
   placeholder?: string;
