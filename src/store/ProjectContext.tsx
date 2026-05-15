@@ -1369,10 +1369,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
           const projectCount = normalizedState.proyectos.length;
           const contractCount = normalizedState.contratos.length;
+          const surveyCount = normalizedState.surveys.length;
           
           console.log(`--- DIAGNÓSTICO DE CARGA ---`);
           console.log(`Proyectos encontrados: ${projectCount}`);
           console.log(`Contratos encontrados: ${contractCount}`);
+          console.log(`Encuestas encontradas: ${surveyCount}`);
           console.log(`Llaves principales en State:`, Object.keys(normalizedState));
           
           if (projectCount === 0 && contractCount > 0) {
@@ -1386,8 +1388,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           // Si el estado local tiene MÁS datos que la nube, y la nube está sospechosamente vacía,
           // no sobrescribir sin preguntar o al menos loguear el conflicto.
           const localProjectCount = state.proyectos.length;
-          if (projectCount === 0 && localProjectCount > 0) {
-            console.warn('PROTECCIÓN ACTIVA: Se detectó una nube vacía mientras que el local tiene datos. Ignorando sincronización para evitar pérdida de datos.');
+          const localSurveyCount = state.surveys.length;
+          
+          if (projectCount === 0 && contractCount === 0 && surveyCount === 0 && (localProjectCount > 0 || localSurveyCount > 0)) {
+            console.warn('PROTECCIÓN ACTIVA: Se detectó una nube vacía mientras que el local tiene datos (proyectos o encuestas). Ignorando sincronización para evitar pérdida de datos.');
             setHasSyncedWithCloud(true);
             return;
           }
