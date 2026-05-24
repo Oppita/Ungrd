@@ -1786,10 +1786,50 @@ export interface ExtractedActivity {
   inconsistencies?: string[];
 }
 
+export interface InformeAnalysisFinancials {
+  valorBasicoObraProgramadaSemanal: number | null;
+  valorBasicoObraProgramadaAcumulado: number | null;
+  valorBasicoObraEjecutadaSemanal: number | null;
+  valorBasicoObraEjecutadaAcumulado: number | null;
+  obraProgramadaPorcentajeSemanal: number | null;
+  obraProgramadaPorcentajeAcumulado: number | null;
+  obraFisicaEjecutadaPorcentajeSemanal: number | null;
+  obraFisicaEjecutadaPorcentajeAcumulado: number | null;
+}
+
+export interface InformeAnalysisContractDetails {
+  contratistaObra: string;
+  contratoObraNo: string;
+  interventoria: string;
+  contratoInterventoriaNo: string;
+  semanaNumero: string;
+  semanaDel: string;
+  semanaAl: string;
+  tiempoTranscurridoDias: number | null;
+  valorInicial: number | null;
+  valorActualizado: number | null;
+  plazoInicial: string;
+  plazoActualizado: string;
+  fechaIniciacion: string;
+  fechaVencimiento: string;
+  objetoContrato: string;
+}
+
 export interface InformeAnalysis {
+  documentType: string;
+  contractDetails: InformeAnalysisContractDetails;
+  financials: InformeAnalysisFinancials;
+  observacionesDirectorInterventoria: string;
+  resumenGeneralEstadoContrato: string;
+  actividadesSisoAmbientalesSociales: string;
+  actividadesRealizadasSiguienteSemana: string; // "ACTIVIDADES A REALIZAR EN LA SIGUIENTE SEMANA"
+  actividadesRealizadasSemana: string;
+  
+  // Legacy / generic fields
   activities: ExtractedActivity[];
   summary: string;
   inconsistenciesDetected: boolean;
+  inconsistenciesList: string[];
 }
 
 export interface Threat {
