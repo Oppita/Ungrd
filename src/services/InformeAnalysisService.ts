@@ -7,21 +7,46 @@ export const analyzeInforme = async (
   docType: string, 
   fileData?: { mimeType: string; data: string }
 ): Promise<InformeAnalysis> => {
-  const prompt = `Actúa como un experto analizador de reportes financieros y de interventoría. Extrae la información requerida de manera ESTRUCTURADA, RIGUROSA Y EXACTA.
+  const prompt = `Actúa como un analista de datos experto en interpretar documentos PDF que han sido convertidos a texto donde las tablas de dos columnas han perdido su formato y aparecen dispersas.
 
-Presta EXTREMA ATENCIÓN a los datos financieros y porcentuales. 
-Las cifras están en formato colombiano (puntos para miles, comas para decimales). DEBES convertirlos a números estándar (ej. "316.162.125,72" a 316162125.72).
+OBJETIVO CRÍTICO:
+Debes extraer la información de manera RIGUROSA, EXACTA y SIN INVENTAR DATOS.
+Lee cuidadosamente CADA PALABRA Y NÚMERO del texto.
 
-En la sección financiera y porcentual, ten mucho cuidado con la distinción entre SEMANAL y ACUMULADO.
-Ejemplo de texto: "$ 2.688.425.849 $ 37.359.009.009 Valor básico de la Obra Ejecutada: 316.162.125,72 1.273.119.326,81"
-- Valor básico de la Obra programada Semanal = 2688425849
-- Valor básico de la Obra programada Acumulado = 37359009009
-- Valor básico de la Obra Ejecutada Semanal = 316162125.72
-- Valor básico de la Obra Ejecutada Acumulado = 1273119326.81
+1. ANÁLISIS DE DATOS FINANCIEROS Y PORCENTUALES DE AVANCE
+La sección "Valor básico de la Obra programada:" y "Valor básico de la Obra Ejecutada:" tiene los datos separados.
+EJEMPLO CLAVE DE CÓMO LEER EL TEXTO:
+Texto en el PDF: "$ 2.688.425.849 $ 37.359.009.009 Valor básico de la Obra Ejecutada: 316.162.125,72 1.273.119.326,81"
+Texto en el PDF: "SEMANAL ACUMULADO SEMANAL ACUMULADO"
+Texto en el PDF: "Obra programada (%) 1,97% 27,39% Obra Física Ejecutada (%) 0,23% 0,93%"
 
-Recopila también precisa y cuidadosamente TODAS LAS FECHAS (Semana Del, Al, Fecha de Iniciación, Vencimiento) respetando su valor exacto en el documento.
+ENTIENDE ESTO ASÍ:
+- Valor Básico de Obra Programada SEMANAL (primer valor): 2688425849
+- Valor Básico de Obra Programada ACUMULADO (segundo valor): 37359009009
+- Valor Básico de Obra Ejecutada SEMANAL (primer valor después del texto): 316162125.72
+- Valor Básico de Obra Ejecutada ACUMULADO (segundo valor): 1273119326.81
+- Obra programada (%) SEMANAL: 1.97
+- Obra programada (%) ACUMULADO: 27.39
+- Obra Física Ejecutada (%) SEMANAL: 0.23
+- Obra Física Ejecutada (%) ACUMULADO: 0.93
 
-Documento:
+=> Todas las cifras están en formato de Colombia (puntos separan miles, comas separan decimales). Convierte TODO a número estándar (tipo float/number) eliminando los signos de dinero y el formato local.
+
+2. DETALLES CONTRACTUALES - EL PROBLEMA DE LAS DOS COLUMNAS
+El formato original tiene dos columnas: Izquierda (Contrato de Obra) y Derecha (Contrato de Interventoría). Al convertirse a texto, los valores se leen de forma contigua o dispersa.
+EJEMPLOS DE CÓMO LEER:
+- "136.398.155.883,00 Valor Inicial: 6.448.186.360,00" -> Valor de la obra (izquierda) = 136398155883. Valor de interventoría (derecha) = 6448186360. Asocia a "valorInicial" el monto de la OBRA (136.398.155.883) por simplicidad, o mejor, toma el referente a la OBRA PRINCIPAL.
+- "30/07/21 Fecha de Iniciación: 30/07/21" -> Toma la fecha correspondiente.
+- "18 MESES Plazo Inicial: 19 MESES" -> 18 meses es para obra, 19 para interventoría. Toma "18 MESES" como plazoInicial.
+- "24/12/21 30/12/21" que suele aparecer perdido, corresponde a "Semana ... Del: 24/12/21 Al: 30/12/21". Búscalos e intégalos en semanaDel y semanaAl.
+- Nombres de Contratista (ej. CONSORCIO PROPLAYA) e Interventoría (ej. AIDCON LTDA), búscalo en el texto "CONTRATISTA DE OBRA: ... INTERVENTORIA: ..."
+
+3. TEXTOS LARGOS Y SECCIONES
+Para las secciones de "RESUMEN GENERAL DEL ESTADO DEL CONTRATO", "OBSERVACIONES DIRECTOR DE INTERVENTORIA", "ACTIVIDADES SISO, AMBIENTALES Y SOCIALES", "ACTIVIDADES REALIZADAS EN LA SEMANA" y "ACTIVIDADES A REALIZAR EN LA SIGUIENTE SEMANA", copia con total fidelidad el texto correspondiente.
+
+Estructura tu respuesta exactamente ajustada al JSON Schema provisto, siendo absoluto y radicalmente riguroso con los valores financieros extrayéndolos del caos del texto como indiqué arriba. 
+
+Documento a analizar:
 ${informeText}`;
   
   const responseText = await generateContent(prompt, 'gemini-3.1-pro-preview', {
