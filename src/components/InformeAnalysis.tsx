@@ -99,10 +99,10 @@ export const InformeAnalysisComponent: React.FC = () => {
               <h4 className="font-bold text-slate-800 mb-4 border-b pb-2">Información Financiera</h4>
               <div className="grid grid-cols-2 gap-y-2 text-sm">
                 <span className="text-slate-500">Valor Inicial:</span>
-                <span className="font-medium">{analysis.contractDetails?.valorInicial ? `$${analysis.contractDetails.valorInicial.toLocaleString()}` : 'N/A'}</span>
+                <span className="font-medium">{analysis.contractDetails?.valorInicial != null ? `$${analysis.contractDetails.valorInicial.toLocaleString('es-CO')}` : 'N/A'}</span>
                 
                 <span className="text-slate-500">Valor Actualizado:</span>
-                <span className="font-medium">{analysis.contractDetails?.valorActualizado ? `$${analysis.contractDetails.valorActualizado.toLocaleString()}` : 'N/A'}</span>
+                <span className="font-medium">{analysis.contractDetails?.valorActualizado != null ? `$${analysis.contractDetails.valorActualizado.toLocaleString('es-CO')}` : 'N/A'}</span>
                 
                 <span className="text-slate-500">Plazo Inicial/Actualizado:</span>
                 <span className="font-medium">{analysis.contractDetails?.plazoInicial} / {analysis.contractDetails?.plazoActualizado}</span>
@@ -123,13 +123,13 @@ export const InformeAnalysisComponent: React.FC = () => {
               <tbody>
                 <tr className="border-b">
                   <td className="px-6 py-3 font-medium">Valor Básico de Obra Programada</td>
-                  <td className="px-6 py-3 text-right">{analysis.financials?.valorBasicoObraProgramadaSemanal ? `$${analysis.financials.valorBasicoObraProgramadaSemanal.toLocaleString()}` : '-'}</td>
-                  <td className="px-6 py-3 text-right">{analysis.financials?.valorBasicoObraProgramadaAcumulado ? `$${analysis.financials.valorBasicoObraProgramadaAcumulado.toLocaleString()}` : '-'}</td>
+                  <td className="px-6 py-3 text-right">{analysis.financials?.valorBasicoObraProgramadaSemanal != null ? `$${analysis.financials.valorBasicoObraProgramadaSemanal.toLocaleString('es-CO')}` : '-'}</td>
+                  <td className="px-6 py-3 text-right">{analysis.financials?.valorBasicoObraProgramadaAcumulado != null ? `$${analysis.financials.valorBasicoObraProgramadaAcumulado.toLocaleString('es-CO')}` : '-'}</td>
                 </tr>
                 <tr className="border-b">
                   <td className="px-6 py-3 font-medium">Valor Básico de Obra Ejecutada</td>
-                  <td className="px-6 py-3 text-right">{analysis.financials?.valorBasicoObraEjecutadaSemanal ? `$${analysis.financials.valorBasicoObraEjecutadaSemanal.toLocaleString()}` : '-'}</td>
-                  <td className="px-6 py-3 text-right text-emerald-600 font-bold">{analysis.financials?.valorBasicoObraEjecutadaAcumulado ? `$${analysis.financials.valorBasicoObraEjecutadaAcumulado.toLocaleString()}` : '-'}</td>
+                  <td className="px-6 py-3 text-right">{analysis.financials?.valorBasicoObraEjecutadaSemanal != null ? `$${analysis.financials.valorBasicoObraEjecutadaSemanal.toLocaleString('es-CO')}` : '-'}</td>
+                  <td className="px-6 py-3 text-right text-emerald-600 font-bold">{analysis.financials?.valorBasicoObraEjecutadaAcumulado != null ? `$${analysis.financials.valorBasicoObraEjecutadaAcumulado.toLocaleString('es-CO')}` : '-'}</td>
                 </tr>
                 <tr className="border-b">
                   <td className="px-6 py-3 font-medium">Obra Programada (%)</td>
@@ -189,7 +189,7 @@ export const InformeAnalysisComponent: React.FC = () => {
                   <div className="flex gap-4 mt-2 text-sm">
                     <span>Tipo: {activity.type}</span>
                     <span>Progreso: {activity.metrics?.progress}%</span>
-                    <span>Costo: ${activity.cost?.toLocaleString()}</span>
+                    <span>Costo: ${activity.cost?.toLocaleString('es-CO')}</span>
                   </div>
                 </div>
               ))}
