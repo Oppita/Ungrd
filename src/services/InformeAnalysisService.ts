@@ -7,8 +7,22 @@ export const analyzeInforme = async (
   docType: string, 
   fileData?: { mimeType: string; data: string }
 ): Promise<InformeAnalysis> => {
-  const prompt = `Analiza el siguiente documento de tipo ${docType} y extrae la información requerida de manera estructurada, prestando especial atención a todos los datos financieros, contractuales y porcentuales. 
-Documento: ${informeText}`;
+  const prompt = `Actúa como un experto analizador de reportes financieros y de interventoría. Extrae la información requerida de manera ESTRUCTURADA, RIGUROSA Y EXACTA.
+
+Presta EXTREMA ATENCIÓN a los datos financieros y porcentuales. 
+Las cifras están en formato colombiano (puntos para miles, comas para decimales). DEBES convertirlos a números estándar (ej. "316.162.125,72" a 316162125.72).
+
+En la sección financiera y porcentual, ten mucho cuidado con la distinción entre SEMANAL y ACUMULADO.
+Ejemplo de texto: "$ 2.688.425.849 $ 37.359.009.009 Valor básico de la Obra Ejecutada: 316.162.125,72 1.273.119.326,81"
+- Valor básico de la Obra programada Semanal = 2688425849
+- Valor básico de la Obra programada Acumulado = 37359009009
+- Valor básico de la Obra Ejecutada Semanal = 316162125.72
+- Valor básico de la Obra Ejecutada Acumulado = 1273119326.81
+
+Recopila también precisa y cuidadosamente TODAS LAS FECHAS (Semana Del, Al, Fecha de Iniciación, Vencimiento) respetando su valor exacto en el documento.
+
+Documento:
+${informeText}`;
   
   const responseText = await generateContent(prompt, 'gemini-3.1-pro-preview', {
       responseMimeType: 'application/json',
