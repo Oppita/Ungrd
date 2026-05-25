@@ -1,1375 +1,355 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  LayoutDashboard,
-  FolderKanban,
-  AlertTriangle,
-  Settings,
-  LogOut,
-  Search,
-  Bell,
-  TableProperties,
-  Activity,
-  Map,
-  Zap,
-  PlusCircle,
-  Calendar,
-  Users,
-  FileText,
-  ClipboardCheck,
-  CloudUpload,
-  CloudDownload,
-  Loader2,
-  RefreshCw,
-  CheckSquare,
-  BrainCircuit,
-  ShieldCheck,
-  Database,
-  CloudRain,
-  TrendingUp,
-  Download,
-  Lock as LockIcon,
-  X,
-} from "lucide-react";
-import { Dashboard } from "./components/Dashboard";
-import { Vista360 } from "./components/Vista360";
-import { ProjectDetails } from "./components/ProjectDetails";
-import { MatrizInteligente } from "./components/MatrizInteligente";
-import { GeneradorInformes } from "./components/GeneradorInformes";
-import { CentroControlSRR } from "./components/CentroControlSRR";
-import { CentroInteligenciaSRR } from "./components/CentroInteligenciaSRR";
-import FlujoInstitucional from "./components/FlujoInstitucional";
-import { ColombiaMap } from "./components/ColombiaMap";
-import { TerritorialPanel } from "./components/TerritorialPanel";
-import { VigenciaModule } from "./components/VigenciaModule";
-import { ContractorProfile } from "./components/ContractorProfile";
-import { DocumentRepository } from "./components/DocumentRepository";
-import { AgendaPMU } from "./components/AgendaPMU";
-import { CreateProjectForm } from "./components/CreateProjectForm";
-import { LandingPage } from "./components/LandingPage";
-import { GestionOPS } from "./components/GestionOPS";
-import { GestionComisiones } from "./components/GestionComisiones";
-import { GestionPolizas } from "./components/GestionPolizas";
-import { TaskBoard } from "./components/TaskBoard";
-import { PriorizacionInversion } from "./components/PriorizacionInversion";
-import { RiskDashboard } from "./components/RiskDashboard";
-import { Auth } from "./components/Auth";
-import { ProteccionFinanciera } from "./components/ProteccionFinanciera";
-import { LaboratorioFinanciero } from "./components/LaboratorioFinanciero";
-import { FinancialTraceabilityDashboard } from "./components/FinancialTraceabilityDashboard";
-import { MicRModule } from "./components/MicRModule";
-import { EventosDashboard } from "./components/EventosDashboard";
-import { SurveyModule } from "./components/SurveyModule";
-import { supabase, isSupabaseConfigured, supabaseUrl } from "./lib/supabase";
-import { ProjectData, DepartmentRisk, Threat } from "./types";
+import React, { useState } from 'react';
+import { Calendar, Bookmark, Settings, QrCode, Users, LogOut, Cloud, CloudOff, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Toaster } from 'sonner';
+import QRCode from 'react-qr-code';
+import { useAgendaData } from './hooks/useAgendaData';
+import { FilterBar } from './components/FilterBar';
+import { AgendaCard } from './components/AgendaCard';
+import { RoomModal } from './components/RoomModal';
+import { EventModal } from './components/EventModal';
+import { AdminEventDetailsModal } from './components/AdminEventDetailsModal';
+import { AdminPanel } from './components/AdminPanel';
+import { QRControlPanel } from './components/QRControlPanel';
+import { InteractiveMap } from './components/InteractiveMap';
+import { formatTime, classNames } from './lib/utils';
+import { Room, AgendaEvent } from './data/agenda';
+import { useAuth } from './context/AuthContext';
 
-import { mockThreats } from "./data/mockDepartments";
-import { useProject } from "./store/ProjectContext";
-import { showAlert } from "./utils/alert";
-
-function App() {
-  const {
-    state,
-    getProjectData,
-    addProject,
-    addContract,
-    updateProjectData,
-    addFinancialDocument,
-    addPago,
-    addAvance,
-    saveToSupabase,
-    loadFromSupabase,
-    repairAllUrls,
-    syncing,
-    loading: contextLoading,
-    error: syncError,
-    isCloudCheckComplete,
-    hasSyncedWithCloud,
-    importFromJSON,
-    exportToJSON,
-  } = useProject();
-  const [user, setUser] = useState<any>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [activeView, setActiveView] = useState<
-    | "landing"
-    | "dashboard"
-    | "project"
-    | "vista360"
-    | "matriz"
-    | "informes"
-    | "centroControl"
-    | "mapa"
-    | "inteligencia"
-    | "crearProyecto"
-    | "vigencias"
-    | "contractors"
-    | "documents"
-    | "flujo"
-    | "ops"
-    | "comisiones"
-    | "tareas"
-    | "interventoria"
-    | "riesgo"
-    | "priorizacion"
-    | "pot"
-    | "riesgoDashboard"
-    | "polizas"
-    | "agenda"
-    | "financiera"
-    | "laboratorio"
-    | "micr"
-    | "eventos"
-    | "trazabilidad"
-    | "encuestas"
-  >("landing");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    null,
-  );
-  const [reportProjectId, setReportProjectId] = useState<string | undefined>();
-  const [selectedDept, setSelectedDept] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Perfiles de acceso por correo
-  const userRole = useMemo(() => {
-    if (!user) return "public";
-    if (user.email?.includes("encuestas") || user.email?.includes("survey"))
-      return "survey_only";
-    // Make any logged in user an admin to avoid issues with export/import limits
-    return "admin";
-  }, [user]);
-
-  const canAccessModule = (view: string) => {
-    if (userRole === "admin") return true;
-    if (userRole === "survey_only") return view === "encuestas";
+export default function App() {
+  const { loading } = useAuth();
+  
+  if (loading) {
     return (
-      view !== "config" &&
-      view !== "financiera" &&
-      view !== "laboratorio" &&
-      view !== "priorizacion"
-    );
-  };
-
-  const executeWithGuard = async (action: () => void) => {
-    if (!isSupabaseConfigured) {
-      action();
-      return;
-    }
-
-    if (!user) {
-      setShowAuth(true);
-      showAlert(
-        "Debe iniciar sesión con una cuenta autorizada para realizar acciones de administración.",
-      );
-      return;
-    }
-
-    const pass = prompt(
-      "⚠️ ACCIÓN PROTEGIDA: Por favor, ingrese su contraseña de Supabase para confirmar:",
-    );
-    if (!pass) return;
-
-    try {
-      setAuthLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: pass,
-      });
-
-      if (error) {
-        showAlert(
-          "❌ Acceso Denegado: La contraseña ingresada no es válida para esta cuenta.",
-        );
-        return;
-      }
-
-      action();
-    } catch (err) {
-      showAlert("Error de seguridad al validar la cuenta.");
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const [alertMessage, setAlertMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handleAlert = (e: CustomEvent) => {
-      setAlertMessage(e.detail);
-    };
-    window.addEventListener("show-alert", handleAlert as EventListener);
-    return () =>
-      window.removeEventListener("show-alert", handleAlert as EventListener);
-  }, []);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      if (!isSupabaseConfigured) {
-        setAuthLoading(false);
-        return;
-      }
-
-      console.log("Verificando estado de Supabase...");
-
-      supabase.auth
-        .getSession()
-        .then(({ data: { session }, error }) => {
-          if (error) {
-            if (
-              error.message.includes("Refresh Token Not Found") ||
-              error.message.includes("Invalid Refresh Token")
-            ) {
-              console.warn("Sesión expirada o inválida, limpiando estado...");
-              supabase.auth.signOut();
-              setUser(null);
-            } else {
-              console.warn(
-                "Supabase no disponible, usando modo local:",
-                error.message,
-              );
-            }
-          } else {
-            setUser(session?.user ?? null);
-          }
-        })
-        .catch((err) => {
-          console.warn(
-            "Error de conexión a Supabase, modo local activado:",
-            err.message,
-          );
-        })
-        .finally(() => {
-          setAuthLoading(false);
-        });
-    };
-
-    initAuth();
-
-    const {
-      data: { subscription },
-    } = isSupabaseConfigured
-      ? supabase.auth.onAuthStateChange((_event, session) => {
-          setUser(session?.user ?? null);
-        })
-      : { data: { subscription: { unsubscribe: () => {} } } };
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.warn("LogOut error:", err);
-    } finally {
-      setUser(null);
-      setActiveView("landing");
-      setShowAuth(true);
-    }
-  };
-
-  const handleExportData = () => {
-    executeWithGuard(() => {
-      const dataStr = localStorage.getItem("srr_app_state");
-      if (!dataStr) {
-        showAlert("No hay datos para exportar.");
-        return;
-      }
-      const dataUri =
-        "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
-      const exportFileDefaultName = `srr_backup_${new Date().toISOString().split("T")[0]}.json`;
-
-      const linkElement = document.createElement("a");
-      linkElement.setAttribute("href", dataUri);
-      linkElement.setAttribute("download", exportFileDefaultName);
-      linkElement.click();
-    });
-  };
-
-  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    executeWithGuard(() => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const content = e.target?.result as string;
-          // Validate JSON
-          JSON.parse(content);
-          localStorage.setItem("srr_app_state", content);
-          showAlert("Datos importados correctamente. La página se recargará.");
-          setTimeout(() => window.location.reload(), 2000);
-        } catch (error) {
-          showAlert(
-            "Error al importar el archivo. Asegúrese de que sea un archivo JSON válido exportado desde esta aplicación.",
-          );
-        }
-      };
-      reader.readAsText(file);
-    });
-
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const handleInjectTestProject = () => {
-    executeWithGuard(() => {
-      const now = Date.now();
-      const pId = `PROJ-EJEMPLO-${now}`;
-      const contractId = `CONT-EJEMPLO-${now}`;
-      const cdpId = `CDP-EJEMPLO-${now}`;
-      const rcId = `RC-EJEMPLO-${now}`;
-      const pago1Id = `PAGO1-EJEMPLO-${now}`;
-      const pago2Id = `PAGO2-EJEMPLO-${now}`;
-      const curDate = new Date().toISOString().split("T")[0];
-
-      // 1. Crear Proyecto
-      addProject({
-        id: pId,
-        nombre: "Proyecto de Ejemplo con Trazabilidad Financiera",
-        objetivoGeneral:
-          "Construcción y mejoramiento de infraestructura vial con ejecución financiera completa.",
-        departamento: "Cundinamarca",
-        municipio: "Bogotá",
-        linea: "Infraestructura",
-        fechaInicio: "2025-01-01",
-        fechaFin: "2026-12-31",
-        avanceFisico: 35,
-        avanceProgramado: 40,
-        estado: "En ejecución",
-      });
-
-      // 2. Crear Contrato
-      addContract({
-        id: contractId,
-        projectId: pId,
-        numero: "CONT-2025-001",
-        tipo: "Obra",
-        objetoContractual: "Construcción de vía principal fase 1",
-        contratista: "Consorcio Vías Colombia",
-        nit: "900.123.456-7",
-        valor: 4500000000,
-        fechaInicio: "2025-01-15",
-        fechaFin: "2026-11-30",
-        estado: "En ejecución",
-        plazoMeses: 22,
-        eventos: [],
-      });
-
-      // 3. Crear CDP
-      addFinancialDocument({
-        id: cdpId,
-        projectId: pId,
-        contractId: contractId,
-        tipo: "CDP",
-        numero: "CDP-2025-100",
-        valor: 4500000000,
-        fecha: "2025-01-05",
-        nombre: "CDP Inicial para Obras",
-        rubro: "Inversión Infraestructura",
-        fuente: "Presupuesto General",
-        descripcion:
-          "Certificado de disponibilidad presupuestal para el contrato de obra principal",
-        validacion_ia: {
-          coherente: true,
-          observaciones: "Aprobado automáticamente",
-          inconsistencias: [],
-        },
-      });
-
-      // 4. Crear RC (Registro de Compromiso)
-      addFinancialDocument({
-        id: rcId,
-        projectId: pId,
-        contractId: contractId,
-        tipo: "RC",
-        numero: "RC-2025-080",
-        numeroCdp: "CDP-2025-100", // Referencia al CDP
-        valor: 4500000000,
-        fecha: "2025-01-15",
-        nombre: "Compromiso Contrato 001",
-        rubro: "Inversión Infraestructura",
-        fuente: "Presupuesto General",
-        descripcion: "Registro de compromiso derivado del contrato de obra",
-        valorPagado: 0, // Inicia en 0, los pagos lo alimentan
-        validacion_ia: {
-          coherente: true,
-          observaciones: "Acorde al CDP",
-          inconsistencias: [],
-        },
-      });
-
-      // 5. Crear Pagos (2 pagos de ejemplo)
-      addPago({
-        id: pago1Id,
-        contractId: contractId,
-        rcId: rcId, // Atado al RC
-        numero: "PAGO-001",
-        numeroFactura: "FAC-001",
-        fecha: "2025-03-01",
-        fechaPagoReal: "2025-03-05",
-        valor: 1000000000,
-        estado: "Pagado",
-        beneficiario: "Consorcio Vías Colombia",
-        nitBeneficiario: "900.123.456-7",
-        entidadBancaria: "Banco de Bogotá",
-        comprobanteEgreso: "CE-2025-03-01",
-        observaciones: "Pago de prueba",
-      });
-
-      addPago({
-        id: pago2Id,
-        contractId: contractId,
-        rcId: rcId, // Atado al RC
-        numero: "PAGO-002",
-        numeroFactura: "FAC-002",
-        fecha: "2025-04-01",
-        fechaPagoReal: "2025-04-10",
-        valor: 800000000, // Total pagado será 1.800.000.000
-        estado: "Pagado",
-        beneficiario: "Consorcio Vías Colombia",
-        entidadBancaria: "Banco de Bogotá",
-        comprobanteEgreso: "CE-2025-04-02",
-        observaciones: "Pago correspondiente al mes de abril",
-      });
-
-      // 6. Avance
-      addAvance(pId, {
-        id: `AV-${now}`,
-        projectId: pId,
-        fecha: curDate,
-        fisicoPct: 35,
-        financieroPct: (1800000000 / 4500000000) * 100, // 40%
-        programadoPct: 40,
-        observaciones:
-          "Avance calculado con ejemplo. Primeros meses de ejecución",
-        reportadoPor: "Sistema",
-      });
-
-      showAlert(
-        'Proyecto de Ejemplo cargado exitosamente. Búscalo como "Proyecto de Ejemplo con Trazabilidad Financiera".',
-      );
-    });
-  };
-
-  const handleClearCache = () => {
-    executeWithGuard(async () => {
-      if (
-        window.confirm(
-          "¿Está seguro de que desea limpiar el caché local? Esto eliminará los datos guardados en el navegador, cerrará su sesión y recargará la página.",
-        )
-      ) {
-        // Clear Supabase session
-        try {
-          await supabase.auth.signOut();
-        } catch (e) {
-          console.warn("Error signing out:", e);
-        }
-
-        // Clear local storage
-        localStorage.removeItem("srr_app_state");
-        // Also clear other potential large keys
-        Object.keys(localStorage).forEach((key) => {
-          if (
-            key.startsWith("edan_data_") ||
-            key.includes("supabase.auth.token")
-          ) {
-            localStorage.removeItem(key);
-          }
-        });
-
-        // Final fallback: clear everything
-        localStorage.clear();
-
-        showAlert("Caché local limpiado y sesión cerrada. Recargando...");
-        setTimeout(() => window.location.reload(), 1500);
-      }
-    });
-  };
-
-  // Reconstruct ProjectData array for components that expect it
-  const projectsData: ProjectData[] = useMemo(() => {
-    const allProjects = state.proyectos
-      .map((p) => getProjectData(p.id)!)
-      .filter(Boolean);
-    return allProjects.filter(
-      (p) =>
-        (p.project.nombre || "")
-          .toLowerCase()
-          .includes((searchQuery || "").toLowerCase()) ||
-        (p.project.municipio || "")
-          .toLowerCase()
-          .includes((searchQuery || "").toLowerCase()) ||
-        state.contratos.some(
-          (c) =>
-            c.projectId === p.project.id &&
-            ((c.numero?.toString() || "")
-              .toLowerCase()
-              .includes((searchQuery || "").toLowerCase()) ||
-              (c.nit?.toString() || "")
-                .toLowerCase()
-                .includes((searchQuery || "").toLowerCase())),
-        ),
-    );
-  }, [state, getProjectData, searchQuery]);
-
-  const dynamicDepartments = useMemo(() => {
-    return state.departamentos.map((dept) => {
-      const deptProjects = projectsData.filter(
-        (p) => p.project.departamento === dept.name,
-      );
-      const totalInvestment = deptProjects.reduce((sum, p) => {
-        const projectContracts = p.contracts || [];
-        const contractValue = projectContracts.reduce(
-          (cSum, c) => cSum + c.valor,
-          0,
-        );
-        return sum + contractValue;
-      }, 0);
-
-      return {
-        ...dept,
-        investment: totalInvestment > 0 ? totalInvestment : dept.investment, // Fallback to mock if no projects
-      };
-    });
-  }, [projectsData, state.departamentos]);
-
-  const selectedProject = useMemo(() => {
-    return selectedProjectId ? getProjectData(selectedProjectId) : null;
-  }, [selectedProjectId, getProjectData]);
-
-  const handleProjectSelect = (project: ProjectData) => {
-    setSelectedProjectId(project.project.id);
-    setActiveView("project");
-  };
-
-  const handleOpenPanel = (dept: string) => {
-    setSelectedDept(dept);
-  };
-
-  const handleBackToDashboard = () => {
-    setSelectedProjectId(null);
-    setActiveView("dashboard");
-  };
-
-  // Function to update project data from the matrix
-  const handleUpdateProject = (
-    projectId: string,
-    section: string,
-    field: string,
-    value: any,
-  ) => {
-    updateProjectData(projectId, section, field, value);
-    // Persist changes
-    saveToSupabase();
-  };
-
-  const handleGenerateReport = (projectId: string) => {
-    setReportProjectId(projectId);
-    setActiveView("informes");
-  };
-
-  const handleSaveToCloud = async () => {
-    executeWithGuard(async () => {
-      try {
-        await saveToSupabase(true);
-        showAlert("Datos guardados en la nube correctamente.");
-      } catch (e) {
-        showAlert("Error al guardar en la nube.");
-      }
-    });
-  };
-
-  const handleLoadFromCloud = async () => {
-    executeWithGuard(async () => {
-      try {
-        await loadFromSupabase(true);
-        showAlert("Datos cargados desde la nube correctamente.");
-      } catch (e) {
-        showAlert("Error al cargar desde la nube.");
-      }
-    });
-  };
-
-  const [showAuth, setShowAuth] = useState(false);
-
-  const isPublicUser = !user && isSupabaseConfigured;
-
-  const [pendingView, setPendingView] = useState<string | null>(null);
-
-  // Redireccionar si el rol cambia y estamos en una vista no permitida
-  useEffect(() => {
-    if (
-      userRole === "survey_only" &&
-      activeView !== "encuestas" &&
-      activeView !== "landing"
-    ) {
-      setActiveView("encuestas");
-    }
-  }, [userRole, activeView]);
-
-  if (showAuth) {
-    return (
-      <Auth
-        onSuccess={() => {
-          setShowAuth(false);
-          const nextView = pendingView || (userRole === "survey_only" ? "encuestas" : "dashboard");
-          setActiveView(nextView as any);
-          setPendingView(null);
-        }}
-      />
-    );
-  }
-
-  if (activeView === "landing") {
-    return (
-      <LandingPage
-        onEnterAdmin={() => {
-          if (!user && isSupabaseConfigured) {
-            setPendingView("dashboard");
-            setShowAuth(true);
-          } else {
-            if (userRole === "survey_only") setActiveView("encuestas");
-            else setActiveView("dashboard");
-          }
-        }}
-        onEnterSurveys={() => {
-          setActiveView("encuestas");
-        }}
-      />
-    );
-  }
-
-  if (activeView === "encuestas") {
-    return (
-      <div className="h-screen w-screen bg-slate-50 overflow-y-auto overflow-x-hidden">
-        <SurveyModule onExit={() => setActiveView("landing")} />
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
+  return <MainApp />;
+}
+
+function MainApp() {
+  const { isAdmin, signOut } = useAuth();
+  const {
+    events,
+    groupedEvents,
+    rooms,
+    setRooms,
+    setEventsData,
+    bookmarks,
+    toggleBookmark,
+    registrations,
+    registerForEvent,
+    cancelRegistration,
+    searchQuery,
+    setSearchQuery,
+    selectedType,
+    setSelectedType,
+    selectedRoom,
+    setSelectedRoom,
+    viewMode,
+    setViewMode,
+    selectedDay,
+    setSelectedDay,
+    availableDays,
+    syncData,
+    syncStatus,
+    lastSynced,
+    supabaseLog,
+    clearLocalCache,
+    deleteEvent,
+    saveEvent,
+    saveRoom,
+    deleteRoom,
+  } = useAgendaData();
+
+  const [activeRoomModal, setActiveRoomModal] = useState<Room | null>(null);
+  const [activeEventModal, setActiveEventModal] = useState<AgendaEvent | null>(null);
+  const [activeAdminEventModal, setActiveAdminEventModal] = useState<AgendaEvent | null>(null);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isQRHubOpen, setIsQRHubOpen] = useState(false);
+  const [qrHubInitialTab, setQrHubInitialTab] = useState<'ROOM' | 'MEAL' | 'DIRECTORY'>('ROOM');
+
+  const handleRoomClick = (roomId: string) => {
+    const room = rooms.find(r => r.id === roomId) || null;
+    setActiveRoomModal(room);
+  };
+
+  const openQRHub = (tab: 'ROOM' | 'MEAL' | 'DIRECTORY') => {
+    setQrHubInitialTab(tab);
+    setIsQRHubOpen(true);
+  };
+
+  const handleCardClick = (event: AgendaEvent) => {
+    if (isAdmin) {
+      setActiveAdminEventModal(event);
+    } else {
+      setActiveEventModal(event);
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0">
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold">
-            M
-          </div>
-          <span className="font-semibold text-white tracking-wide">
-            Matriz Inteligente
-          </span>
-        </div>
-
-        <nav className="flex-1 py-6 px-4 space-y-2 overflow-y-auto custom-scrollbar">
-          {canAccessModule("dashboard") && (
-            <button
-              onClick={handleBackToDashboard}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "dashboard" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <LayoutDashboard size={20} />
-              <span className="font-medium">Dashboard Ejecutivo SRR</span>
-            </button>
-          )}
-
-          {canAccessModule("flujo") && (
-            <button
-              onClick={() => setActiveView("flujo")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "flujo" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <ClipboardCheck size={20} />
-              <span className="font-medium">Banco de Proyectos</span>
-            </button>
-          )}
-
-          <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Gestión
-          </div>
-
-          {canAccessModule("inteligencia") && (
-            <button
-              onClick={() => setActiveView("inteligencia")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "inteligencia" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <BrainCircuit size={20} />
-              <span className="font-medium">Centro de Inteligencia</span>
-            </button>
-          )}
-
-          {canAccessModule("financiera") && (
-            <button
-              onClick={() => setActiveView("financiera")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "financiera" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <ShieldCheck size={20} />
-              <span className="font-medium">Prot. Financiera</span>
-            </button>
-          )}
-
-          {canAccessModule("laboratorio") && (
-            <button
-              onClick={() => setActiveView("laboratorio")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "laboratorio" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <TrendingUp size={20} />
-              <span className="font-medium">Laboratorio Financiero</span>
-            </button>
-          )}
-
-          {canAccessModule("eventos") && (
-            <button
-              onClick={() => setActiveView("eventos")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "eventos" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <CloudRain size={20} />
-              <span className="font-medium">
-                Gestión de Eventos (MIC-R/PMU)
-              </span>
-            </button>
-          )}
-
-          {canAccessModule("riesgoDashboard") && (
-            <button
-              onClick={() => setActiveView("riesgoDashboard")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "riesgoDashboard" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <AlertTriangle size={20} />
-              <span className="font-medium">Dashboard de Riesgos</span>
-            </button>
-          )}
-
-          {canAccessModule("priorizacion") && (
-            <button
-              onClick={() => setActiveView("priorizacion")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "priorizacion" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <TableProperties size={20} />
-              <span className="font-medium">Priorización Inversión</span>
-            </button>
-          )}
-
-          {canAccessModule("centroControl") && (
-            <button
-              onClick={() => setActiveView("centroControl")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "centroControl" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <Activity size={20} />
-              <span className="font-medium">Centro de Control SRR</span>
-            </button>
-          )}
-
-          {canAccessModule("mapa") && (
-            <button
-              onClick={() => setActiveView("mapa")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "mapa" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <Map size={20} />
-              <span className="font-medium">Mapa Territorial</span>
-            </button>
-          )}
-
-          {canAccessModule("matriz") && (
-            <button
-              onClick={() => setActiveView("matriz")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "matriz" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <TableProperties size={20} />
-              <span className="font-medium">Matriz Seguimiento SRR</span>
-            </button>
-          )}
-
-          {canAccessModule("informes") && (
-            <button
-              onClick={() => setActiveView("informes")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "informes" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <FolderKanban size={20} />
-              <span className="font-medium">Generador de Informes</span>
-            </button>
-          )}
-
-          {canAccessModule("tareas") && (
-            <button
-              onClick={() => setActiveView("tareas")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "tareas" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <CheckSquare size={20} />
-              <span className="font-medium">Tareas y Notificaciones</span>
-            </button>
-          )}
-
-          {canAccessModule("vigencias") && (
-            <button
-              onClick={() => setActiveView("vigencias")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "vigencias" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <Calendar size={20} />
-              <span className="font-medium">Vigencias e Inversión</span>
-            </button>
-          )}
-
-          {canAccessModule("contractors") && (
-            <button
-              onClick={() => setActiveView("contractors")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "contractors" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <Users size={20} />
-              <span className="font-medium">Perfil de Contratista</span>
-            </button>
-          )}
-
-          {canAccessModule("ops") && (
-            <button
-              onClick={() => setActiveView("ops")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "ops" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <Users size={20} />
-              <span className="font-medium">Gestión OPS</span>
-            </button>
-          )}
-
-          {canAccessModule("comisiones") && (
-            <button
-              onClick={() => setActiveView("comisiones")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "comisiones" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <Map size={20} />
-              <span className="font-medium">Gestión Comisiones</span>
-            </button>
-          )}
-
-          {canAccessModule("polizas") && (
-            <button
-              onClick={() => setActiveView("polizas")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "polizas" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <ShieldCheck size={20} />
-              <span className="font-medium">Gestión Pólizas</span>
-            </button>
-          )}
-
-          {canAccessModule("documents") && (
-            <button
-              onClick={() => setActiveView("documents")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeView === "documents" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <FileText size={20} />
-              <span className="font-medium">Repositorio Documental</span>
-            </button>
-          )}
-
-          {canAccessModule("encuestas") && (
-            <button
-              onClick={() => setActiveView("encuestas")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${(activeView as string) === "encuestas" ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-slate-800 hover:text-white"}`}
-            >
-              <ClipboardCheck size={20} />
-              <span className="font-medium">Módulo de Encuestas</span>
-            </button>
-          )}
-        </nav>
-
-        <div className="p-4 border-t border-slate-800 space-y-2">
-          {isPublicUser ? (
-            <button
-              onClick={() => setShowAuth(true)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-colors border border-indigo-500/30"
-            >
-              <LockIcon size={20} />
-              <span className="font-medium">Sincronizar Nube</span>
-            </button>
-          ) : (
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 hover:text-rose-400 transition-colors"
-            >
-              <LogOut size={20} />
-              <span className="font-medium">Salir</span>
-            </button>
-          )}
-
-          <input
-            type="file"
-            accept=".json"
-            ref={fileInputRef}
-            onChange={handleImportData}
-            className="hidden"
-          />
-          {(userRole === "admin" || isPublicUser) && (
-            <>
-              <button
-                onClick={handleInjectTestProject}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors mb-2"
+    <div className="h-screen flex flex-col overflow-hidden text-slate-800 bg-slate-50">
+      <Toaster position="top-right" richColors />
+      {/* Header */}
+      <header className="h-auto min-h-16 py-3 lg:py-0 lg:h-16 bg-white border-b border-slate-250 text-slate-800 flex flex-col lg:flex-row items-center justify-between px-6 shrink-0 z-40 gap-3 lg:gap-0 shadow-sm">
+        <div className="flex items-center gap-4 w-full lg:w-auto overflow-x-auto scrollbar-hide pb-1 lg:pb-0">
+          <div className="w-10 h-10 bg-emerald-600 text-white rounded-lg flex items-center justify-center font-black text-xl italic uppercase shrink-0">P</div>
+          <div className="flex items-center gap-4 shrink-0">
+            <div>
+              <h1 className="text-xl font-black tracking-tight leading-none uppercase text-emerald-800">PN26</h1>
+              <p className="text-[10px] text-slate-500 font-bold tracking-widest mt-1 uppercase hidden sm:block">Plataforma de Navegación</p>
+            </div>
+            
+            {/* Sync Indicator */}
+            {isAdmin && (
+              <button 
+                onClick={syncData}
+                title={`Forzar Sincronización. Última act: ${lastSynced ? lastSynced.toLocaleTimeString() : 'N/A'}`}
+                className="ml-2 sm:ml-4 flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 text-slate-700 transition"
               >
-                <Database size={20} />
-                <span className="font-medium text-left leading-tight">
-                  Cargar Proyecto de Ejemplo
+                {syncStatus === 'syncing' && <RefreshCw className="w-3.5 h-3.5 text-emerald-500 animate-spin" />}
+                {syncStatus === 'success' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                {syncStatus === 'error' && <CloudOff className="w-3.5 h-3.5 text-red-500" />}
+                {syncStatus === 'idle' && <Cloud className="w-3.5 h-3.5 text-slate-400" />}
+                
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider hidden md:inline-block">
+                  {syncStatus === 'syncing' 
+                    ? 'Sincronizando...' 
+                    : syncStatus === 'success' 
+                      ? `${supabaseLog?.events || 0} charlas • ${supabaseLog?.rooms || 0} salas` 
+                      : syncStatus === 'error' 
+                        ? 'Error Sync' 
+                        : 'Sync'}
                 </span>
               </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 hover:text-emerald-400 transition-colors"
+            )}
+          </div>
+        </div>
+        <div className="flex gap-2 sm:gap-3 items-center w-full lg:w-auto overflow-x-auto scrollbar-hide pb-1 lg:pb-0">
+          {isAdmin && (
+            <>
+              <button 
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-emerald-500 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-[10px] font-black transition-colors uppercase tracking-widest text-white shadow-md shrink-0"
+                onClick={() => openQRHub('DIRECTORY')}
               >
-                <CloudUpload size={20} />
-                <span className="font-medium">Importar Datos</span>
+                <Users className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Directorio</span>
               </button>
-              <button
-                onClick={handleExportData}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 hover:text-indigo-400 transition-colors"
+              <button 
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-teal-500 bg-teal-600 hover:bg-teal-500 rounded-lg text-[10px] font-black transition-colors uppercase tracking-widest text-white shadow-md shrink-0"
+                onClick={() => openQRHub('ROOM')}
               >
-                <CloudDownload size={20} />
-                <span className="font-medium">Exportar Datos</span>
+                <QrCode className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Escáner</span>
               </button>
-              <button
-                onClick={handleClearCache}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 hover:text-rose-400 transition-colors"
+              <button 
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg text-[10px] font-black transition-colors uppercase tracking-widest shrink-0"
+                onClick={() => setIsAdminOpen(true)}
               >
-                <RefreshCw size={20} />
-                <span className="font-medium">Limpiar Caché Local</span>
+                <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Config</span>
+              </button>
+              <button 
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50 hover:bg-red-100 rounded-lg text-[10px] font-black transition-colors uppercase tracking-widest text-red-700 shrink-0"
+                onClick={() => signOut()}
+                title="Salir del modo administrador"
+              >
+                <LogOut className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Salir</span>
               </button>
             </>
           )}
         </div>
-      </aside>
+      </header>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Top Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span
-              className="hover:text-slate-900 cursor-pointer transition-colors"
-              onClick={handleBackToDashboard}
-            >
-              Inicio
-            </span>
-            {activeView === "project" && selectedProject && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium truncate max-w-[300px]">
-                  {selectedProject.project.nombre}
-                </span>
-              </>
-            )}
-            {activeView === "inteligencia" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Centro de Inteligencia
-                </span>
-              </>
-            )}
-            {activeView === "centroControl" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Centro de Control SRR
-                </span>
-              </>
-            )}
-            {activeView === "mapa" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Mapa Territorial
-                </span>
-              </>
-            )}
-            {activeView === "matriz" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Matriz de Seguimiento SRR
-                </span>
-              </>
-            )}
-            {activeView === "informes" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Generador de Informes Institucionales
-                </span>
-              </>
-            )}
-            {activeView === "agenda" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">Agenda y PMU</span>
-              </>
-            )}
-            {activeView === "tareas" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Tareas y Notificaciones
-                </span>
-              </>
-            )}
-            {activeView === "vigencias" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Vigencias e Inversión
-                </span>
-              </>
-            )}
-            {activeView === "contractors" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Perfil de Contratista
-                </span>
-              </>
-            )}
-            {activeView === "documents" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Repositorio Documental
-                </span>
-              </>
-            )}
-            {activeView === "laboratorio" && (
-              <>
-                <span>/</span>
-                <span className="text-slate-900 font-medium">
-                  Laboratorio Financiero
-                </span>
-              </>
-            )}
-          </div>
+      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+        
+        {/* Hero Interactive Map */}
+        <div className="h-[35vh] lg:h-[45vh] shrink-0 border-b border-slate-200 relative z-10 shadow-sm bg-white">
+            <InteractiveMap rooms={rooms} onSelectRoom={(id) => setSelectedRoom(prev => prev === id ? 'All' : id)} />
+        </div>
 
-          <div className="flex items-center gap-6">
-            {/* Sync Controls */}
-            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 border-r border-slate-200 text-xs font-semibold">
-                {!isCloudCheckComplete ? (
-                  <>
-                    <Loader2
-                      size={12}
-                      className="animate-spin text-indigo-500"
-                    />
-                    <span className="text-slate-500">Conectando...</span>
-                  </>
-                ) : hasSyncedWithCloud ? (
-                  <>
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-emerald-600 font-medium">
-                      Nube Activa ({state.proyectos.length})
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Database size={12} className="text-slate-400" />
-                    <span className="text-slate-500">Solo Local</span>
-                  </>
-                )}
-              </div>
-              <button
-                onClick={handleSaveToCloud}
-                disabled={syncing || !isSupabaseConfigured}
-                title="Sincronizar con la nube (Subir)"
-                className="p-2 text-slate-600 hover:bg-white hover:text-indigo-600 rounded-lg transition-all disabled:opacity-50"
-              >
-                {syncing ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <CloudUpload size={18} />
-                )}
-              </button>
-              <button
-                onClick={handleLoadFromCloud}
-                disabled={syncing || !isSupabaseConfigured}
-                title="Cargar desde la nube (Descargar)"
-                className="p-2 text-slate-600 hover:bg-white hover:text-indigo-600 rounded-lg transition-all disabled:opacity-50"
-              >
-                <CloudDownload size={18} />
-              </button>
-              <button
-                onClick={repairAllUrls}
-                disabled={syncing}
-                title="Reparar URLs de Almacenamiento"
-                className="p-2 text-slate-600 hover:bg-white hover:text-amber-600 rounded-lg transition-all disabled:opacity-50"
-              >
-                <RefreshCw
-                  size={18}
-                  className={syncing ? "animate-spin" : ""}
-                />
-              </button>
-
-              {/* Botones de Rescate JSON */}
-              <div className="flex items-center gap-1 border-l border-slate-200 ml-1 pl-1">
-                <button
-                  onClick={handleExportData}
-                  title="Exportar copia de seguridad (JSON)"
-                  className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
-                >
-                  <Download size={18} />
-                </button>
-                <label className="p-2 text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer">
-                  <FileText size={18} />
-                  <input
-                    type="file"
-                    accept=".json"
-                    className="hidden"
-                    onChange={handleImportData}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar */}
+          <aside className="hidden lg:flex w-80 bg-white border-r border-slate-200 p-6 flex-col gap-8 overflow-y-auto relative z-20">
+               <div className="relative z-10">
+                 <FilterBar 
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    selectedType={selectedType}
+                    setSelectedType={setSelectedType}
+                    selectedRoom={selectedRoom}
+                    setSelectedRoom={setSelectedRoom}
+                    rooms={rooms}
                   />
-                </label>
-              </div>
+               </div>
+          </aside>
 
-              {syncError && (
-                <div
-                  className="px-2 text-xs text-rose-500 font-medium max-w-[150px] truncate"
-                  title={syncError}
-                >
-                  Error
-                </div>
-              )}
+          <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 relative">
+            
+            {/* Days & Main Navigation */}
+            <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 shadow-sm z-30">
+               <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto scroller-hide">
+                  {availableDays.map((day, index) => (
+                    <button
+                      key={day}
+                      onClick={() => setSelectedDay(day)}
+                      className={classNames(
+                        "flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest whitespace-nowrap",
+                        selectedDay === day 
+                          ? "bg-white text-slate-800 shadow-sm scale-[1.02] border border-slate-200" 
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      DÍA {index + 1}
+                    </button>
+                  ))}
+                  {availableDays.length === 0 && (
+                     <div className="px-6 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Aún no hay días</div>
+                  )}
+               </div>
+
+               <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scroller-hide">
+                  <button 
+                    onClick={() => setViewMode('All')}
+                    className={classNames(
+                      "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border",
+                      viewMode === 'All' ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    )}
+                  >
+                    AGENDA GENERAL
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('MyAgenda')}
+                    className={classNames(
+                      "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap border",
+                      viewMode === 'MyAgenda' ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    )}
+                  >
+                    <Bookmark className="w-3.5 h-3.5" /> MIS SESIONES ({bookmarks.size})
+                  </button>
+               </div>
             </div>
 
-            <div className="relative">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Buscar proyecto, NIT, contrato..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-slate-100 border-transparent rounded-full text-sm focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all w-64"
-              />
-            </div>
-            <button className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors">
-              <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>
-            </button>
-            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm border border-indigo-200">
-              AD
-            </div>
-          </div>
-        </header>
+          <main className="flex-1 overflow-y-auto p-6 md:p-8">
+             <div className="max-w-7xl mx-auto">
+                 {viewMode === 'MyAgenda' && bookmarks.size === 0 ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-slate-400 bg-white rounded-3xl border-2 border-dashed border-slate-200 shadow-sm">
+                    <Bookmark className="w-12 h-12 mb-4 opacity-20" />
+                    <p className="font-bold uppercase tracking-widest text-xs">No tienes sesiones guardadas aún</p>
+                    <button onClick={() => setViewMode('All')} className="mt-4 text-blue-600 text-[10px] font-black uppercase hover:underline">Ir a la agenda general</button>
+                  </div>
+                ) : Object.keys(groupedEvents).length === 0 ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-slate-400">
+                    <Calendar className="w-12 h-12 mb-4 opacity-20" />
+                    <p className="font-bold uppercase tracking-widest text-xs">No se encontraron sesiones</p>
+                    <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest">Prueba ajustando los filtros o la búsqueda</p>
+                  </div>
+                ) : (
+                  <div className="space-y-12 pb-20">
+                    {Object.entries(groupedEvents).map(([dayKey, timeGroups]) => (
+                      <div key={dayKey} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="space-y-6">
+                          {Object.entries(timeGroups).sort().map(([time, events]) => (
+                            <div key={time} className="grid grid-cols-1 lg:grid-cols-[120px_1fr] gap-4 md:gap-8 border-b border-slate-200 pb-8 last:border-0 relative z-10">
+                              {/* Time Block Column */}
+                              <div className="lg:sticky lg:top-8 self-start">
+                                <div className="bg-emerald-50 text-emerald-800 border-2 border-emerald-200/50 px-4 py-3 rounded-2xl inline-block lg:block text-center shadow-sm">
+                                  <span className="text-lg font-black tracking-tighter">
+                                    {formatTime(time)}
+                                  </span>
+                                </div>
+                              </div>
 
-        {/* Scrollable Content Area */}
-        <div
-          className={`flex-1 overflow-auto ${activeView === "matriz" || activeView === "centroControl" || activeView === "vista360" ? "p-0 bg-slate-100" : "p-8"}`}
-        >
-          {activeView === "crearProyecto" && (
-            <div className="h-full p-4">
-              <CreateProjectForm
-                onSave={(p) => {
-                  addProject(p);
-                  setActiveView("dashboard");
-                }}
-                onCancel={() => setActiveView("flujo")}
-              />
-            </div>
-          )}
-          {activeView === "dashboard" && (
-            <Dashboard
-              projects={projectsData}
-              onSelectProject={handleProjectSelect}
-              onManageLiquidation={(project) => {
-                setSelectedProjectId(project.project.id);
-                setActiveView("flujo");
-              }}
-            />
-          )}
-          {activeView === "vista360" && selectedProject && (
-            <Vista360
-              project={selectedProject}
-              onBack={() => setActiveView("dashboard")}
-            />
-          )}
-          {activeView === "project" && selectedProject && (
-            <ProjectDetails
-              data={selectedProject}
-              onBack={handleBackToDashboard}
-              onUpdateProject={handleUpdateProject}
-              onOpenVista360={() => setActiveView("vista360")}
-            />
-          )}
-          {activeView === "matriz" && (
-            <div className="h-full p-4">
-              <MatrizInteligente
-                projects={projectsData}
-                onUpdateProject={handleUpdateProject}
-                onSelectProject={handleProjectSelect}
-              />
-            </div>
-          )}
-          {activeView === "informes" && (
-            <div className="h-full p-4">
-              <GeneradorInformes
-                projects={projectsData}
-                initialProjectId={reportProjectId}
-              />
-            </div>
-          )}
-          {activeView === "tareas" && (
-            <div className="h-full p-4">
-              <TaskBoard />
-            </div>
-          )}
-          {activeView === "inteligencia" && (
-            <div className="h-full p-4">
-              <CentroInteligenciaSRR
-                projects={projectsData}
-                professionals={state.professionals}
-              />
-            </div>
-          )}
-          {activeView === "priorizacion" && (
-            <div className="h-full p-4 overflow-y-auto">
-              <PriorizacionInversion
-                projects={projectsData.map((p) => p.project)}
-                departmentsData={dynamicDepartments}
-              />
-            </div>
-          )}
-          {activeView === "riesgoDashboard" && (
-            <div className="h-full p-4 overflow-y-auto">
-              <RiskDashboard
-                contracts={state.contratos}
-                otrosies={state.otrosies}
-                pagos={state.pagos}
-                reports={state.informesInterventoria}
-                projects={projectsData}
-              />
-            </div>
-          )}
-          {activeView === "agenda" && (
-            <div className="h-full bg-slate-50">
-              <AgendaPMU />
-            </div>
-          )}
-          {activeView === "eventos" && (
-            <div className="h-full bg-slate-50 overflow-y-auto">
-              <EventosDashboard />
-            </div>
-          )}
-          {activeView === "flujo" && (
-            <div className="h-full">
-              <FlujoInstitucional
-                initialSelectedProjectId={selectedProjectId}
-                onGoToProjectDetails={(projectId) => {
-                  setSelectedProjectId(projectId);
-                  setActiveView("project");
-                }}
-                onCreateProject={() => setActiveView("crearProyecto")}
-              />
-            </div>
-          )}
-          {activeView === "vigencias" && (
-            <div className="h-full p-4">
-              <VigenciaModule />
-            </div>
-          )}
-          {activeView === "contractors" && (
-            <div className="h-full p-4">
-              <ContractorProfile
-                onSelectProject={(projectId) => {
-                  setSelectedProjectId(projectId);
-                  setActiveView("project");
-                }}
-              />
-            </div>
-          )}
-          {activeView === "documents" && (
-            <div className="h-full p-4">
-              <DocumentRepository />
-            </div>
-          )}
-          {activeView === "ops" && (
-            <div className="h-full p-4">
-              <GestionOPS projectId={selectedProjectId || ""} />
-            </div>
-          )}
-          {activeView === "comisiones" && (
-            <div className="h-full p-4">
-              <GestionComisiones projectId={selectedProjectId || ""} />
-            </div>
-          )}
-          {activeView === "polizas" && (
-            <div className="h-full p-4">
-              <GestionPolizas projectId={selectedProjectId || ""} />
-            </div>
-          )}
-          {activeView === "financiera" && (
-            <div className="h-full">
-              <ProteccionFinanciera />
-            </div>
-          )}
-          {activeView === "laboratorio" && (
-            <div className="h-full overflow-y-auto">
-              <LaboratorioFinanciero />
-            </div>
-          )}
-          {activeView === "micr" && (
-            <div className="h-full">
-              <MicRModule />
-            </div>
-          )}
-          {activeView === "centroControl" && (
-            <CentroControlSRR
-              projects={projectsData}
-              onGenerateReport={handleGenerateReport}
-            />
-          )}
-          {activeView === "mapa" && (
-            <div className="h-full p-4">
-              <ColombiaMap
-                projects={projectsData}
-                departmentsData={dynamicDepartments}
-                threats={mockThreats}
-                onOpenPanel={handleOpenPanel}
-                onSelectProject={(project) => {
-                  setSelectedProjectId(project.project.id);
-                  setActiveView("project");
-                }}
-              />
-              {selectedDept && (
-                <TerritorialPanel
-                  dept={selectedDept}
-                  projects={projectsData}
-                  threats={mockThreats}
-                  onClose={() => setSelectedDept(null)}
-                  onSelectProject={(project) => {
-                    setSelectedProjectId(project.project.id);
-                    setActiveView("project");
-                    setSelectedDept(null);
-                  }}
-                />
-              )}
-            </div>
-          )}
+                              {/* Sessions Cards Grid */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {events.map(event => (
+                                  <AgendaCard
+                                    key={event.id}
+                                    event={event}
+                                    room={rooms.find(r => r.id === event.roomId)}
+                                    isBookmarked={bookmarks.has(event.id)}
+                                    onToggleBookmark={toggleBookmark}
+                                    onClickRoom={handleRoomClick}
+                                    onClickCard={() => handleCardClick(event)}
+                                  />
+                                ))}
+                              </div>
+
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+             </div>
+
+             {/* QR Code Section for feedback */}
+             <div className="max-w-[15rem] mx-auto mt-6 mb-8 flex flex-col items-center justify-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm text-center">
+                 <h3 className="font-black text-emerald-800 tracking-tight leading-tight mb-2 uppercase text-sm">Déjanos conocer tu opinión</h3>
+                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">Escanea el código QR</p>
+                 <div className="p-3 bg-white border-2 border-emerald-50 rounded-xl shadow-sm">
+                   <QRCode value="https://symmetrical-succotash-1.onrender.com/q/plataforma2026" size={120} fgColor="#064e3b" />
+                 </div>
+             </div>
+          </main>
         </div>
-      </main>
+      </div>
+    </div>
 
-      {/* Global Alert Modal */}
-      {alertMessage && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 text-center animate-in zoom-in duration-200">
-            <div className="mx-auto w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4">
-              <AlertTriangle size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Aviso</h3>
-            <p className="text-slate-600 mb-6">{alertMessage}</p>
-            <button
-              onClick={() => setAlertMessage(null)}
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
+    <RoomModal 
+        room={activeRoomModal} 
+        onClose={() => setActiveRoomModal(null)}
+        onFilterByRoom={(roomId) => {
+          setSelectedRoom(roomId);
+          setActiveRoomModal(null);
+        }}
+      />
+
+      <EventModal
+        event={activeEventModal}
+        room={activeEventModal ? rooms.find(r => r.id === activeEventModal.roomId) : undefined}
+        isBookmarked={activeEventModal ? bookmarks.has(activeEventModal.id) : false}
+        isRegistered={activeEventModal ? registrations.has(activeEventModal.id) : false}
+        onClose={() => setActiveEventModal(null)}
+        onToggleBookmark={toggleBookmark}
+        onRoomClick={handleRoomClick}
+        onRegister={activeEventModal ? () => registerForEvent(activeEventModal.id) : () => {}}
+        onCancelRegistration={activeEventModal ? () => cancelRegistration(activeEventModal.id) : () => {}}
+      />
+
+      {activeAdminEventModal && (
+        <AdminEventDetailsModal
+          event={activeAdminEventModal}
+          room={rooms.find(r => r.id === activeAdminEventModal.roomId)}
+          onClose={() => setActiveAdminEventModal(null)}
+        />
+      )}
+
+      {isAdminOpen && (
+          <AdminPanel 
+            rooms={rooms}
+            setRooms={setRooms}
+            events={events}
+            setEvents={setEventsData}
+            onClose={() => setIsAdminOpen(false)}
+            onEventClick={(event) => setActiveAdminEventModal(event)}
+            syncData={syncData}
+            deleteEvent={deleteEvent}
+            saveEvent={saveEvent}
+            saveRoom={saveRoom}
+            deleteRoom={deleteRoom}
+            supabaseLog={supabaseLog}
+            clearLocalCache={clearLocalCache}
+          />
+      )}
+
+      {isQRHubOpen && (
+        <QRControlPanel 
+          rooms={rooms}
+          initialTab={qrHubInitialTab}
+          onClose={() => setIsQRHubOpen(false)}
+        />
       )}
     </div>
   );
 }
-
-export default App;
