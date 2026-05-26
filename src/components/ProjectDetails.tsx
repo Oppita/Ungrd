@@ -367,14 +367,40 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, on
                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
                   <h4 className="font-medium text-slate-700 mb-4">Métricas de Avance</h4>
                   
-                  <div className="mb-4">
+                  <div className="mb-6">
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-500">Avance Físico</span>
-                      <span className="font-bold text-slate-900">{project.avanceFisico}%</span>
+                      <span className="text-slate-500 font-bold">Avance Físico</span>
+                      <span className="font-black text-slate-900 text-lg">{project.avanceFisico}%</span>
                     </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2.5">
-                      <div className="bg-indigo-500 h-2.5 rounded-full" style={{ width: `${project.avanceFisico}%` }}></div>
+                    <div className="w-full bg-slate-200 rounded-full h-2.5 mb-3">
+                      <div className="bg-indigo-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${project.avanceFisico}%` }}></div>
                     </div>
+                    
+                    {project.historialAvances && project.historialAvances.length > 0 && (
+                      <div className="mt-4 bg-white border border-indigo-100 rounded-lg p-4">
+                         <h5 className="text-[10px] uppercase tracking-widest font-black text-indigo-700 mb-3 flex items-center gap-2">
+                           <Activity size={12} />
+                           Trazabilidad de Ejecución Física
+                         </h5>
+                         <div className="space-y-4">
+                           {[...project.historialAvances].reverse().map((h, i, arr) => (
+                             <div key={i} className="flex items-start gap-3 text-xs relative">
+                               {i < arr.length - 1 && <div className="absolute left-[7px] top-4 w-px h-[calc(100%+16px)] bg-slate-200 z-0"></div>}
+                               <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 z-10 ${i === 0 ? 'bg-indigo-600 ring-2 ring-indigo-200' : 'bg-slate-300'}`}>
+                                 <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+                               </div>
+                               <div className="flex-1">
+                                 <div className="flex justify-between items-center mb-1">
+                                   <span className={`font-bold text-sm ${i === 0 ? 'text-indigo-900' : 'text-slate-600'}`}>{h.valor}%</span>
+                                   <span className="text-slate-400">{new Date(h.fecha).toLocaleDateString()}</span>
+                                 </div>
+                                 <div className="text-slate-500">Origen: {h.origenTipo} <span className="font-mono text-[9px] text-slate-400 bg-slate-100 px-1 py-0.5 rounded truncate inline-block max-w-[100px] align-bottom">ID: {h.origenId}</span></div>
+                               </div>
+                             </div>
+                           ))}
+                         </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
