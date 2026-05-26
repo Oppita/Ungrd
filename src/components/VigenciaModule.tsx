@@ -5,6 +5,7 @@ import { InvestmentDashboard } from './InvestmentDashboard';
 import { SigfdDashboard } from './SigfdDashboard';
 import { ConfirmationModal } from './ConfirmationModal';
 import { ConvenioDocumentManager } from './ConvenioDocumentManager';
+import { ConvenioVisualizer } from './ConvenioVisualizer';
 import { AIProviderSelector } from './AIProviderSelector';
 import { LineaInversionDetailView } from './LineaInversionDetailView';
 import { useProject } from '../store/ProjectContext';
@@ -72,6 +73,7 @@ export const VigenciaModule: React.FC = () => {
   const [pasteText, setPasteText] = useState('');
   const [editPasteText, setEditPasteText] = useState('');
   const [managingConvenioDocs, setManagingConvenioDocs] = useState<string | null>(null);
+  const [viewingConvenioVisualizer, setViewingConvenioVisualizer] = useState<string | null>(null);
   const [newConvenio, setNewConvenio] = useState({ 
     numero: '', 
     nombre: '', 
@@ -1341,7 +1343,25 @@ export const VigenciaModule: React.FC = () => {
                         {c.estado}
                       </span>
                       <button 
-                        onClick={() => setManagingConvenioDocs(managingConvenioDocs === c.id ? null : c.id)} 
+                        onClick={() => {
+                          setViewingConvenioVisualizer(viewingConvenioVisualizer === c.id ? null : c.id);
+                          setManagingConvenioDocs(null);
+                        }} 
+                        className={`p-2 rounded-lg transition-colors flex items-center gap-1.5 ${
+                          viewingConvenioVisualizer === c.id 
+                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' 
+                            : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+                        }`}
+                        title="Visor Gráfico del Convenio e Interactivo"
+                      >
+                        <PieChart size={18} />
+                        {viewingConvenioVisualizer === c.id && <span className="text-[10px] font-bold uppercase tracking-widest">Cerrar Visor</span>}
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setManagingConvenioDocs(managingConvenioDocs === c.id ? null : c.id);
+                          setViewingConvenioVisualizer(null);
+                        }} 
                         className={`p-2 rounded-lg transition-colors flex items-center gap-1.5 ${
                           managingConvenioDocs === c.id 
                             ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
@@ -1358,6 +1378,7 @@ export const VigenciaModule: React.FC = () => {
                   </div>
                 )}
                 {managingConvenioDocs === c.id && <ConvenioDocumentManager convenio={c} />}
+                {viewingConvenioVisualizer === c.id && <ConvenioVisualizer convenio={c} projects={state.proyectos.filter(p => p.convenioId === c.id)} />}
               </div>
             ))}
           </div>
