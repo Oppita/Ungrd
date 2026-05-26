@@ -1,2508 +1,1667 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { ProjectData, Avance, Seguimiento, ProjectDocument, Contract, Otrosie } from '../types';
-import { useProject } from '../store/ProjectContext';
-import { StatusBadge } from './Dashboard';
-import { downloadFileWithAutoRepair, uploadDocumentToStorage, getIframeSafeUrl } from '../lib/storage';
-import { 
-  ArrowLeft, Building2, FileText, DollarSign, Activity, 
-  AlertTriangle, Leaf, Calendar, MapPin, Target, Users,
-  Paperclip, Image as ImageIcon, Download, CheckCircle2, Clock, ShieldAlert,
-  PlusCircle, Eye, Upload, Trash2, Edit2, ChevronDown, ChevronUp, Globe,
-  BrainCircuit, TrendingUp, TrendingDown, Zap, ShieldAlert as ShieldAlertIcon, X,
-  Briefcase, Shield, FileWarning, Search, Filter, MoreVertical,
-  Layers, PieChart as PieChartIcon, LayoutDashboard, Share2, Sparkles, ShieldCheck
-} from 'lucide-react';
-import { generatePDF as generatePDFUtil } from '../utils/pdfGenerator';
-import { PredictiveAnalytics } from './PredictiveAnalytics';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
-import { calculateContractTotals, calculateProjectTotals } from '../utils/projectCalculations';
-import { InterventoriaReportsTab } from './InterventoriaReportsTab';
-import { ComisionesTerritorio } from './ComisionesTerritorio';
-import { FinancialExecutionModule } from './FinancialExecutionModule';
-import { ProjectDocumentsTab } from './ProjectDocumentsTab';
-import { AddOtrosieForm } from './AddOtrosieForm';
-import { ChecklistLiquidacion } from './ChecklistLiquidacion';
-import { AddContractForm } from './AddContractForm';
-import { ProjectHierarchyTree } from './ProjectHierarchyTree';
-import { ContractTimeline } from './ContractTimeline';
-import { RiskDashboard } from './RiskDashboard';
-import { ContratosDetallados } from './ContratosDetallados';
-import { AvancesGraficos } from './AvancesGraficos';
-import { GestionOPS } from './GestionOPS';
-import { GestionComisiones } from './GestionComisiones';
-import { EditProjectModal } from './EditProjectModal';
-import { SmartTimeline } from './SmartTimeline';
-import { ProjectRadiography } from './ProjectRadiography';
-import { ScheduleReconstructor } from './ScheduleReconstructor';
-import { InformeAnalysisComponent } from './InformeAnalysis';
-import { ActasYSuspensionesTab } from './ActasYSuspensionesTab';
-import { CompromisosTab } from './CompromisosTab';
-import { ImpactoTerritorialDashboard } from './ImpactoTerritorialDashboard';
-import { FinancialImpactDashboard } from './FinancialImpactDashboard';
-import { EditContractModal } from './EditContractModal';
-import { EditConvenioModal } from './EditConvenioModal';
-import { GestionPolizas } from './GestionPolizas';
-import { ActividadesProyecto } from './ActividadesProyecto';
-
-interface ProjectDetailsProps {
-  data: ProjectData;
-  onBack: () => void;
-  onUpdateProject?: (projectId: string, section: string, field: string, value: any) => void;
-  onOpenVista360?: () => void;
-}
-
-
-
-export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ data, onBack, onUpdateProject, onOpenVista360 }) => {
-  const { state, deleteProject, deleteContract, deleteOtrosie, updateOtrosie } = useProject();
-  const [activeTab, setActiveTab] = useState<TabType>('resumen');
-  const [activeSubTabTerritorio, setActiveSubTabTerritorio] = useState<string>('actividades');
-  const [activeSubTabMonitoreo, setActiveSubTabMonitoreo] = useState<string>('alertas');
-  const [activeSubTabContratos, setActiveSubTabContratos] = useState<string>('jerarquia');
-  const [activeSubTabResumen, setActiveSubTabResumen] = useState<string>('nucleo');
-  const [activeSubTabDocumentos, setActiveSubTabDocumentos] = useState<string>('repositorio');
-
-  const [editingContract, setEditingContract] = useState<Contract | null>(null);
-  const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [showAddContract, setShowAddContract] = useState(false);
-  const [showAddOtrosie, setShowAddOtrosie] = useState(false);
-  const [showFinancialModal, setShowFinancialModal] = useState(false);
-  const [selectedOtrosie, setSelectedOtrosie] = useState<Otrosie | null>(null);
-  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [contractToDelete, setContractToDelete] = useState<string | null>(null);
-  const [otrosieToDelete, setOtrosieToDelete] = useState<string | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showEditConvenioModal, setShowEditConvenioModal] = useState(false);
-
-  const [isUploadingOtrosiePDF, setIsUploadingOtrosiePDF] = useState(false);
-
-  const calculatePlazo = (start: string, end: string) => {
-    if (!start || !end) return 0;
-    const d1 = new Date(start);
-    const d2 = new Date(end);
-    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0;
-    const diffTime = d2.getTime() - d1.getTime();
-    if (diffTime < 0) return 0;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-    return Number((diffDays / 30).toFixed(1));
-  };
-
-  const handleUploadOtrosiePDF = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0 || !selectedOtrosie) return;
-    const file = e.target.files[0];
-    setIsUploadingOtrosiePDF(true);
-    try {
-      const url = await uploadDocumentToStorage(file, `Contratos/${selectedOtrosie.contractId || 'general'}/Otrosies`);
-      const updated = { ...selectedOtrosie, documentoUrl: url, documentoNombre: file.name };
-      setSelectedOtrosie(updated);
-      updateOtrosie(updated);
-    } catch(err) {
-      alert("Error subiendo el archivo: " + String(err));
-    } finally {
-      setIsUploadingOtrosiePDF(false);
-    }
-  };
-  const [showAlerts, setShowAlerts] = useState(true);
-  const reportRef = useRef<HTMLDivElement>(null);
-  const { 
-    project, 
-    contracts, 
-    otrosies, 
-    afectaciones, 
-    presupuesto, 
-    avances, 
-    alerts, 
-    environmental, 
-    seguimientos,
-    pagos = [],
-    interventoriaReports: reports = []
-  } = data;
-
-  const convenio = useMemo(() => 
-    state.convenios.find(c => c.id === project.convenioId),
-    [state.convenios, project.convenioId]
-  );
-
-  const convenioTotals = useMemo(() => {
-    if (!convenio) return null;
-    return calculateProjectTotals(
-      project, 
-      state.contratos, 
-      state.otrosies, 
-      state.convenios, 
-      state.afectaciones || [], 
-      state.pagos || [], 
-      state.suspensiones || [], 
-      [], 
-      state.proyectos,
-      undefined,
-      state.presupuestos
-    );
-  }, [convenio, project, state.contratos, state.otrosies, state.convenios, state.afectaciones, state.pagos, state.suspensiones, state.proyectos]);
-
-  const timeProgress = useMemo(() => {
-    if (!convenio || !convenio.fechaInicio || !convenio.fechaFin) return 0;
-    const start = new Date(convenio.fechaInicio).getTime();
-    const end = new Date(convenio.fechaFin).getTime();
-    const now = new Date().getTime();
-    if (now < start) return 0;
-    if (now > end) return 100;
-    return ((now - start) / (end - start)) * 100;
-  }, [convenio]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
-  };
-  type TabType = 'resumen' | 'contratos' | 'financiero' | 'monitoreo' | 'territorio' | 'documentos' | 'polizas' | 'actividades';
-  const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: 'resumen', label: 'Resumen e Impacto', icon: <Target size={18} /> },
-    { id: 'contratos', label: 'Gestión y Contratos', icon: <Briefcase size={18} /> },
-    { id: 'financiero', label: 'Eje Financiero', icon: <DollarSign size={18} /> },
-    { id: 'monitoreo', label: 'PILA Inteligencia (IA)', icon: <BrainCircuit size={18} /> },
-    { id: 'territorio', label: 'Despliegue Territorial', icon: <MapPin size={18} /> },
-    { id: 'documentos', label: 'Archivo Digital', icon: <FileText size={18} /> },
-  ];
-
-  // --- CAPA 7: GENERADOR AUTOMÁTICO DE INFORMES ---
-  const generatePDF = async () => {
-    if (!reportRef.current) return;
-    setIsGeneratingPDF(true);
-    
-    try {
-      await generatePDFUtil(reportRef.current, {
-        filename: `Informe_Semanal_${project.id}.pdf`,
-        backgroundColor: '#ffffff'
-      });
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-    } finally {
-      setIsGeneratingPDF(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-      {/* Header */}
-      <div className="flex items-start gap-4">
-        <button 
-          onClick={onBack}
-          className="p-2 mt-1 rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-sm font-mono font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-              {project.id}
-            </span>
-            <StatusBadge status={project.estado} />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">{project.nombre}</h1>
-          <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
-            <div className="flex items-center gap-1.5">
-              <MapPin size={16} />
-              <span>{project.municipio}, {project.departamento}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Building2 size={16} />
-              <span>{project.tipoObra}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Calendar size={16} />
-              <span>{project.fechaInicio} — {project.fechaFin}</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFinancialModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg font-medium transition-colors shadow-sm"
-          >
-            <DollarSign size={18} />
-            Módulo Financiero
-          </button>
-          {onOpenVista360 && (
-            <button
-              onClick={onOpenVista360}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-medium transition-colors shadow-sm"
-            >
-              <Globe size={18} />
-              Vista 360°
-            </button>
-          )}
-          <button
-            onClick={() => setShowEditModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg font-medium transition-colors"
-          >
-            <Edit2 size={18} />
-            Editar Proyecto
-          </button>
-          <button
-            onClick={() => setShowDeleteModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-medium transition-colors"
-          >
-            <Trash2 size={18} />
-            Borrar Proyecto
-          </button>
-        </div>
-      </div>
-
-      {showEditModal && (
-        <EditProjectModal 
-          project={project} 
-          presupuesto={presupuesto}
-          onClose={() => setShowEditModal(false)} 
-        />
-      )}
-
-      {showFinancialModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4">
-          <div className="bg-slate-50 rounded-3xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in duration-300">
-            <div className="bg-indigo-700 p-6 text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <DollarSign size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Módulo de Ejecución Financiera Centralizado</h3>
-                  <p className="text-indigo-100 text-xs font-medium">Gestión de CDP, RC y RP — {project.nombre}</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowFinancialModal(false)} 
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-8">
-              <FinancialExecutionModule projectId={project.id} />
-            </div>
-            <div className="p-4 bg-white border-t border-slate-200 flex justify-end shrink-0">
-              <button 
-                onClick={() => setShowFinancialModal(false)}
-                className="px-8 py-2.5 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-all shadow-lg shadow-slate-200"
-              >
-                Cerrar Módulo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Navigation Tabs */}
-      <div className="border-b border-slate-200">
-        <nav className="flex space-x-8 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors
-                ${activeTab === tab.id 
-                  ? 'border-indigo-500 text-indigo-600' 
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}
-              `}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Tab Content */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 min-h-[400px]">
-        
-        {activeTab === 'resumen' && (
-          <div className="flex space-x-2 overflow-x-auto mb-6 border-b border-slate-100">
-            <button onClick={() => setActiveSubTabResumen('nucleo')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabResumen === 'nucleo' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Núcleo del Proyecto</button>
-            <button onClick={() => setActiveSubTabResumen('fases')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabResumen === 'fases' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Fases y Actividad</button>
-            <button onClick={() => setActiveSubTabResumen('jerarquia')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabResumen === 'jerarquia' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Jerarquía y Eventos</button>
-            <button onClick={() => setActiveSubTabResumen('radiografia')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabResumen === 'radiografia' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Radiografía Integral</button>
-            <button onClick={() => setActiveSubTabResumen('impacto')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabResumen === 'impacto' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Impacto Territorial</button>
-          </div>
-        )}
-
-        {/* TAB 1: PROYECTO */}
-        {activeTab === 'resumen' && activeSubTabResumen === 'nucleo' && (
-          <div className="space-y-8 animate-in fade-in">
-            <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-4">Núcleo del Proyecto</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <InfoItem label="Línea de Intervención" value={project.linea} />
-                <InfoItem label="Tipo de Obra" value={project.tipoObra} />
-                <InfoItem label="Ubicación" value={`${project.municipio}, ${project.departamento}`} />
-                <InfoItem label="Beneficiarios" value={project.beneficiarios || 'No especificado'} />
-                
-                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                  <h4 className="font-bold text-indigo-900 mb-2">Fechas Clave</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-indigo-700">Inicio:</span>
-                      <span className="font-semibold text-indigo-900">{project.fechaInicio}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-indigo-700">Fin Programado:</span>
-                      <span className="font-semibold text-indigo-900">{project.fechaFin}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <button
-                    onClick={() => setShowFinancialModal(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-bold transition-all border border-indigo-200"
-                  >
-                    <DollarSign size={20} />
-                    Abrir Módulo de Ejecución Financiera
-                  </button>
-                </div>
-              </div>
-              
-              <div className="space-y-6">
-                <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
-                  <h4 className="font-medium text-slate-700 mb-4">Métricas de Avance</h4>
-                  
-                  <div className="mb-6">
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-500 font-bold">Avance Físico</span>
-                      <span className="font-black text-slate-900 text-lg">{project.avanceFisico}%</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2.5 mb-3">
-                      <div className="bg-indigo-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${project.avanceFisico}%` }}></div>
-                    </div>
-                    
-                    {project.historialAvances && project.historialAvances.length > 0 && (
-                      <div className="mt-4 bg-white border border-indigo-100 rounded-lg p-4">
-                         <h5 className="text-[10px] uppercase tracking-widest font-black text-indigo-700 mb-3 flex items-center gap-2">
-                           <Activity size={12} />
-                           Trazabilidad de Ejecución Física
-                         </h5>
-                         <div className="space-y-4">
-                           {[...project.historialAvances].reverse().map((h, i, arr) => (
-                             <div key={i} className="flex items-start gap-3 text-xs relative">
-                               {i < arr.length - 1 && <div className="absolute left-[7px] top-4 w-px h-[calc(100%+16px)] bg-slate-200 z-0"></div>}
-                               <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 z-10 ${i === 0 ? 'bg-indigo-600 ring-2 ring-indigo-200' : 'bg-slate-300'}`}>
-                                 <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
-                               </div>
-                               <div className="flex-1">
-                                 <div className="flex justify-between items-center mb-1">
-                                   <span className={`font-bold text-sm ${i === 0 ? 'text-indigo-900' : 'text-slate-600'}`}>{h.valor}%</span>
-                                   <span className="text-slate-400">{new Date(h.fecha).toLocaleDateString()}</span>
-                                 </div>
-                                 <div className="text-slate-500">Origen: {h.origenTipo} <span className="font-mono text-[9px] text-slate-400 bg-slate-100 px-1 py-0.5 rounded truncate inline-block max-w-[100px] align-bottom">ID: {h.origenId}</span></div>
-                               </div>
-                             </div>
-                           ))}
-                         </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-500">Avance Financiero</span>
-                      <span className="font-bold text-slate-900">{project.avanceFinanciero}%</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2.5">
-                      <div className="bg-emerald-500 h-2.5 rounded-full" style={{ width: `${project.avanceFinanciero}%` }}></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-medium text-slate-700">Resumen Presupuestal Detallado</h4>
-                    {project.convenioId && (
-                      <button 
-                        onClick={() => setShowEditConvenioModal(true)}
-                        className="text-[10px] font-black text-indigo-600 flex items-center gap-1 hover:text-indigo-800 transition-colors uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full"
-                      >
-                        <Edit2 size={12} />
-                        Editar Convenio
-                      </button>
-                    )}
-                  </div>
-                  {(() => {
-                    const totals = calculateProjectTotals(project, contracts, otrosies, state.convenios, state.afectaciones, pagos, project.suspensiones || [], undefined, state.proyectos, undefined, state.presupuestos);
-                    const { 
-                      valorOriginal, 
-                      valorTotal: totalPresupuestoActual,
-                      valorContratado,
-                      valorEjecutado,
-                      saldoPorContratar,
-                      saldoPorEjecutar
-                    } = totals;
-                    
-                    const convenioOtrosies = otrosies.filter(o => o.convenioId === project.convenioId || (o.contractId && contracts.some(c => c.id === o.contractId && c.tipo === 'Convenio')) || (!o.contractId && !o.convenioId));
-                    const chartData = [
-                      { name: 'Aportes FNGRD', value: totals.aportesFngrd, fill: '#4f46e5' },
-                      { name: 'Aportes Local', value: totals.aportesLocal, fill: '#10b981' },
-                      { name: 'Otros Aportes', value: totals.aportesOtros, fill: '#f59e0b' }
-                    ].filter(d => d.value > 0);
-
-                    return (
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-end">
-                           <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Valor Actualizado del Proyecto</p>
-                            <p className="text-2xl font-black text-slate-900">{formatCurrency(totalPresupuestoActual)}</p>
-                          </div>
-                        </div>
-                        
-                        {/* Detalle Presupuestal */}
-                        <div className="p-4 bg-white rounded-xl border border-slate-100 shadow-sm space-y-3">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-50 pb-2">Desglose de Aportes</p>
-                          
-                          <div className="flex justify-between items-center bg-indigo-50/30 p-2 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-indigo-600"></div>
-                              <span className="text-xs font-bold text-slate-600">Aporte FNGRD</span>
-                            </div>
-                            <span className="text-sm font-black text-indigo-700">{formatCurrency(totals.aportesFngrd)}</span>
-                          </div>
-
-                          <div className="flex justify-between items-center bg-emerald-50/30 p-2 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-emerald-600"></div>
-                              <span className="text-xs font-bold text-slate-600">Aporte Local (Distrito)</span>
-                            </div>
-                            <span className="text-sm font-black text-emerald-700">{formatCurrency(totals.aportesLocal)}</span>
-                          </div>
-
-                          <div className="flex justify-between items-center bg-amber-50/30 p-2 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-amber-600"></div>
-                              <span className="text-xs font-bold text-slate-600">Otros Aportes</span>
-                            </div>
-                            <span className="text-sm font-black text-amber-700">{formatCurrency(totals.aportesOtros)}</span>
-                          </div>
-                        </div>
-
-                        {/* Detalle Presupuestal Anterior (keeping some info for context) */}
-                        <div className="bg-slate-50 rounded-lg p-4 text-sm space-y-3 border border-slate-200">
-                          <p className="font-bold text-slate-700 text-xs uppercase border-b border-slate-200 pb-2">Trazabilidad Técnica</p>
-                          
-                          <div className="flex justify-between">
-                            <span className="text-slate-600 text-xs font-bold">Inversión Inicial</span>
-                            <span className="font-bold text-slate-800 text-xs">{formatCurrency(valorOriginal)}</span>
-                          </div>
-                          
-                          {convenioOtrosies.length > 0 && (
-                            <div className="pl-2 border-l-2 border-indigo-200 space-y-1 mt-1">
-                               <p className="text-[10px] font-bold text-indigo-600 uppercase">Adiciones al Proyecto / Convenio</p>
-                              {convenioOtrosies.map(o => (
-                                <div key={o.id} className="flex justify-between text-xs text-slate-600 group relative">
-                                  <span className="truncate max-w-[200px]" title={o.objeto}>Otrosí #{o.numero}</span>
-                                  <span className="text-emerald-600 font-semibold space-x-2">
-                                    {(o.valorAdicional || 0) > 0 && <span>+{formatCurrency(o.valorAdicional || 0)}</span>}
-                                    {(o.plazoAdicionalMeses || 0) > 0 && <span>+{o.plazoAdicionalMeses} meses</span>}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          <div className="border-t border-slate-200 pt-2 space-y-2">
-                             <div className="flex justify-between">
-                              <span className="text-slate-600 flex items-center gap-1"><DollarSign size={14}/> Total Contratado</span>
-                              <span className="font-bold text-indigo-700">{formatCurrency(valorContratado)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-slate-500">Saldo por Contratar</span>
-                              <span className={`font-semibold ${saldoPorContratar < 0 ? 'text-rose-600' : 'text-slate-500'}`}>{formatCurrency(saldoPorContratar)}</span>
-                            </div>
-
-                            <div className="flex justify-between mt-2">
-                              <span className="text-slate-600 flex items-center gap-1"><Activity size={14}/> Total Ejecutado (Pagos/Informes)</span>
-                              <span className="font-bold text-emerald-700">{formatCurrency(valorEjecutado)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className="text-slate-500">Saldo por Ejecutar (Pagar)</span>
-                              <span className="font-semibold text-slate-500">{formatCurrency(saldoPorEjecutar)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="h-48 mt-4">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={chartData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={40}
-                                outerRadius={80}
-                                paddingAngle={2}
-                                dataKey="value"
-                                nameKey="name"
-                              >
-                                {chartData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                                ))}
-                              </Pie>
-                              <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                              <Legend />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-
-                        {/* Ejecución y Disponibilidad */}
-                        <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-slate-600">Comprometido OPS:</span>
-                            <span className="text-sm font-bold text-slate-800">{formatCurrency(presupuesto.valorComprometidoProfesionales || 0)}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-slate-600">Comprometido Comisiones:</span>
-                            <span className="text-sm font-bold text-slate-800">{formatCurrency(presupuesto.valorComprometidoComisiones || 0)}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-slate-600">Pagos Realizados:</span>
-                            <span className="text-sm font-bold text-slate-800">{formatCurrency(presupuesto.pagosRealizados || 0)}</span>
-                          </div>
-                          <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                            <span className="text-sm font-bold text-slate-700">Saldo Disponible:</span>
-                            <span className={`text-sm font-black ${presupuesto.valorDisponible && presupuesto.valorDisponible < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                              {formatCurrency(presupuesto.valorDisponible || 0)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            </div>
-
-            {/* Impacto Territorial Summary in Vista 360 */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mt-8">
-              <h4 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <Target className="text-indigo-500" />
-                Impacto Territorial y Reducción de Riesgo
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                  <div className="text-emerald-600 mb-2"><Users size={20} /></div>
-                  <div className="text-2xl font-bold text-slate-900">{project.poblacionBeneficiada?.toLocaleString() || 'N/A'}</div>
-                  <div className="text-xs font-medium text-emerald-700">Personas Protegidas</div>
-                </div>
-                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100">
-                  <div className="text-rose-600 mb-2"><Activity size={20} /></div>
-                  <div className="text-2xl font-bold text-slate-900">{project.riesgoAntes || 'N/A'}</div>
-                  <div className="text-xs font-medium text-rose-700">Nivel de Riesgo Inicial</div>
-                </div>
-                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                  <div className="text-indigo-600 mb-2"><TrendingDown size={20} /></div>
-                  <div className="text-2xl font-bold text-slate-900">{project.riesgoDespues || 'N/A'}</div>
-                  <div className="text-xs font-medium text-indigo-700">Nivel de Riesgo Actual</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <div className="text-blue-600 mb-2"><Zap size={20} /></div>
-                  <div className="text-2xl font-bold text-slate-900">
-                    {project.poblacionBeneficiada && project.poblacionBeneficiada > 0 ? 
-                      formatCurrency(calculateProjectTotals(project, contracts, otrosies, state.convenios, state.afectaciones, pagos, project.suspensiones || [], undefined, state.proyectos, undefined, state.presupuestos).valorTotal / project.poblacionBeneficiada) 
-                      : 'N/A'}
-                  </div>
-                  <div className="text-xs font-medium text-blue-700">Costo por Persona</div>
-                </div>
-                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
-                  <div className="text-amber-600 mb-2"><Briefcase size={20} /></div>
-                  <div className="text-2xl font-bold text-slate-900">{project.empleosGenerados?.toLocaleString() || 'N/A'}</div>
-                  <div className="text-xs font-medium text-amber-700">Empleos Generados</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'resumen' && activeSubTabResumen === 'fases' && (
-          <div className="space-y-6 animate-in fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <Layers className="text-indigo-600" size={24} />
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">Auditoría por Fases</h3>
-                  <p className="text-sm text-slate-500">Haz clic en una fase para ver su trazabilidad completa</p>
-                </div>
-              </div>
-              <div className="text-[10px] bg-slate-100 px-3 py-1.5 rounded-full font-bold text-slate-500 uppercase tracking-widest border border-slate-200">
-                {project.fases?.length || 0} Fases Definidas
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-              {project.fases?.map(fase => {
-                const isSelected = selectedPhaseId === fase.id;
-                const faseContracts = state.contratos.filter(c => c.faseId === fase.id);
-                const faseCalculations = faseContracts.map(c => {
-                  const o = state.otrosies.filter(ots => ots.contractId === c.id);
-                  return calculateContractTotals(c, o);
-                });
-                
-                const faseValor = faseCalculations.reduce((sum, calc) => sum + calc.valorTotal, 0);
-                const fasePagado = faseCalculations.reduce((sum, calc) => sum + calc.valorPagado, 0);
-                const progress = faseValor > 0 ? (fasePagado / faseValor) * 100 : 0;
-
-                return (
-                  <button 
-                    key={fase.id}
-                    onClick={() => setSelectedPhaseId(isSelected ? null : fase.id)}
-                    className={`p-5 rounded-2xl border-2 transition-all text-left relative overflow-hidden group ${
-                      isSelected 
-                        ? 'border-indigo-600 bg-indigo-50/50 shadow-md translate-y-[-2px]' 
-                        : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className={`p-2 rounded-lg ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600'}`}>
-                        <Layers size={18} />
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                          {faseContracts.length} Ítems
-                        </div>
-                        <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded mt-1 ${progress >= 90 ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                          {progress.toFixed(0)}%
-                        </div>
-                      </div>
-                    </div>
-                    <h4 className="text-sm font-black text-slate-900 mb-1 line-clamp-1">{fase.nombre}</h4>
-                    <p className="text-xs font-bold text-indigo-600 mb-3">{formatCurrency(faseValor)}</p>
-                    
-                    <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden mb-3">
-                      <div className="bg-indigo-500 h-full transition-all duration-700" style={{ width: `${progress}%` }}></div>
-                    </div>
-
-                    <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold uppercase transition-colors group-hover:text-slate-600">
-                      <Calendar size={10} />
-                      {fase.fechaFin || 'S/F'}
-                    </div>
-
-                    {isSelected && (
-                      <div className="absolute top-2 right-2">
-                        <CheckCircle2 className="text-indigo-600 fill-indigo-50" size={18} />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {selectedPhaseId ? (
-              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-10">
-                <div className="bg-gradient-to-r from-slate-900 to-indigo-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-[-50px] right-[-50px] w-80 h-80 bg-indigo-500/20 rounded-full blur-[80px]"></div>
-                  <div className="absolute bottom-[-50px] left-[-20px] w-64 h-64 bg-emerald-500/10 rounded-full blur-[60px]"></div>
-                  
-                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-[0.2em] border border-white/10">Auditoría 360° de Fase</span>
-                      </div>
-                      <h3 className="text-3xl font-black tracking-tight leading-none">
-                        {project.fases?.find(f => f.id === selectedPhaseId)?.nombre}
-                      </h3>
-                      <p className="text-slate-300 text-sm font-medium max-w-xl">Trazabilidad consolidada de contratos, presupuestos asignados, otrosíes y ejecución financiera.</p>
-                    </div>
-
-                    <div className="bg-white/5 backdrop-blur-md border border-white/10 p-6 rounded-3xl flex flex-col justify-center min-w-[200px]">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Inversión de Fase</span>
-                      {(() => {
-                        const phaseConts = state.contratos.filter(c => c.faseId === selectedPhaseId);
-                        const phaseValor = phaseConts.reduce((sum, c) => {
-                          const o = state.otrosies.filter(ots => ots.contractId === c.id);
-                          return sum + calculateContractTotals(c, o).valorTotal;
-                        }, 0);
-                        return <p className="text-2xl font-black text-white">{formatCurrency(phaseValor)}</p>;
-                      })()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Grid de Actividad Detallada */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                  {/* Columna Principal: Contratación y Otrosíes */}
-                  <div className="lg:col-span-8 space-y-8">
-                    {/* Contratos y Ejecutores */}
-                    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-                      <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                          <Briefcase className="text-indigo-600" size={18} />
-                          Contratistas y Ejecutores en Fase
-                        </h4>
-                        <div className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-black">
-                          {state.contratos.filter(c => c.faseId === selectedPhaseId).length} Contratos
-                        </div>
-                      </div>
-                      <div className="p-6 divide-y divide-slate-100">
-                        {state.contratos.filter(c => c.faseId === selectedPhaseId).length === 0 ? (
-                          <div className="text-center py-10">
-                            <Briefcase size={40} className="text-slate-100 mx-auto mb-3" />
-                            <p className="text-sm text-slate-400 italic">No hay contratos vinculados a esta fase.</p>
-                          </div>
-                        ) : (
-                          state.contratos.filter(c => c.faseId === selectedPhaseId).map(c => {
-                            const cOtrosies = state.otrosies.filter(o => o.contractId === c.id);
-                            const totals = calculateContractTotals(c, cOtrosies);
-                            return (
-                              <div key={c.id} className="py-6 first:pt-0 last:pb-0">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                                  <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-2xl ${c.tipo === 'Obra' ? 'bg-blue-600' : 'bg-amber-500'} text-white shadow-lg`}>
-                                      {c.tipo === 'Obra' ? <Building2 size={24} /> : <Shield size={24} />}
-                                    </div>
-                                    <div>
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2.3 py-0.5 rounded-full uppercase tracking-widest">{c.numero}</span>
-                                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-lg uppercase tracking-wider">{c.tipo}</span>
-                                      </div>
-                                      <h5 className="text-lg font-black text-slate-800">{c.contratista}</h5>
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Inversión Actualizada</div>
-                                    <div className="text-xl font-black text-slate-900">{formatCurrency(totals.valorTotal)}</div>
-                                    <div className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg inline-block mt-1">
-                                      Ejecutado: {((totals.valorPagado / totals.valorTotal) * 100).toFixed(1)}%
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 ml-0 md:ml-16 bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
-                                  <div>
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">CDP / RP</span>
-                                    <p className="text-xs font-mono font-bold text-slate-700">{c.cdp || 'S/N'} / {c.rp || 'S/N'}</p>
-                                  </div>
-                                  <div>
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Plazo de Fase</span>
-                                    <p className="text-xs font-bold text-slate-700">{totals.plazoTotalMeses} Meses</p>
-                                  </div>
-                                  <div>
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Supervisor</span>
-                                    <p className="text-xs font-bold text-slate-700 line-clamp-1">{c.supervisor || 'Pendiente'}</p>
-                                  </div>
-                                </div>
-
-                                {/* Otrosíes de este contrato en esta fase */}
-                                {cOtrosies.length > 0 && (
-                                  <div className="mt-4 ml-0 md:ml-16 space-y-2">
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-1">
-                                      <PlusCircle size={12} /> Modificaciones y Otrosíes ({cOtrosies.length})
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                      {cOtrosies.map(o => (
-                                        <div key={o.id} className="text-[10px] font-bold bg-white border border-indigo-100 px-3 py-1.5 rounded-xl shadow-sm text-slate-600 flex items-center gap-3">
-                                          <span className="text-indigo-600">#{o.numero}</span>
-                                          {(o.valorAdicional || 0) > 0 && <span className="text-emerald-600">+{formatCurrency(o.valorAdicional || 0)}</span>}
-                                          {(o.plazoAdicionalMeses || 0) > 0 && <span className="text-amber-600">+{o.plazoAdicionalMeses}m</span>}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Afectaciones Presupuestales y Pagos */}
-                    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-                      <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                          <DollarSign className="text-emerald-600" size={18} />
-                          Movimientos Financieros (CDPs, Pagos, RC)
-                        </h4>
-                      </div>
-                      <div className="p-6">
-                        {(() => {
-                          const phaseContIds = state.contratos.filter(c => c.faseId === selectedPhaseId).map(c => c.id);
-                          const phasePagos = state.pagos?.filter(p => phaseContIds.includes(p.contractId || '')) || [];
-                          const phaseAfectaciones = state.afectaciones?.filter(a => phaseContIds.includes(a.contractId || '')) || [];
-                          
-                          const allMoves = [
-                            ...phasePagos.map(p => ({ ...p, sortType: 'pago', color: 'bg-emerald-500', icon: <DollarSign size={14}/> })),
-                            ...phaseAfectaciones.map(a => ({ ...a, sortType: 'afectacion', color: 'bg-indigo-500', icon: <FileText size={14}/> }))
-                          ].sort((a, b) => new Date(b.fecha || '').getTime() - new Date(a.fecha || '').getTime());
-
-                          if (allMoves.length === 0) return (
-                            <div className="text-center py-10">
-                              <DollarSign size={40} className="text-slate-100 mx-auto mb-3" />
-                              <p className="text-sm text-slate-400 italic">No hay registros financieros para esta fase.</p>
-                            </div>
-                          );
-
-                          return (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {allMoves.map((m: any) => (
-                                <div key={m.id} className="flex gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:border-indigo-100 transition-all group">
-                                  <div className={`mt-1 h-8 w-8 rounded-full ${m.color} text-white flex items-center justify-center shrink-0 shadow-sm`}>
-                                    {m.icon}
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex justify-between items-start mb-1">
-                                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{m.fecha || 'Sin fecha'}</span>
-                                      <span className="text-xs font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{formatCurrency(m.valor || 0)}</span>
-                                    </div>
-                                    <h6 className="text-[11px] font-bold text-slate-800 line-clamp-1">{m.numero || m.referencia || 'Documento'}</h6>
-                                    <p className="text-[10px] text-slate-500 line-clamp-2 mt-1">{m.descripcion || m.objeto}</p>
-                                    <div className="mt-2 flex items-center gap-2">
-                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${m.sortType === 'pago' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                                        {m.sortType === 'pago' ? 'Desembolso' : m.tipo || 'Afectación'}
-                                      </span>
-                                      <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{m.estado}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Columna Lateral: Resúmenes y Estadísticas */}
-                  <div className="lg:col-span-4 space-y-6">
-                    {/* Composición Financiera de Fase */}
-                    <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
-                      <div className="p-6 bg-indigo-600 text-white">
-                        <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                          <PieChartIcon size={18} />
-                          Composición de Fase
-                        </h4>
-                      </div>
-                      <div className="p-6 space-y-6">
-                        {(() => {
-                           const phaseContracts = state.contratos.filter(c => c.faseId === selectedPhaseId);
-                           const phaseTotals = phaseContracts.reduce((acc, c) => {
-                             const ots = state.otrosies.filter(o => o.contractId === c.id);
-                             const calc = calculateContractTotals(c, ots);
-                             return {
-                               total: acc.total + calc.valorTotal,
-                               fngrd: acc.fngrd + calc.aportesFngrd,
-                               local: acc.local + calc.aportesLocal,
-                               otros: acc.otros + calc.aportesOtros,
-                               pagado: acc.pagado + calc.valorPagado
-                             };
-                           }, { total: 0, fngrd: 0, local: 0, otros: 0, pagado: 0 });
-
-                           const progress = phaseTotals.total > 0 ? (phaseTotals.pagado / phaseTotals.total) * 100 : 0;
-
-                           return (
-                             <div className="space-y-6">
-                               <div className="text-center">
-                                 <div className="inline-flex items-center justify-center p-4 bg-indigo-50 rounded-full mb-4">
-                                   <div className="text-center">
-                                      <span className="text-[10px] font-black text-indigo-600 border-b border-indigo-200 block pb-1">Ejecución</span>
-                                      <span className="text-2xl font-black text-indigo-800">{progress.toFixed(1)}%</span>
-                                   </div>
-                                 </div>
-                               </div>
-
-                               <div className="space-y-4">
-                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                                   <div>
-                                     <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Aporte FNGRD</p>
-                                     <p className="text-sm font-black text-slate-800">{formatCurrency(phaseTotals.fngrd)}</p>
-                                   </div>
-                                   <div className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-1 rounded-lg border border-indigo-50">
-                                     {phaseTotals.total > 0 ? ((phaseTotals.fngrd / phaseTotals.total) * 100).toFixed(0) : 0}%
-                                   </div>
-                                 </div>
-                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                                   <div>
-                                     <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Aporte Distrito</p>
-                                     <p className="text-sm font-black text-slate-800">{formatCurrency(phaseTotals.local)}</p>
-                                   </div>
-                                   <div className="text-[10px] font-bold text-emerald-600 bg-white px-2 py-1 rounded-lg border border-emerald-50">
-                                     {phaseTotals.total > 0 ? ((phaseTotals.local / phaseTotals.total) * 100).toFixed(0) : 0}%
-                                   </div>
-                                 </div>
-                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                                   <div>
-                                     <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Otros Aportes</p>
-                                     <p className="text-sm font-black text-slate-800">{formatCurrency(phaseTotals.otros)}</p>
-                                   </div>
-                                   <div className="text-[10px] font-bold text-amber-600 bg-white px-2 py-1 rounded-lg border border-amber-50">
-                                     {phaseTotals.total > 0 ? ((phaseTotals.otros / phaseTotals.total) * 100).toFixed(0) : 0}%
-                                   </div>
-                                 </div>
-                               </div>
-
-                               <div className="pt-4 border-t border-slate-100">
-                                 <div className="flex justify-between items-center">
-                                   <span className="text-sm font-bold text-slate-700">Total Auditado:</span>
-                                   <span className="text-sm font-black text-slate-900">{formatCurrency(phaseTotals.total)}</span>
-                                 </div>
-                               </div>
-                             </div>
-                           );
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Responsables de Fase */}
-                    <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
-                      <div className="p-6 bg-slate-50 border-b border-slate-100">
-                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                           <Users className="text-blue-600" size={18} />
-                           Equipo Asignado
-                         </h4>
-                      </div>
-                      <div className="p-6">
-                        {(() => {
-                           const phaseConts = state.contratos.filter(c => c.faseId === selectedPhaseId);
-                           const respIds = new Set(phaseConts.map(c => c.responsibleId).filter(Boolean));
-                           const phaseProfessionals = state.professionals.filter(p => respIds.has(p.id));
-
-                           if (phaseProfessionals.length === 0) return <p className="text-xs text-slate-400 text-center py-4">No hay profesionales asignados.</p>;
-
-                           return (
-                             <div className="space-y-4">
-                               {phaseProfessionals.map(p => (
-                                 <div key={p.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-2xl transition-colors group">
-                                   <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-black shadow-lg shadow-indigo-100">
-                                     {p.nombre.charAt(0)}
-                                   </div>
-                                   <div>
-                                     <p className="text-sm font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{p.nombre}</p>
-                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.profesion}</p>
-                                   </div>
-                                 </div>
-                               ))}
-                             </div>
-                           );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="py-24 flex flex-col items-center justify-center text-slate-400 gap-6 border-4 border-dashed border-slate-100 rounded-[3rem] bg-slate-50/50">
-                <div className="p-8 bg-white rounded-full shadow-2xl shadow-indigo-100 animate-bounce">
-                  <Layers size={64} className="text-indigo-100" />
-                </div>
-                <div className="text-center">
-                  <p className="text-xl font-black text-slate-900 mb-2">Selecciona una Fase para Auditar</p>
-                  <p className="text-sm font-medium text-slate-500 max-w-xs mx-auto">Obtén una visión detallada de los contratos, flujos de caja y responsables de cada etapa del proyecto.</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'territorio' && (
-          <div className="flex space-x-2 overflow-x-auto mb-6 border-b border-slate-100">
-            <button onClick={() => setActiveSubTabTerritorio('actividades')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabTerritorio === 'actividades' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Actividades PMU</button>
-            <button onClick={() => setActiveSubTabTerritorio('compromisos')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabTerritorio === 'compromisos' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Compromisos</button>
-            <button onClick={() => setActiveSubTabTerritorio('ops')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabTerritorio === 'ops' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Gestión OPS</button>
-            <button onClick={() => setActiveSubTabTerritorio('comisiones')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabTerritorio === 'comisiones' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Comisiones a Terreno</button>
-            <button onClick={() => setActiveSubTabTerritorio('ambiental')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabTerritorio === 'ambiental' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Ambiental</button>
-            <button onClick={() => setActiveSubTabTerritorio('interventoria')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabTerritorio === 'interventoria' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Interventoría</button>
-          </div>
-        )}
-
-        {/* TAB 1.1: ACTIVIDADES Y PMU */}
-        {activeTab === 'territorio' && activeSubTabTerritorio === 'actividades' && (
-          <div className="animate-in fade-in">
-            <ActividadesProyecto project={project} />
-          </div>
-        )}
-
-        {activeTab === 'contratos' && (
-          <div className="flex space-x-2 overflow-x-auto mb-6 border-b border-slate-100">
-            <button onClick={() => setActiveSubTabContratos('jerarquia')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabContratos === 'jerarquia' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Estructura Contractual</button>
-            <button onClick={() => setActiveSubTabContratos('detallado')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabContratos === 'detallado' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Análisis Detallado</button>
-            <button onClick={() => setActiveSubTabContratos('polizas')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabContratos === 'polizas' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Pólizas y Garantías</button>
-          </div>
-        )}
-
-        {/* TAB 2: CONTRATOS */}
-        {activeTab === 'contratos' && activeSubTabContratos === 'jerarquia' && (
-          <div className="space-y-6 animate-in fade-in">
-            {/* Jerarquía: Convenio (Nivel 1) */}
-            {convenio && convenioTotals && (
-              <div className="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-3xl p-6 shadow-sm mb-8">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-100">
-                      <Layers size={24} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg uppercase tracking-wider">Nivel 1: Convenio Marco</span>
-                        <span className="text-xs font-bold text-slate-400">No. {convenio.numero}</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-slate-900">{convenio.nombre}</h3>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end bg-white/60 px-4 py-2 rounded-xl border border-indigo-100">
-                    <div className="text-sm font-bold text-indigo-600">{formatCurrency(convenioTotals.valorTotal)}</div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Valor Total Convenio</div>
-                  </div>
-                </div>
-
-                {/* Trazabilidad Financiera Rápida */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-white/80 p-3 rounded-xl border border-indigo-50">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Contratado</p>
-                    <p className="text-sm font-bold text-slate-700">{formatCurrency(convenioTotals.valorContratado)}</p>
-                  </div>
-                  <div className="bg-white/80 p-3 rounded-xl border border-indigo-50">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Ejecutado</p>
-                    <p className="text-sm font-bold text-emerald-600">{formatCurrency(convenioTotals.valorEjecutado)}</p>
-                  </div>
-                  <div className="bg-white/80 p-3 rounded-xl border border-indigo-50">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Saldo x Ejecutar</p>
-                    <p className="text-sm font-bold text-rose-600">{formatCurrency(convenioTotals.saldoPorEjecutar)}</p>
-                  </div>
-                  <div className="bg-white/80 p-3 rounded-xl border border-indigo-50">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Estado</p>
-                    <p className="text-sm font-bold text-indigo-600">{convenio.estado}</p>
-                  </div>
-                </div>
-
-                {/* Barras de Progreso */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Progreso Financiero */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-end">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                        <DollarSign size={12} className="text-emerald-500" /> Ejecución Financiera
-                      </div>
-                      <div className="text-sm font-black text-emerald-600">
-                        {((convenioTotals.valorEjecutado / convenioTotals.valorTotal) * 100).toFixed(1)}%
-                      </div>
-                    </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                      <div 
-                        className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-1000"
-                        style={{ width: `${Math.min(100, (convenioTotals.valorEjecutado / convenioTotals.valorTotal) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Progreso Temporal */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-end">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                        <Clock size={12} className="text-indigo-500" /> Transcurso del Tiempo
-                      </div>
-                      <div className="text-sm font-black text-indigo-600">
-                        {timeProgress.toFixed(1)}%
-                      </div>
-                    </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                      <div 
-                        className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full transition-all duration-1000"
-                        style={{ width: `${timeProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest pt-4 mt-4 border-t border-indigo-50">
-                  <span className="flex items-center gap-1"><TrendingUp size={10} className="text-emerald-500" /> Inicio: {convenio.fechaInicio}</span>
-                  <span className="flex items-center gap-1"><Calendar size={10} className="text-indigo-500" /> Fin: {convenio.fechaFin}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-slate-800">
-                  {convenio ? 'Nivel 2: Estructura Contractual Derivada' : 'Estructura Contractual'}
-                </h3>
-                {convenio && (
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-lg uppercase tracking-wider border border-slate-200">
-                    Vinculado a Convenio
-                  </span>
-                )}
-              </div>
-              <button onClick={() => setShowAddContract(true)} className="text-sm bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">+ Nuevo Contrato</button>
-            </div>
-            {showAddContract && <AddContractForm projectId={project.id} onClose={() => setShowAddContract(false)} />}
-            
-            <div className="grid grid-cols-1 gap-6">
-              {contracts.map(contract => {
-                const contractOtrosies = otrosies.filter(o => o.contractId === contract.id);
-                const { 
-                  valorTotal: totalValor, 
-                  plazoTotalMeses: totalPlazo,
-                  valorAdicional,
-                  plazoAdicionalMeses
-                } = calculateContractTotals(contract, contractOtrosies);
-                
-                return (
-                <div 
-                  key={contract.id} 
-                  className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
-                  onClick={() => setSelectedContract(contract)}
-                >
-                  <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wider ${
-                        contract.tipo === 'Obra' ? 'bg-indigo-100 text-indigo-700' : 
-                        contract.tipo === 'Interventoría' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                      }`}>
-                        {contract.tipo}
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">{contract.numero}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-sm font-bold text-indigo-600 flex flex-col items-end">
-                        <span>{formatCurrency(contract.valor)}</span>
-                        {valorAdicional > 0 && (
-                          <span className="text-xs text-emerald-600">Total: {formatCurrency(totalValor)}</span>
-                        )}
-                      </div>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingContract(contract);
-                        }}
-                        className="text-slate-400 hover:text-indigo-600 transition-colors"
-                        title="Editar contrato"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setContractToDelete(contract.id);
-                        }}
-                        className="text-slate-400 hover:text-rose-600 transition-colors"
-                        title="Eliminar contrato"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="md:col-span-2 space-y-4">
-                      <div>
-                        <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Objeto Contractual</h5>
-                        <p className="text-sm text-slate-700 leading-relaxed">{contract.objetoContractual}</p>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contratista</h5>
-                          <p className="text-sm font-semibold text-slate-900">{contract.contratista}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-xs text-slate-500">NIT: {contract.nit}</p>
-                            {(() => {
-                              const entes = state.entesControl?.filter(e => e.tipoReferencia === 'Contratista' && state.contratistas.find(c => c.nit === contract.nit)?.id === e.referenciaId) || [];
-                              const hasSanciones = entes.some(e => e.estado === 'Sancionado');
-                              const hasHallazgos = entes.some(e => e.estado === 'Con Hallazgos');
-                              if (hasSanciones) return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">Sancionado</span>;
-                              if (hasHallazgos) return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Hallazgos</span>;
-                              return null;
-                            })()}
-                          </div>
-                        </div>
-                        <div>
-                          <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Supervisor / Interventor</h5>
-                          <p className="text-sm font-semibold text-slate-900">{contract.supervisor || 'No asignado'}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-slate-50 rounded-xl p-4 space-y-4 border border-slate-100">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">Plazo Inicial</span>
-                        <span className="text-sm font-bold text-slate-900">{contract.plazoMeses} meses</span>
-                      </div>
-                      {plazoAdicionalMeses > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-indigo-600 font-bold">Plazo Total</span>
-                          <span className="text-sm font-bold text-indigo-600">{totalPlazo} meses</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">Inicio</span>
-                        <span className="text-sm font-bold text-slate-900">{contract.fechaInicio || 'Pendiente'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">Fin</span>
-                        <span className="text-sm font-bold text-slate-900">{contract.fechaFin || 'Pendiente'}</span>
-                      </div>
-                      
-                      {contract.obligacionesPrincipales && contract.obligacionesPrincipales.length > 0 && (
-                        <div className="pt-2 border-t border-slate-200">
-                          <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Obligaciones Clave</h5>
-                          <ul className="space-y-1">
-                            {contract.obligacionesPrincipales.slice(0, 3).map((ob, i) => (
-                              <li key={i} className="text-[10px] text-slate-600 flex gap-2">
-                                <span className="text-indigo-500">•</span>
-                                <span className="line-clamp-1">{ob}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <ChecklistLiquidacion contract={contract} documents={data.documents || []} />
-                      <div className="grid grid-cols-2 gap-2">
-                        <button className="text-[10px] font-bold text-indigo-600 bg-indigo-50 p-2 rounded-lg hover:bg-indigo-100">Acta Inicio</button>
-                        <button className="text-[10px] font-bold text-indigo-600 bg-indigo-50 p-2 rounded-lg hover:bg-indigo-100">Otrosí</button>
-                        <button className="text-[10px] font-bold text-indigo-600 bg-indigo-50 p-2 rounded-lg hover:bg-indigo-100">Suspensión</button>
-                        <button className="text-[10px] font-bold text-indigo-600 bg-indigo-50 p-2 rounded-lg hover:bg-indigo-100">Informe</button>
-                        <button className="text-[10px] font-bold text-indigo-600 bg-indigo-50 p-2 rounded-lg hover:bg-indigo-100">Liquidación</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-              })}
-              {contracts.length === 0 && <EmptyState message="No hay contratos registrados." />}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2.1: DETALLE CONTRATOS */}
-        {activeTab === 'contratos' && activeSubTabContratos === 'detallado' && (
-          <div className="animate-in fade-in">
-            <ContratosDetallados contracts={contracts} otrosies={otrosies} projectId={project.id} project={project} />
-          </div>
-        )}
-
-        {/* TAB 2.2: JERARQUÍA Y EVENTOS */}
-        {activeTab === 'resumen' && activeSubTabResumen === 'jerarquia' && (
-          <div className="space-y-12 animate-in fade-in">
-            <ProjectHierarchyTree 
-              project={project} 
-              contracts={contracts} 
-              otrosies={otrosies} 
-              pagos={pagos}
-              reports={reports}
-            />
-            <div className="border-t border-slate-100 pt-12">
-              <ContractTimeline contracts={contracts} otrosies={otrosies} />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'monitoreo' && (
-          <div className="flex space-x-2 overflow-x-auto mb-6 border-b border-slate-100">
-            <button onClick={() => setActiveSubTabMonitoreo('alertas')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabMonitoreo === 'alertas' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Riesgos y Alertas</button>
-            <button onClick={() => setActiveSubTabMonitoreo('seguimiento')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabMonitoreo === 'seguimiento' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Timeline y Avances</button>
-            <button onClick={() => setActiveSubTabMonitoreo('reconstructor')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabMonitoreo === 'reconstructor' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Reconstructor Cronológico</button>
-            <button onClick={() => setActiveSubTabMonitoreo('analitica')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabMonitoreo === 'analitica' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Analítica Predictiva</button>
-            <button onClick={() => setActiveSubTabMonitoreo('actas')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabMonitoreo === 'actas' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Actas y Suspensiones</button>
-          </div>
-        )}
-
-        {/* TAB 2.2: DASHBOARD INTEGRAL DE GESTIÓN */}
-        {activeTab === 'monitoreo' && activeSubTabMonitoreo === 'actas' && (
-          <div className="animate-in fade-in">
-            <ActasYSuspensionesTab projectId={project.id} />
-          </div>
-        )}
-
-        {/* TAB 2.3: DASHBOARD DE RIESGOS */}
-        {activeTab === 'monitoreo' && activeSubTabMonitoreo === 'alertas' && (
-          <div className="animate-in fade-in">
-            <RiskDashboard 
-              contracts={contracts} 
-              otrosies={otrosies} 
-              pagos={pagos} 
-              reports={reports} 
-              projects={[data]}
-            />
-          </div>
-        )}
-
-        {/* TAB 3: FINANCIERO */}
-        {['financiero'].includes(activeTab) && (
-          <div className="space-y-8 animate-in fade-in">
-            <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-4">Ejecución Financiera</h3>
-            
-            {(() => {
-              const totalsConfig = calculateProjectTotals(project, contracts, otrosies, state.convenios, state.afectaciones, pagos, project.suspensiones || [], undefined, state.proyectos, undefined, state.presupuestos);
-              const { 
-                valorTotal: totalActual, 
-                valorEjecutado: ejecutadoActual,
-                saldoPorContratar,
-                saldoPorEjecutar,
-                valorOriginal
-              } = totalsConfig;
-
-              return (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 col-span-1 md:col-span-3 flex justify-between items-center">
-                      <div>
-                        <div className="text-sm text-slate-500 font-medium mb-1">Valor Total Actualizado</div>
-                        <div className="text-3xl font-bold text-slate-900">{formatCurrency(totalActual)}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-slate-500 font-medium mb-1">Ejecución Financiera (Pagos)</div>
-                        <div className="text-2xl font-bold text-emerald-600">{formatCurrency(ejecutadoActual)}</div>
-                      </div>
-                    </div>
-                    
-                    {/* Detalle Presupuestal */}
-                    <div className="col-span-1 md:col-span-3 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                      <p className="font-bold text-slate-800 text-sm uppercase mb-4 flex items-center gap-2">
-                        <Activity size={18} className="text-indigo-600" />
-                        Trazabilidad del Valor Actualizado (Afectaciones y Otrosíes)
-                      </p>
-                      
-                      <div className="flex justify-between items-center bg-slate-50 p-4 rounded-lg border border-slate-100">
-                        <span className="text-slate-600 font-medium">Presupuesto Base Inicial</span>
-                        <span className="font-black text-slate-900 text-lg">{formatCurrency(valorOriginal)}</span>
-                      </div>
-                      
-                      {(() => {
-                        const convenioOtrosies = otrosies.filter(o => o.convenioId === project.convenioId || (o.contractId && contracts.some(c => c.id === o.contractId && c.tipo === 'Convenio')) || (!o.contractId && !o.convenioId));
-                         const contractOtrosies = otrosies.filter(o => contracts.some(c => c.id === o.contractId) && !convenioOtrosies.some(co => co.id === o.id));
-                        
-                        if (convenioOtrosies.length === 0 && contractOtrosies.length === 0) {
-                           return <div className="p-4 text-center text-slate-400 text-sm font-medium border border-dashed border-slate-200 rounded-lg">No hay adiciones registradas mediante otrosíes para este proyecto.</div>;
-                        }
-
-                        return (
-                          <div className="space-y-3">
-                            {convenioOtrosies.length > 0 && (
-                              <div className="pl-4 border-l-4 border-indigo-200 py-2 space-y-2">
-                                <p className="text-xs font-black text-indigo-700 uppercase tracking-widest">Adiciones a Convenio Marco</p>
-                                {convenioOtrosies.map(o => (
-                                  <div key={o.id} className="flex justify-between text-sm bg-indigo-50/50 p-2 rounded-md">
-                                    <span className="font-medium text-slate-700">Otrosí No. {o.numero} <span className="text-xs font-normal text-slate-500 ml-1">({o.fechaFirma})</span></span>
-                                    <span className="font-black text-emerald-600 space-x-3">
-                                      {(o.valorAdicional || 0) > 0 && <span>+{formatCurrency(o.valorAdicional || 0)}</span>}
-                                      {(o.plazoAdicionalMeses || 0) > 0 && <span>+{o.plazoAdicionalMeses} meses</span>}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {contractOtrosies.length > 0 && (
-                              <div className="pl-4 border-l-4 border-amber-200 py-2 space-y-2 mt-2">
-                                <p className="text-xs font-black text-amber-700 uppercase tracking-widest">Adiciones a Contratos Derivados</p>
-                                {contractOtrosies.map(o => {
-                                  const contract = contracts.find(c => c.id === o.contractId);
-                                  return (
-                                    <div key={o.id} className="flex justify-between text-sm bg-amber-50/50 p-2 rounded-md">
-                                      <span className="font-medium text-slate-700">
-                                        <span className="text-xs bg-white border border-amber-200 px-1 py-0.5 rounded mr-2 text-amber-800">{contract?.tipo}</span>
-                                        Otrosí No. {o.numero} <span className="text-xs font-normal text-slate-500 ml-1">({o.fechaFirma})</span>
-                                      </span>
-                                      <span className="font-black text-emerald-600 space-x-3">
-                                        {(o.valorAdicional || 0) > 0 && <span>+{formatCurrency(o.valorAdicional || 0)}</span>}
-                                        {(o.plazoAdicionalMeses || 0) > 0 && <span>+{o.plazoAdicionalMeses} meses</span>}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="border border-slate-200 p-5 rounded-xl bg-amber-50/30">
-                      <div className="text-sm text-slate-500 mb-1">Saldo por Contratar</div>
-                      <div className="font-semibold text-lg text-amber-700">{formatCurrency(saldoPorContratar)}</div>
-                      <div className="mt-2 text-xs text-slate-400 bg-white inline-block px-2 py-1 rounded border border-slate-100">
-                        Presupuesto no asignado a contratos
-                      </div>
-                    </div>
-
-                    <div className="border border-slate-200 p-5 rounded-xl bg-blue-50/30">
-                      <div className="text-sm text-slate-500 mb-1">Saldo por Ejecutar</div>
-                      <div className="font-semibold text-lg text-blue-700">{formatCurrency(saldoPorEjecutar)}</div>
-                      <div className="mt-2 text-xs text-slate-400 bg-white inline-block px-2 py-1 rounded border border-slate-100">
-                        Pendiente por pagar de contratos
-                      </div>
-                    </div>
-
-                    <div className="border border-slate-200 p-5 rounded-xl">
-                      <div className="text-sm text-slate-500 mb-1">Soportes Presupuestales</div>
-                      <div className="space-y-2 mt-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-500">CDP:</span>
-                          <span className="font-mono font-medium">{presupuesto.cdp}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-500">RC:</span>
-                          <span className="font-mono font-medium">{presupuesto.rc}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Integración con Pólizas */}
-                    <div className="border border-slate-200 p-5 rounded-xl bg-indigo-50/30 col-span-1 md:col-span-3">
-                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="text-sm font-bold text-indigo-900 flex items-center gap-2">
-                          <ShieldCheck size={18} />
-                          Cobertura de Riesgos (Pólizas y Garantías)
-                        </h4>
-                        <button 
-                          onClick={() => setActiveTab('polizas')}
-                          className="text-xs font-bold text-indigo-600 hover:underline"
-                        >
-                          Ver Detalle
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {(() => {
-                          const projectPolizas = state.polizas.filter(p => 
-                            contracts.some(c => c.id === p.id_contrato)
-                          );
-                          const totalAsegurado = projectPolizas.reduce((acc, p) => acc + (p.valor_asegurado || 0), 0);
-                          const coveragePct = totalActual > 0 ? (totalAsegurado / totalActual) * 100 : 0;
-                          const expiredCount = projectPolizas.filter(p => new Date(p.fecha_finalizacion_vigencia) < new Date()).length;
-
-                          return (
-                            <>
-                              <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Total Asegurado</span>
-                                <span className="text-lg font-bold text-indigo-700">{formatCurrency(totalAsegurado)}</span>
-                              </div>
-                              <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">% Cobertura Global</span>
-                                <span className="text-lg font-bold text-indigo-700">{coveragePct.toFixed(1)}%</span>
-                              </div>
-                              <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Pólizas Activas</span>
-                                <span className="text-lg font-bold text-emerald-600">{projectPolizas.length - expiredCount}</span>
-                              </div>
-                              <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Pólizas Vencidas</span>
-                                <span className={`text-lg font-bold ${expiredCount > 0 ? 'text-rose-600' : 'text-slate-400'}`}>{expiredCount}</span>
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="border border-slate-200 p-5 rounded-xl">
-                      <div className="text-sm text-slate-500 mb-1">Aportes FNGRD</div>
-                      <div className="font-semibold text-lg">{formatCurrency(presupuesto.aportesFngrd)}</div>
-                      <div className="mt-2 text-xs text-slate-400 bg-slate-100 inline-block px-2 py-1 rounded">
-                        {((presupuesto.aportesFngrd / totalActual) * 100).toFixed(1)}% del total actual
-                      </div>
-                    </div>
-
-                    <div className="border border-slate-200 p-5 rounded-xl">
-                      <div className="text-sm text-slate-500 mb-1">Aportes Municipio</div>
-                      <div className="font-semibold text-lg">{formatCurrency(presupuesto.aportesMunicipio)}</div>
-                      <div className="mt-2 text-xs text-slate-400 bg-slate-100 inline-block px-2 py-1 rounded">
-                        {((presupuesto.aportesMunicipio / totalActual) * 100).toFixed(1)}% del total actual
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-8">
-                    <FinancialExecutionModule projectId={project.id} />
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* TAB 4: SEGUIMIENTO */}
-        {activeTab === 'monitoreo' && activeSubTabMonitoreo === 'seguimiento' && (
-          <div className="space-y-12 animate-in fade-in">
-            <AvancesGraficos data={data} />
-            
-            <div className="border-t border-slate-200 pt-8">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-lg font-semibold text-slate-800">Timeline del Proyecto</h3>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={generatePDF}
-                    disabled={isGeneratingPDF}
-                    className="text-sm bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-colors flex items-center gap-2 disabled:opacity-50"
-                  >
-                    <Download size={16} />
-                    {isGeneratingPDF ? 'Generando PDF...' : 'Generar Informe PDF'}
-                  </button>
-                  <button className="text-sm bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-                    + Nuevo Reporte
-                  </button>
-                </div>
-              </div>
-              
-              <div className="relative border-l-2 border-indigo-200 ml-4 space-y-8 pb-4">
-                {/* Combine all events for a complete timeline */}
-                {(() => {
-                  const timelineEvents = [
-                    ...avances.map(a => ({ id: a.id, fecha: a.fecha, tipo: 'Avance', titulo: `Avance Reportado: ${a.fisicoPct}%`, descripcion: a.observaciones, responsable: a.reportadoPor, color: 'indigo', adjuntos: a.adjuntos, trazabilidad: undefined })),
-                    ...seguimientos.map(s => ({ id: s.id, fecha: s.fecha, tipo: 'Seguimiento', titulo: `${s.tipo}: Cambio Detectado`, descripcion: s.descripcion, responsable: s.responsable, color: 'emerald', trazabilidad: s.trazabilidad, adjuntos: undefined })),
-                    ...contracts.map(c => ({ id: c.id, fecha: c.fechaInicio || project.fechaInicio, tipo: 'Contrato', titulo: `Contrato ${c.numero}`, descripcion: c.objetoContractual, responsable: c.contratista, color: 'blue', adjuntos: undefined, trazabilidad: undefined })),
-                    ...otrosies.map(o => ({ id: o.id, fecha: o.fechaFirma, tipo: 'Otrosí', titulo: `Otrosí ${o.numero}`, descripcion: o.objeto, responsable: 'N/A', color: 'amber', adjuntos: undefined, trazabilidad: undefined })),
-                    ...reports.map(r => ({ id: r.id, fecha: r.fechaFin, tipo: 'Informe', titulo: `Informe Semana ${r.semana}`, descripcion: r.observaciones, responsable: r.interventorResponsable, color: 'purple', adjuntos: undefined, trazabilidad: undefined })),
-                    ...state.polizas.filter(p => contracts.some(c => c.id === p.id_contrato)).map(p => ({ 
-                      id: p.id, 
-                      fecha: p.fecha_inicio_vigencia, 
-                      tipo: 'Póliza', 
-                      titulo: `Póliza: ${p.tipo_amparo}`, 
-                      descripcion: `Expedida por ${p.entidad_aseguradora}. Número: ${p.numero_poliza}. Cobertura: ${p.porcentaje_cobertura}%`, 
-                      responsable: 'N/A', 
-                      color: 'indigo', 
-                      adjuntos: undefined, 
-                      trazabilidad: undefined 
-                    }))
-                  ] as { id: string; fecha: string; tipo: string; titulo: string; descripcion: string; responsable: string; color: string; adjuntos?: any[]; trazabilidad?: string; }[];
-
-                  return timelineEvents.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((item) => (
-                    <div key={`${item.tipo}-${item.id}`} className="relative pl-8">
-                      <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-4 border-white shadow-sm ${
-                        item.color === 'indigo' ? 'bg-indigo-600' : 
-                        item.color === 'emerald' ? 'bg-emerald-500' : 
-                        item.color === 'blue' ? 'bg-blue-500' :
-                        item.color === 'amber' ? 'bg-amber-500' : 'bg-purple-500'
-                      }`}></div>
-                      
-                      <div className={`bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow ${
-                        item.color === 'emerald' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200'
-                      }`}>
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded ${
-                                item.color === 'indigo' ? 'text-indigo-600 bg-indigo-50' : 
-                                item.color === 'emerald' ? 'text-emerald-700 bg-emerald-100' :
-                                item.color === 'blue' ? 'text-blue-700 bg-blue-100' :
-                                item.color === 'amber' ? 'text-amber-700 bg-amber-100' : 'text-purple-700 bg-purple-100'
-                              }`}>
-                                {item.fecha} - {item.tipo}
-                              </span>
-                              <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-                                <Clock size={12}/> Hace {Math.floor((new Date().getTime() - new Date(item.fecha).getTime()) / (1000 * 3600 * 24))} días
-                              </span>
-                            </div>
-                            
-                            <h4 className="font-bold text-slate-900 mt-2 text-lg">{item.titulo}</h4>
-                          </div>
-                          
-                          {item.responsable && item.responsable !== 'N/A' && (
-                            <div className="flex flex-col items-end gap-2">
-                              <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5 border border-slate-200">
-                                <Users size={14} className="text-slate-400" /> {item.responsable}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className={`p-4 rounded-lg border mb-4 ${
-                          item.color === 'emerald' ? 'bg-white border-emerald-100' : 'bg-slate-50 border-slate-100'
-                        }`}>
-                          <p className="text-sm text-slate-700 leading-relaxed">
-                            {item.descripcion}
-                          </p>
-                          {item.trazabilidad && (
-                            <div className="mt-2 pt-2 border-t border-emerald-100 text-[10px] font-mono text-emerald-600">
-                              Trazabilidad: {item.trazabilidad}
-                            </div>
-                          )}
-                        </div>
-                        
-                        {item.adjuntos && item.adjuntos.length > 0 && (
-                          <div className="border-t border-slate-100 pt-3 mt-3">
-                            <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                              <Paperclip size={14} /> Archivos Adjuntos ({item.adjuntos.length})
-                            </h5>
-                            <div className="flex flex-wrap gap-3">
-                              {item.adjuntos.map(adj => (
-                                <a key={adj.id} href={adj.url} className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors group cursor-pointer">
-                                  {adj.type === 'pdf' ? <FileText size={16} className="text-rose-500" /> : <ImageIcon size={16} className="text-indigo-500" />}
-                                  <span className="text-xs font-medium text-slate-700 group-hover:text-indigo-700">{adj.name}</span>
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ));
-                })()}
-                {avances.length === 0 && seguimientos.length === 0 && contracts.length === 0 && otrosies.length === 0 && reports.length === 0 && <EmptyState message="No hay eventos en el timeline." />}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'resumen' && activeSubTabResumen === 'radiografia' && (
-          <div className="animate-in fade-in">
-            <ProjectRadiography project={data} />
-          </div>
-        )}
-        
-        {activeTab === 'monitoreo' && activeSubTabMonitoreo === 'reconstructor' && (
-          <div className="animate-in fade-in">
-            <ScheduleReconstructor project={data} />
-          </div>
-        )}
-        
-        {activeTab === 'documentos' && (
-          <div className="flex space-x-2 overflow-x-auto mb-6 border-b border-slate-100">
-            <button onClick={() => setActiveSubTabDocumentos('repositorio')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabDocumentos === 'repositorio' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Repositorio Documental</button>
-            <button onClick={() => setActiveSubTabDocumentos('analisis')} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeSubTabDocumentos === 'analisis' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Análisis de Informes (IA)</button>
-          </div>
-        )}
-
-        {activeTab === 'documentos' && activeSubTabDocumentos === 'analisis' && (
-          <div className="animate-in fade-in">
-            <InformeAnalysisComponent />
-          </div>
-        )}
-        
-        {activeTab === 'monitoreo' && activeSubTabMonitoreo === 'analitica' && (
-          <div className="animate-in fade-in">
-            <PredictiveAnalytics projectData={data} />
-          </div>
-        )}
-
-        {activeTab === 'territorio' && activeSubTabTerritorio === 'compromisos' && (
-          <div className="animate-in fade-in">
-            <CompromisosTab project={project} />
-          </div>
-        )}
-        
-        {/* TAB 5: ALERTAS */}
-        {activeTab === 'monitoreo' && activeSubTabMonitoreo === 'alertas' && (
-          <div className="space-y-6 animate-in fade-in">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-              <h3 className="text-lg font-semibold text-slate-800">Gestión de Riesgos y Alertas ({alerts.length})</h3>
-              <button 
-                onClick={() => setShowAlerts(!showAlerts)}
-                className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors flex items-center gap-2 text-sm font-medium"
-              >
-                {showAlerts ? (
-                  <>Ocultar Alertas <ChevronUp size={18} /></>
-                ) : (
-                  <>Mostrar Alertas <ChevronDown size={18} /></>
-                )}
-              </button>
-            </div>
-            
-            {showAlerts && (
-              <div className="grid grid-cols-1 gap-4">
-                {alerts.map(alert => {
-                  const isHigh = alert.nivel === 'Alto';
-                  const isClosed = alert.estado === 'Cerrada';
-                  
-                  return (
-                    <div key={alert.id} className={`
-                      border rounded-xl p-5 flex gap-4
-                      ${isClosed ? 'bg-slate-50 border-slate-200 opacity-70' : 
-                        isHigh ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'}
-                    `}>
-                      <div className={`mt-1 ${isClosed ? 'text-slate-400' : isHigh ? 'text-rose-500' : 'text-amber-500'}`}>
-                        <AlertTriangle size={24} />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider
-                              ${isClosed ? 'bg-slate-200 text-slate-600' : 
-                                isHigh ? 'bg-rose-200 text-rose-800' : 'bg-amber-200 text-amber-800'}
-                            `}>
-                              {alert.tipo}
-                            </span>
-                            <span className="text-xs text-slate-500">{alert.fecha}</span>
-                          </div>
-                          <span className={`text-xs font-semibold px-2 py-1 rounded-full border
-                            ${isClosed ? 'bg-slate-100 text-slate-500 border-slate-300' : 'bg-white text-slate-700 border-slate-300'}
-                          `}>
-                            {alert.estado}
-                          </span>
-                        </div>
-                        <p className={`text-sm mt-2 ${isClosed ? 'text-slate-500' : 'text-slate-700 font-medium'}`}>
-                          {alert.descripcion}
-                        </p>
-                        {alert.recomendacionIA && (
-                          <div className="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
-                            <h5 className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                              <Sparkles size={14} /> Recomendación IA
-                            </h5>
-                            <p className="text-sm text-indigo-900 leading-relaxed italic">
-                              {alert.recomendacionIA}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                {alerts.length === 0 && <EmptyState message="No hay alertas registradas para este proyecto." />}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 6: AMBIENTAL */}
-        {activeTab === 'territorio' && activeSubTabTerritorio === 'ambiental' && (
-          <div className="space-y-6 animate-in fade-in">
-            <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-4">Cumplimiento Ambiental</h3>
-            
-            <div className="grid grid-cols-1 gap-6">
-              {environmental.map(env => (
-                <div key={env.id} className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Leaf size={18} className="text-emerald-600" />
-                      <h4 className="font-semibold text-slate-800">{env.permiso}</h4>
-                    </div>
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full border
-                      ${env.estado === 'Aprobado' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                        env.estado === 'En Trámite' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
-                        'bg-slate-100 text-slate-600 border-slate-200'}
-                    `}>
-                      {env.estado}
-                    </span>
-                  </div>
-                  <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <InfoItem label="Resolución / Acto Administrativo" value={env.resolucion} />
-                    <InfoItem label="Plan de Compensación" value={env.compensaciones} />
-                  </div>
-                </div>
-              ))}
-              {environmental.length === 0 && <EmptyState message="No hay registros ambientales." />}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 7: INFORMES DE INTERVENTORÍA */}
-        {activeTab === 'territorio' && activeSubTabTerritorio === 'interventoria' && (
-          <div className="animate-in fade-in">
-            <InterventoriaReportsTab data={data} onUpdateProject={onUpdateProject} />
-          </div>
-        )}
-
-        {/* TAB 8: COMISIONES A TERRITORIO */}
-        {activeTab === 'territorio' && activeSubTabTerritorio === 'comisiones' && (
-          <div className="animate-in fade-in space-y-8">
-            <ComisionesTerritorio projectId={project.id} />
-            <GestionComisiones projectId={project.id} />
-          </div>
-        )}
-
-        {/* TAB 9: REPOSITORIO DOCUMENTAL */}
-        {activeTab === 'documentos' && activeSubTabDocumentos === 'repositorio' && (
-          <div className="animate-in fade-in">
-            <ProjectDocumentsTab projectId={project.id} />
-          </div>
-        )}
-
-        {activeTab === 'territorio' && activeSubTabTerritorio === 'ops' && (
-          <div className="animate-in fade-in space-y-8">
-            <GestionOPS projectId={project.id} />
-          </div>
-        )}
-
-        {activeTab === 'monitoreo' && activeSubTabMonitoreo === 'seguimiento' && (
-          <div className="animate-in fade-in">
-            <SmartTimeline project={data} />
-          </div>
-        )}
-
-        {/* TAB 10: IMPACTO TERRITORIAL */}
-        {activeTab === 'resumen' && activeSubTabResumen === 'impacto' && (
-          <div className="space-y-8 animate-in fade-in">
-            <ImpactoTerritorialDashboard projects={[data]} onSelectProject={() => {}} />
-          </div>
-        )}
-
-        {/* TAB 10.1: METODOLOGÍA INVERSIÓN-IMPACTO */}
-        {activeTab === 'resumen' && activeSubTabResumen === 'impacto' && (
-          <div className="animate-in fade-in">
-             <FinancialImpactDashboard projectData={data} edanData={{} as any /* EDAN MOCK */} />
-          </div>
-        )}
-
-        {/* TAB 11: PÓLIZAS Y GARANTÍAS */}
-        {activeTab === 'contratos' && activeSubTabContratos === 'polizas' && (
-          <div className="animate-in fade-in">
-            <GestionPolizas projectId={project.id} />
-          </div>
-        )}
-
-      </div>
-
-      {/* HIDDEN REPORT TEMPLATE FOR PDF EXPORT */}
-      <div className="absolute left-[-9999px] top-[-9999px]">
-        <div ref={reportRef} style={{ width: '800px', backgroundColor: '#ffffff', padding: '40px', fontFamily: 'sans-serif', color: '#1e293b' }}>
-          {/* Header Institucional */}
-          <div style={{ borderBottom: '4px solid #312e81', paddingBottom: '24px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <div>
-              <h1 style={{ fontSize: '30px', fontWeight: 900, color: '#312e81', textTransform: 'uppercase', letterSpacing: '-0.025em', margin: 0 }}>Informe Semanal de Interventoría</h1>
-              <p style={{ fontSize: '18px', color: '#64748b', marginTop: '4px', fontWeight: 500, margin: 0 }}>Sistema de Seguimiento SRR</p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>Fecha de Generación</p>
-              <p style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>{new Date().toLocaleDateString('es-CO')}</p>
-            </div>
-          </div>
-
-          {/* Datos del Proyecto */}
-          <div style={{ backgroundColor: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{project.nombre}</h2>
-              <span style={{ padding: '4px 12px', backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 700, borderRadius: '9999px', fontSize: '14px' }}>{project.id}</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '14px' }}>
-              <div><span style={{ color: '#64748b', fontWeight: 500 }}>Ubicación:</span> <strong style={{ color: '#0f172a' }}>{project.municipio}, {project.departamento}</strong></div>
-              <div><span style={{ color: '#64748b', fontWeight: 500 }}>Estado:</span> <strong style={{ color: '#0f172a' }}>{project.estado}</strong></div>
-              <div><span style={{ color: '#64748b', fontWeight: 500 }}>Contratista Obra:</span> <strong style={{ color: '#0f172a' }}>{contracts.find(c => c.tipo === 'Obra')?.contratista || 'N/A'}</strong></div>
-              <div><span style={{ color: '#64748b', fontWeight: 500 }}>Interventoría:</span> <strong style={{ color: '#0f172a' }}>{contracts.find(c => c.tipo === 'Interventoría')?.contratista || 'N/A'}</strong></div>
-            </div>
-          </div>
-
-          {/* Avances */}
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#312e81', borderBottom: '2px solid #e0e7ff', paddingBottom: '8px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>1. Estado de Avances</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '32px' }}>
-            <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#ffffff' }}>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Avance Programado</div>
-              <div style={{ fontSize: '24px', fontWeight: 900, color: '#1e293b' }}>{project.avanceProgramado}%</div>
-            </div>
-            <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#ffffff' }}>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Avance Físico Real</div>
-              <div style={{ fontSize: '24px', fontWeight: 900, color: '#4f46e5' }}>{project.avanceFisico}%</div>
-            </div>
-            <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#ffffff' }}>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Avance Financiero</div>
-              <div style={{ fontSize: '24px', fontWeight: 900, color: '#059669' }}>{project.avanceFinanciero}%</div>
-            </div>
-          </div>
-
-          {/* Resumen Financiero Detallado */}
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#312e81', borderBottom: '2px solid #e0e7ff', paddingBottom: '8px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>2. Resumen Financiero</h3>
-          <div style={{ backgroundColor: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '32px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              <div>
-                <p style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px', margin: 0 }}>Inversión Total</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(presupuesto.valorTotal)}</p>
-              </div>
-              <div>
-                <p style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px', margin: 0 }}>Pagos Realizados</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: '#059669', margin: 0 }}>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(presupuesto.pagosRealizados)}</p>
-              </div>
-              <div>
-                <p style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px', margin: 0 }}>Saldo por Ejecutar</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(presupuesto.valorTotal - presupuesto.pagosRealizados)}</p>
-              </div>
-              <div>
-                <p style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px', margin: 0 }}>Vigencia</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: 0 }}>{presupuesto.vigencia}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Últimas Actividades (Trackings) */}
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#312e81', borderBottom: '2px solid #e0e7ff', paddingBottom: '8px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>3. Actividades y Observaciones Recientes</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-            {avances.slice(0, 3).map(t => (
-              <div key={t.id} style={{ borderLeft: '4px solid #6366f1', paddingLeft: '16px', paddingTop: '8px', paddingBottom: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '4px' }}>
-                  <strong style={{ color: '#1e293b' }}>Fecha: {t.fecha}</strong>
-                  <span style={{ color: '#64748b' }}>Reporta: {t.reportadoPor}</span>
-                </div>
-                <p style={{ fontSize: '14px', color: '#334155', margin: 0 }}>{t.observaciones}</p>
-              </div>
-            ))}
-            {avances.length === 0 && <p style={{ fontSize: '14px', color: '#64748b', fontStyle: 'italic', margin: 0 }}>No hay actividades reportadas.</p>}
-          </div>
-
-          {/* Trazabilidad Institucional */}
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#312e81', borderBottom: '2px solid #e0e7ff', paddingBottom: '8px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>4. Trazabilidad Institucional</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-            {seguimientos.slice(0, 3).map(s => (
-              <div key={s.id} style={{ border: '1px solid #e2e8f0', padding: '12px', borderRadius: '8px', backgroundColor: '#ffffff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                  <strong style={{ color: '#312e81' }}>{s.tipo} - {s.fecha}</strong>
-                </div>
-                <p style={{ fontSize: '13px', color: '#1e293b', margin: '4px 0' }}>{s.descripcion}</p>
-                <p style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic', margin: 0 }}>Trazabilidad: {s.trazabilidad}</p>
-              </div>
-            ))}
-            {seguimientos.length === 0 && <p style={{ fontSize: '14px', color: '#64748b', fontStyle: 'italic', margin: 0 }}>No hay registros de trazabilidad institucional.</p>}
-          </div>
-
-          {/* Alertas Activas */}
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#312e81', borderBottom: '2px solid #e0e7ff', paddingBottom: '8px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>5. Alertas y Riesgos Activos</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-            {alerts.filter(a => a.estado === 'Abierta').map(a => (
-              <div key={a.id} style={{ backgroundColor: '#fff1f2', border: '1px solid #fecdd3', padding: '12px', borderRadius: '8px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <AlertTriangle size={18} color="#e11d48" style={{ marginTop: '2px' }} />
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#881337' }}>{a.tipo} ({a.nivel})</div>
-                  <div style={{ fontSize: '14px', color: '#9f1239', marginTop: '4px' }}>{a.descripcion}</div>
-                </div>
-              </div>
-            ))}
-            {alerts.filter(a => a.estado === 'Abierta').length === 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', backgroundColor: '#ecfdf5', padding: '12px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
-                <CheckCircle2 size={18} color="#059669" />
-                <span style={{ fontSize: '14px', fontWeight: 500 }}>No hay alertas activas reportadas.</span>
-              </div>
-            )}
-          </div>
-
-          {/* Gestión Ambiental */}
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#312e81', borderBottom: '2px solid #e0e7ff', paddingBottom: '8px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>6. Gestión Ambiental</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-            {environmental.map(e => (
-              <div key={e.id} style={{ border: '1px solid #e2e8f0', padding: '12px', borderRadius: '8px', backgroundColor: '#ffffff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                  <strong style={{ color: '#0f172a' }}>{e.permiso}</strong>
-                  <span style={{ 
-                    padding: '2px 8px', 
-                    borderRadius: '9999px', 
-                    fontSize: '11px', 
-                    fontWeight: 700,
-                    backgroundColor: e.estado === 'Aprobado' ? '#ecfdf5' : e.estado === 'En Trámite' ? '#fffbeb' : '#fef2f2',
-                    color: e.estado === 'Aprobado' ? '#059669' : e.estado === 'En Trámite' ? '#d97706' : '#dc2626'
-                  }}>
-                    {e.estado}
-                  </span>
-                </div>
-                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Resolución: {e.resolucion || 'Pendiente'}</p>
-              </div>
-            ))}
-            {environmental.length === 0 && <p style={{ fontSize: '14px', color: '#64748b', fontStyle: 'italic', margin: 0 }}>No se registran trámites ambientales.</p>}
-          </div>
-
-          {/* Impacto Territorial */}
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#312e81', borderBottom: '2px solid #e0e7ff', paddingBottom: '8px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>7. Impacto Territorial y Reducción de Riesgo</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', marginBottom: '32px' }}>
-            <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#ecfdf5' }}>
-              <div style={{ fontSize: '12px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Personas Protegidas</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: '#064e3b' }}>{project.poblacionBeneficiada?.toLocaleString() || 'N/A'}</div>
-            </div>
-            <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#fff1f2' }}>
-              <div style={{ fontSize: '12px', color: '#e11d48', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Riesgo Inicial</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: '#881337' }}>{project.riesgoAntes || 'N/A'}</div>
-            </div>
-            <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#e0e7ff' }}>
-              <div style={{ fontSize: '12px', color: '#4f46e5', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Riesgo Actual</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: '#312e81' }}>{project.riesgoDespues || 'N/A'}</div>
-            </div>
-            <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#eff6ff' }}>
-              <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Costo por Persona</div>
-              <div style={{ fontSize: '16px', fontWeight: 900, color: '#1e3a8a' }}>
-                {project.poblacionBeneficiada && project.poblacionBeneficiada > 0 ? 
-                  formatCurrency(calculateProjectTotals(project, contracts, otrosies, state.convenios, state.afectaciones, pagos, project.suspensiones || [], undefined, state.proyectos, undefined, state.presupuestos).valorTotal / project.poblacionBeneficiada) 
-                  : 'N/A'}
-              </div>
-            </div>
-          </div>
-
-          {/* Firmas */}
-          <div style={{ marginTop: '64px', paddingTop: '32px', borderTop: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderBottom: '1px solid #94a3b8', width: '100%', marginBottom: '8px', height: '48px' }}></div>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b', margin: 0 }}>Firma Interventoría</p>
-              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>{contracts.find(c => c.tipo === 'Interventoría')?.contratista || 'N/A'}</p>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderBottom: '1px solid #94a3b8', width: '100%', marginBottom: '8px', height: '48px' }}></div>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b', margin: 0 }}>Firma Supervisión SRR</p>
-              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Aprobación de Informe</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Delete Confirmation Modal for Project */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 text-rose-600 mb-4">
-              <AlertTriangle size={24} />
-              <h3 className="text-lg font-bold">¿Borrar Proyecto?</h3>
-            </div>
-            <p className="text-slate-600 mb-6">
-              ¿Estás seguro de que deseas borrar este proyecto? Esta acción es irreversible y eliminará todos los datos asociados.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  deleteProject(project.id);
-                  setShowDeleteModal(false);
-                  onBack();
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors"
-              >
-                Sí, borrar proyecto
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal for Contract */}
-      {contractToDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 text-rose-600 mb-4">
-              <AlertTriangle size={24} />
-              <h3 className="text-lg font-bold">¿Borrar Contrato?</h3>
-            </div>
-            <p className="text-slate-600 mb-6">
-              ¿Estás seguro de que deseas borrar este contrato? Esta acción es irreversible y eliminará todos los otrosíes y documentos asociados.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setContractToDelete(null)}
-                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  deleteContract(contractToDelete);
-                  setContractToDelete(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors"
-              >
-                Sí, borrar contrato
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal for Otrosie */}
-      {otrosieToDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 text-rose-600 mb-4">
-              <AlertTriangle size={24} />
-              <h3 className="text-lg font-bold">¿Borrar Otrosí?</h3>
-            </div>
-            <p className="text-slate-600 mb-6">
-              ¿Estás seguro de que deseas borrar este otrosí? Esta acción es irreversible.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setOtrosieToDelete(null)}
-                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  deleteOtrosie(otrosieToDelete);
-                  setOtrosieToDelete(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors"
-              >
-                Sí, borrar otrosí
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Contract Details Modal */}
-      {selectedContract && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full my-8 animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur-md z-10 rounded-t-2xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">Contrato {selectedContract.numero}</h3>
-                  <p className="text-sm text-slate-500">{selectedContract.tipo} - {selectedContract.contratista}</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setSelectedContract(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-8">
-              {/* Financial & Time Impact */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
-                  <div className="flex items-center gap-2 text-emerald-700 mb-2">
-                    <DollarSign size={18} />
-                    <h4 className="font-bold">Valor del Contrato</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-emerald-900">{formatCurrency(selectedContract.valor)}</p>
-                </div>
-                
-                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
-                  <div className="flex items-center gap-2 text-indigo-700 mb-2">
-                    <Calendar size={18} />
-                    <h4 className="font-bold">Plazo de Ejecución</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-indigo-900">{selectedContract.plazoMeses} meses</p>
-                  <p className="text-sm text-indigo-700 mt-1">
-                    {selectedContract.fechaInicio || 'Inicio no definido'} - {selectedContract.fechaFin || 'Fin no definido'}
-                  </p>
-                </div>
-              </div>
-
-              {/* AI Analysis Section */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-                  <BrainCircuit size={20} className="text-indigo-600" />
-                  <h4 className="text-lg font-bold text-slate-800">Análisis del Contrato (IA)</h4>
-                </div>
-                
-                <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
-                  <h5 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3">Objeto Contractual</h5>
-                  <p className="text-slate-700 leading-relaxed">{selectedContract.objetoContractual}</p>
-                </div>
-
-                {selectedContract.obligacionesPrincipales && selectedContract.obligacionesPrincipales.length > 0 && (
-                  <div className="bg-indigo-50/50 rounded-xl p-5 border border-indigo-100">
-                    <h5 className="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-3">Obligaciones Principales</h5>
-                    <ul className="list-disc pl-5 space-y-2 text-indigo-800">
-                      {selectedContract.obligacionesPrincipales.map((obligacion, index) => (
-                        <li key={index} className="leading-relaxed">{obligacion}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                
-                {selectedContract.garantias && selectedContract.garantias.length > 0 && (
-                  <div className="bg-amber-50 rounded-xl p-5 border border-amber-100">
-                    <h5 className="text-sm font-bold text-amber-900 uppercase tracking-wider mb-3">Garantías Exigidas</h5>
-                    <ul className="list-disc pl-5 space-y-2 text-amber-800">
-                      {selectedContract.garantias.map((garantia, index) => (
-                        <li key={index} className="leading-relaxed">{garantia}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Associated Document */}
-              {(() => {
-                const doc = state.documentos.find(d => d.contractId === selectedContract.id && d.tipo === 'Contrato');
-                if (doc && doc.versiones.length > 0) {
-                  return (
-                    <div className="border-t border-slate-200 pt-6">
-                      <h4 className="font-bold text-slate-800 mb-4">Documento Original</h4>
-                      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <div className="flex items-center gap-3">
-                          <FileText className="text-indigo-600" size={24} />
-                          <div>
-                            <p className="font-medium text-slate-900">{doc.titulo}</p>
-                            <p className="text-xs text-slate-500">Subido el {new Date(doc.fechaCreacion).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={async () => {
-                            const latestVersion = doc.versiones[doc.versiones.length - 1];
-                            await downloadFileWithAutoRepair(latestVersion.url, latestVersion.nombreArchivo);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                          <Eye size={16} />
-                          Ver PDF
-                        </button>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-
-              {/* Financial Documents Manager */}
-              <div className="border-t border-slate-200 pt-6">
-                <p className="text-sm text-slate-500 italic">Gestione la trazabilidad financiera desde la pestaña "Financiero" del proyecto.</p>
-              </div>
-            </div>
-            
-            <div className="p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex justify-end">
-              <button 
-                onClick={() => setSelectedContract(null)}
-                className="px-6 py-2.5 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl font-medium transition-colors"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Otrosí Details Modal */}
-      {selectedOtrosie && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h3 className="text-xl font-bold text-slate-800">Detalles del Otrosí No. {selectedOtrosie.numero}</h3>
-                <p className="text-sm text-slate-500 mt-1">Fecha de firma: {selectedOtrosie.fechaFirma}</p>
-              </div>
-              <button onClick={() => setSelectedOtrosie(null)} className="text-slate-400 hover:text-slate-600">
-                <PlusCircle size={24} className="rotate-45" />
-              </button>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <h4 className="text-sm font-bold text-slate-700 mb-2">Objeto del Otrosí</h4>
-                <p className="text-sm text-slate-600 leading-relaxed">{selectedOtrosie.objeto}</p>
-              </div>
-
-              <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-                <h4 className="text-sm font-bold text-amber-800 mb-2">Edición Rápida (Corrección IA)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Valor Adicional</label>
-                    <input 
-                      type="number"
-                      value={selectedOtrosie.valorAdicional}
-                      onChange={(e) => {
-                        const updated = { ...selectedOtrosie, valorAdicional: Number(e.target.value) || 0 };
-                        setSelectedOtrosie(updated);
-                        updateOtrosie(updated);
-                      }}
-                      className="w-full px-3 py-2 border border-amber-300 rounded text-sm font-bold text-amber-900"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Inicio Prórroga</label>
-                      <input 
-                        type="date"
-                        value={selectedOtrosie.fechaInicioProrroga || ''}
-                        onChange={(e) => {
-                          const fechaInicio = e.target.value;
-                          const plazoCalculado = calculatePlazo(fechaInicio, selectedOtrosie.fechaFinProrroga || '');
-                          const updated = { 
-                            ...selectedOtrosie, 
-                            fechaInicioProrroga: fechaInicio,
-                            plazoAdicionalMeses: plazoCalculado || selectedOtrosie.plazoAdicionalMeses
-                          };
-                          setSelectedOtrosie(updated);
-                          updateOtrosie(updated);
-                        }}
-                        className="w-full px-3 py-2 border border-amber-300 rounded text-sm font-bold text-amber-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Fin Prórroga</label>
-                      <input 
-                        type="date"
-                        value={selectedOtrosie.fechaFinProrroga || ''}
-                        onChange={(e) => {
-                          const fechaFin = e.target.value;
-                          const plazoCalculado = calculatePlazo(selectedOtrosie.fechaInicioProrroga || '', fechaFin);
-                          const updated = { 
-                            ...selectedOtrosie, 
-                            fechaFinProrroga: fechaFin,
-                            plazoAdicionalMeses: plazoCalculado || selectedOtrosie.plazoAdicionalMeses
-                          };
-                          setSelectedOtrosie(updated);
-                          updateOtrosie(updated);
-                        }}
-                        className="w-full px-3 py-2 border border-amber-300 rounded text-sm font-bold text-amber-900"
-                      />
-                    </div>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Plazo Adicional Manual (Meses)</label>
-                    <input 
-                      type="number"
-                      step="0.1"
-                      value={selectedOtrosie.plazoAdicionalMeses}
-                      onChange={(e) => {
-                        const updated = { ...selectedOtrosie, plazoAdicionalMeses: Number(e.target.value) || 0 };
-                        setSelectedOtrosie(updated);
-                        updateOtrosie(updated);
-                      }}
-                      className="w-full px-3 py-2 border border-amber-300 rounded text-sm font-bold text-amber-900"
-                    />
-                  </div>
-                </div>
-                <p className="text-[10px] text-amber-600 mt-2 font-medium italic">* Si la IA extrajo incorrectamente los valores cruciales debido a la complejidad del PDF, corríjalos aquí. Los cambios se guardan automáticamente y afectan la trazabilidad.</p>
-              </div>
-
-              {/* PDF Document Upload and Preview */}
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <h4 className="text-sm font-bold text-slate-800 flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <FileText size={16} className="text-indigo-600" />
-                    Documento Principal (PDF)
-                  </div>
-                  {!selectedOtrosie.documentoUrl && (
-                    <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-colors">
-                      {isUploadingOtrosiePDF ? <Activity size={14} className="animate-spin" /> : <Upload size={14} />}
-                      Subir o Reemplazar PDF
-                      <input type="file" accept="application/pdf" className="hidden" onChange={handleUploadOtrosiePDF} disabled={isUploadingOtrosiePDF} />
-                    </label>
-                  )}
-                </h4>
-                
-                {selectedOtrosie.documentoUrl ? (
-                  <div className="space-y-3">
-                    <div className="w-full h-96 bg-white border border-slate-300 rounded-lg overflow-hidden relative">
-                      <iframe 
-                        src={getIframeSafeUrl(selectedOtrosie.documentoUrl)} 
-                        title={`PDF Otrosí ${selectedOtrosie.numero}`}
-                        className="w-full h-full"
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                       <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors">
-                        {isUploadingOtrosiePDF ? <Activity size={14} className="animate-spin" /> : <Upload size={14} />}
-                        Reemplazar PDF
-                        <input type="file" accept="application/pdf" className="hidden" onChange={handleUploadOtrosiePDF} disabled={isUploadingOtrosiePDF} />
-                      </label>
-                      <button 
-                        onClick={() => downloadFileWithAutoRepair(selectedOtrosie.documentoUrl!, selectedOtrosie.documentoNombre || `Otrosí_${selectedOtrosie.numero}.pdf`)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors"
-                      >
-                        <Download size={14} /> Descargar PDF Original
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-300 rounded-lg bg-white">
-                    <FileText size={32} className="text-slate-300 mb-2" />
-                    <p className="text-sm font-medium text-slate-500 mb-4">No se ha adjuntado el documento original</p>
-                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-100 transition-colors">
-                      {isUploadingOtrosiePDF ? <Activity size={18} className="animate-spin" /> : <Upload size={18} />}
-                      {isUploadingOtrosiePDF ? 'Subiendo...' : 'Seleccionar archivo PDF'}
-                      <input type="file" accept="application/pdf" className="hidden" onChange={handleUploadOtrosiePDF} disabled={isUploadingOtrosiePDF} />
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
-                  <h4 className="text-sm font-bold text-indigo-800 mb-1">Impacto Financiero</h4>
-                  <p className="text-lg font-bold text-indigo-600">
-                    {selectedOtrosie.valorAdicional > 0 ? `+${formatCurrency(selectedOtrosie.valorAdicional)}` : 'Sin adición'}
-                  </p>
-                </div>
-                <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100">
-                  <h4 className="text-sm font-bold text-emerald-800 mb-1">Impacto en Plazo</h4>
-                  <p className="text-lg font-bold text-emerald-600">
-                    {selectedOtrosie.plazoAdicionalMeses > 0 ? `+${selectedOtrosie.plazoAdicionalMeses} meses` : 'Sin prórroga'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  <BrainCircuit size={16} className="text-indigo-600" />
-                  Análisis de Justificación (IA)
-                </h4>
-                
-                <div className="bg-white border border-slate-200 rounded-lg p-4">
-                  <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Justificación Técnica</h5>
-                  <p className="text-sm text-slate-700 leading-relaxed">{selectedOtrosie.justificacionTecnica}</p>
-                </div>
-                
-                <div className="bg-white border border-slate-200 rounded-lg p-4">
-                  <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Justificación Jurídica</h5>
-                  <p className="text-sm text-slate-700 leading-relaxed">{selectedOtrosie.justificacionJuridica}</p>
-                </div>
-              </div>
-
-              {selectedOtrosie.clausulasModificadas && selectedOtrosie.clausulasModificadas.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-3">Cláusulas Modificadas</h4>
-                  <div className="space-y-3">
-                    {selectedOtrosie.clausulasModificadas.map((c, i) => (
-                      <div key={i} className="border border-slate-200 rounded-lg overflow-hidden">
-                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-                          <span className="text-sm font-bold text-slate-700">Cláusula {c.numero}</span>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-                          <div className="p-4 bg-rose-50/30">
-                            <span className="text-xs font-bold text-rose-700 block mb-1">Dice:</span>
-                            <p className="text-xs text-slate-600">{c.descripcionAnterior}</p>
-                          </div>
-                          <div className="p-4 bg-emerald-50/30">
-                            <span className="text-xs font-bold text-emerald-700 block mb-1">Debe Decir:</span>
-                            <p className="text-xs text-slate-600">{c.descripcionNueva}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-8 pt-8 border-t border-slate-100">
-                <p className="text-sm text-slate-500 italic">Gestione la trazabilidad financiera desde la pestaña "Financiero" del proyecto.</p>
-              </div>
-            </div>
-            
-            <div className="mt-8 flex justify-end">
-              <button
-                onClick={() => setSelectedOtrosie(null)}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
-              >
-                Cerrar Detalles
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingContract && (
-        <EditContractModal 
-          contract={editingContract}
-          projectId={project.id}
-          onClose={() => setEditingContract(null)}
-        />
-      )}
-
-      {showEditConvenioModal && project.convenioId && (
-        <EditConvenioModal
-          convenio={state.convenios.find(c => c.id === project.convenioId)!}
-          onClose={() => setShowEditConvenioModal(false)}
-        />
-      )}
-    </div>
-  );
+import { Type } from "@google/genai";
+import { ProjectData, ConocimientoTerritorial } from "../types";
+import { calculateContractorPerformance } from "./performanceService";
+import { generateContent, getAIModel, AIProvider } from "./aiProviderService";
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64String = reader.result as string;
+      resolve(base64String.split(',')[1]);
+    };
+    reader.onerror = (error) => reject(error);
+  });
 };
 
-// Helper Components
-const InfoItem = ({ label, value, icon }: { label: string, value: string | number, icon?: React.ReactNode }) => (
-  <div>
-    <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1.5">
-      {icon && <span className="text-slate-400">{icon}</span>}
-      {label}
-    </div>
-    <div className="text-sm font-medium text-slate-900">{value}</div>
-  </div>
-);
+export const generateReportAIAnalysis = async (
+  project: ProjectData,
+  territorialKnowledge: ConocimientoTerritorial[]
+) => {
+  const model = getAIModel();
 
-const EmptyState = ({ message }: { message: string }) => (
-  <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-    <p className="text-slate-500 text-sm">{message}</p>
-  </div>
-);
+  const deptKnowledge = territorialKnowledge.filter(
+    k => (k.departamento || '').toLowerCase() === (project.project.departamento || '').toLowerCase()
+  );
+
+  // Extract analysis from project documents
+  const docAnalyses = project.documents?.filter(d => d.analysis).map(d => ({
+    titulo: d.titulo,
+    tipo: d.tipo,
+    resumen: d.analysis?.summary,
+    riesgosMitigados: d.analysis?.riesgosMitigados,
+    impactos: d.analysis?.impacts
+  })) || [];
+
+  const prompt = `
+    Analiza el siguiente proyecto en el contexto del conocimiento territorial (POD, POT, Riesgos) del departamento de ${project.project.departamento} y los documentos técnicos cargados.
+    
+    Proyecto:
+    Nombre: ${project.project.nombre}
+    Estado: ${project.project.estado}
+    Avance Físico: ${project.project.avanceFisico}%
+    Presupuesto: ${project.presupuesto.valorTotal}
+    Justificación: ${project.project.justificacion}
+    Objetivo: ${project.project.objetivoGeneral}
+    
+    Análisis de Documentos del Proyecto (Deep Learning):
+    ${JSON.stringify(docAnalyses)}
+    
+    Conocimiento Territorial (Documentos analizados con Deep Learning - POD, POT, Riesgos):
+    ${JSON.stringify(deptKnowledge)}
+    
+    Por favor, genera un análisis detallado de cómo este proyecto está contribuyendo a la disminución del riesgo en el departamento, considerando los hallazgos de los documentos territoriales y la información técnica del proyecto.
+    
+    Debes responder con un enfoque estratégico, evaluando si el proyecto ataca las causas raíz de los riesgos identificados en el territorio (según POD/POT) y cómo su ejecución impacta la resiliencia departamental.
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          analisisRiesgoTerritorial: { type: Type.STRING, description: "Análisis de cómo el proyecto contribuye a la disminución del riesgo basado en el conocimiento territorial y documentos del proyecto." },
+          alineacionPOD: { type: Type.STRING, description: "Alineación del proyecto con los Planes de Ordenamiento Departamental (POD) y POT." },
+          impactoResiliencia: { type: Type.STRING, description: "Evaluación del impacto del proyecto en la resiliencia del departamento." },
+          recomendacionesEstrategicas: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Recomendaciones estratégicas para maximizar el impacto del proyecto en la reducción del riesgo." }
+        },
+        required: ["analisisRiesgoTerritorial", "alineacionPOD", "impactoResiliencia", "recomendacionesEstrategicas"]
+      }
+    });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const extractEDANData = async (text: string, provider?: AIProvider) => {
+  const model = getAIModel();
+
+  const prompt = `
+    Analiza el siguiente texto de un reporte EDAN (Evaluación de Daños y Análisis de Necesidades) de la UNGRD con MÁXIMO RIGOR.
+    Extrae CADA CIFRA, FECHA y DATO mencionado, mapeándolo al formato JSON solicitado.
+    
+    Formatos de referencia:
+    - FR-1703-SMD-09 (Información General)
+    - FR-1900-SMD-04 (Consolidado de Daños y Necesidades)
+
+    INSTRUCCIONES DE RIGOR:
+    1. FECHAS Y HORAS: Extrae con exactitud (ej: 21/06/2022 8:00 AM).
+    2. POBLACIÓN: Diferencia entre heridos, muertos, desaparecidos, familias y personas.
+    3. VIVIENDAS: Diferencia entre averiadas/destruidas y urbano/rural.
+    4. COSTOS: Si el texto menciona costos (ej: "Valor total estimado: 175.000.000"), extráelos. Si menciona valores unitarios (ej: "350.000 por hora"), calcúlalos o lístalos.
+    5. INFRAESTRUCTURA: Identifica centros de salud, educación, vías (metros), puentes, etc.
+
+    Estructura JSON requerida:
+    {
+      "generalData": {
+        "diligenciador": "Nombre",
+        "institucion": "Institución",
+        "cargo": "Cargo",
+        "fecha": "YYYY-MM-DD",
+        "hora": "HH:MM",
+        "evento": "Tipo de evento",
+        "descripcionEvento": "Descripción breve",
+        "magnitud": "Datos de referencia",
+        "fechaEvento": "YYYY-MM-DD",
+        "horaEvento": "HH:MM",
+        "sitioEvento": "Ubicación",
+        "sectoresAfectados": "Barrios/veredas",
+        "eventosSecundarios": "Riesgos"
+      },
+      "poblacion": {
+        "heridos": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "muertos": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "desaparecidos": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "familiasAfectadas": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "personasAfectadas": { "cantidad": número, "valorUnitario": número, "valorTotal": número }
+      },
+      "danosVivienda": {
+        "averiadasUrbano": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "destruidasUrbano": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "averiadasRural": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "destruidasRural": { "cantidad": número, "valorUnitario": número, "valorTotal": número }
+      },
+      "infraestructura": {
+        "centrosSalud": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "centrosEducativos": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "viasMetros": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "puentesVehiculares": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "puentesPeatonales": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "redesElectricas": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "acueducto": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "alcantarillado": { "cantidad": número, "valorUnitario": número, "valorTotal": número }
+      },
+      "serviciosPublicos": {
+        "acueducto": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "alcantarillado": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "energia": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "gas": { "cantidad": número, "valorUnitario": número, "valorTotal": número }
+      },
+      "necesidades": {
+        "mercados": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "kitsAseo": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "kitsCocina": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "frazadas": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "colchonetas": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "aguaLitros": { "cantidad": número, "valorUnitario": número, "valorTotal": número },
+        "maquinariaHoras": { "cantidad": número, "valorUnitario": número, "valorTotal": número }
+      },
+      "costoTotalEstimado": número
+    }
+
+    Texto del reporte:
+    ${text}
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        generalData: {
+          type: Type.OBJECT,
+          properties: {
+            diligenciador: { type: Type.STRING },
+            institucion: { type: Type.STRING },
+            cargo: { type: Type.STRING },
+            fecha: { type: Type.STRING },
+            hora: { type: Type.STRING },
+            evento: { type: Type.STRING },
+            descripcionEvento: { type: Type.STRING },
+            magnitud: { type: Type.STRING },
+            fechaEvento: { type: Type.STRING },
+            horaEvento: { type: Type.STRING },
+            sitioEvento: { type: Type.STRING },
+            sectoresAfectados: { type: Type.STRING },
+            eventosSecundarios: { type: Type.STRING }
+          }
+        },
+        poblacion: {
+          type: Type.OBJECT,
+          properties: {
+            heridos: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            muertos: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            desaparecidos: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            familiasAfectadas: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            personasAfectadas: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } }
+          }
+        },
+        danosVivienda: {
+          type: Type.OBJECT,
+          properties: {
+            averiadasUrbano: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            destruidasUrbano: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            averiadasRural: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            destruidasRural: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } }
+          }
+        },
+        infraestructura: {
+          type: Type.OBJECT,
+          properties: {
+            centrosSalud: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            centrosEducativos: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            viasMetros: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            puentesVehiculares: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            puentesPeatonales: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            redesElectricas: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            acueducto: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            alcantarillado: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } }
+          }
+        },
+        serviciosPublicos: {
+          type: Type.OBJECT,
+          properties: {
+            acueducto: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            alcantarillado: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            energia: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            gas: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } }
+          }
+        },
+        necesidades: {
+          type: Type.OBJECT,
+          properties: {
+            mercados: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            kitsAseo: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            kitsCocina: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            frazadas: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            colchonetas: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            aguaLitros: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } },
+            maquinariaHoras: { type: Type.OBJECT, properties: { cantidad: { type: Type.NUMBER }, valorUnitario: { type: Type.NUMBER }, valorTotal: { type: Type.NUMBER } } }
+          }
+        },
+        costoTotalEstimado: { type: Type.NUMBER }
+      }
+    }
+  }, undefined, provider);
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const parseJSONResponse = (text: string) => {
+  if (!text) return null;
+  if (typeof text === 'object') return text;
+  
+  // Extract JSON using regex
+  const rootJsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+  let cleanText = rootJsonMatch ? rootJsonMatch[0] : "{}";
+  
+  const tryParse = (str: string) => {
+    try {
+      return JSON.parse(str);
+    } catch (e) {
+      // Try to fix common JSON errors like trailing commas
+      try {
+        const fixedJson = str.replace(/,\s*([\]}])/g, '$1');
+        return JSON.parse(fixedJson);
+      } catch (e2) {
+        // Try to fix truncated JSON by adding missing closing braces/brackets
+        try {
+          let fixed = str;
+          const openBraces = (fixed.match(/\{/g) || []).length;
+          const closeBraces = (fixed.match(/\}/g) || []).length;
+          const openBrackets = (fixed.match(/\[/g) || []).length;
+          const closeBrackets = (fixed.match(/\]/g) || []).length;
+          
+          if (openBraces > closeBraces) {
+            fixed += '}'.repeat(openBraces - closeBraces);
+          }
+          if (openBrackets > closeBrackets) {
+            fixed += ']'.repeat(openBrackets - closeBrackets);
+          }
+          return JSON.parse(fixed);
+        } catch (e3) {
+          return null;
+        }
+      }
+    }
+  };
+
+  // 2. Try direct parsing
+  let result = tryParse(cleanText);
+  if (result) return result;
+
+  // 3. Try to extract JSON from markdown code blocks (more aggressive)
+  const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/g;
+  let match;
+  while ((match = codeBlockRegex.exec(text)) !== null) {
+    result = tryParse(match[1].trim());
+    if (result) return result;
+  }
+  
+  // 4. Try finding the first '{' and last '}'
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const jsonCandidate = text.substring(firstBrace, lastBrace + 1);
+    result = tryParse(jsonCandidate);
+    if (result) return result;
+  }
+  
+  // 5. Try finding the first '[' and last ']'
+  const firstBracket = text.indexOf('[');
+  const lastBracket = text.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    const jsonCandidate = text.substring(firstBracket, lastBracket + 1);
+    result = tryParse(jsonCandidate);
+    if (result) return result;
+  }
+
+  // 6. If still failing, try to find ANY JSON-like structure
+  const anyJsonMatch = text.match(/\{[\s\S]*\}/);
+  if (anyJsonMatch) {
+    result = tryParse(anyJsonMatch[0]);
+    if (result) return result;
+  }
+  
+  throw new Error(`La IA no devolvió un formato de datos válido (JSON). Esto suele suceder cuando el documento no contiene la información solicitada o es ilegible. Respuesta recibida: "${text.substring(0, 150)}..."`);
+};
+
+export const extractConvenioDataFromPDF = async (file: File) => {
+  const model = getAIModel();
+  const base64 = await fileToBase64(file);
+
+  const prompt = `
+    Eres un auditor experto en contratación estatal y un especialista en OCR avanzado. Analiza el CONVENIO adjunto. 
+    ADVERTENCIA: El documento puede ser un escaneo de baja calidad, estar torcido, tener sellos sobre el texto, o estar escrito a mano.
+    
+    TU MISIÓN: Extraer la información con MÁXIMO RIGOR y TOLERANCIA A FALLOS DE OCR.
+    
+    ESTRATEGIAS DE EXTRACCIÓN:
+    1. Busca sinónimos: "N°", "Número", "No.", "Convenio Interadministrativo", "Contrato".
+    2. Infiere fechas de sellos de radicación, firmas, o textos introductorios si no hay un campo explícito.
+    3. Los valores monetarios pueden tener errores de OCR (ej. "S" por "$", "O" por "0"). Corrige estos errores lógicamente.
+    4. Si un campo no está explícitamente etiquetado, infiere su valor por el contexto (ej. el objeto suele estar en las primeras páginas después de "CONSIDERANDO" o "ACUERDAN").
+    5. NUNCA devuelvas un campo vacío si hay información que razonablemente podría corresponder a ese campo.
+    
+    Campos a extraer:
+    - numeroConvenio: N° CONVENIO (Busca en encabezados, sellos, o primer párrafo)
+    - partesConvenio: PARTES DEL CONVENIO (Quienes firman, ej. UNGRD y Municipio X)
+    - objetoConvenio: OBJETO DEL CONVENIO (Suele empezar con "Aunar esfuerzos...")
+    - plazoInicialMesesConvenio: PLAZO INICIAL (MESES) CONVENIO (Convierte texto a número si es necesario)
+    - tiempoTotalEjecucionMeses: TIEMPO TOTAL DE EJECUCIÓN (MESES)
+    - actaInicioConvenio: ACTA DE INICIO CONVENIO (Fecha YYYY-MM-DD)
+    - fechaFinalizacionConvenio: FECHA FINALIZACIÓN CONVENIO (YYYY-MM-DD)
+    - afectacionPresupuestal: AFECTACIÓN PRESUPUESTAL (CDP, RP, Rubro)
+    - cdpConvenio: Numero de CDP CONVENIO
+    - fechaCdpConvenio: Fecha de CDP CONVENIO (YYYY-MM-DD)
+    - rcConvenio: Número de RC/RP CONVENIO
+    - fechaRcConvenio: Fecha de RC/RP CONVENIO (YYYY-MM-DD)
+    - cdpObra: Numero de CDP OBRA
+    - fechaCdpObra: Fecha de CDP OBRA (YYYY-MM-DD)
+    - rcObra: Número de RC/RP OBRA
+    - fechaRcObra: Fecha de RC/RP OBRA (YYYY-MM-DD)
+    - cdpInterventoria: Numero de CDP INTERVENTORIA
+    - fechaCdpInterventoria: Fecha de CDP INTERVENTORIA (YYYY-MM-DD)
+    - rcInterventoria: Número de RC/RP INTERVENTORIA
+    - fechaRcInterventoria: Fecha de RC/RP INTERVENTORIA (YYYY-MM-DD)
+    - afectacionesPresupuestalesAdiciones: AFECTACIONES PRESUPUESTALES ADICIONES
+    - aporteMunicipioGobernacionObraInterventoria: APORTE DEL MUNICIPIO O GOBERNACION (Valor numérico)
+    - aporteDistrito: APORTE DEL DISTRITO / CIUDAD (Valor numérico)
+    - aporteGobernacion: APORTE DE LA GOBERNACIÓN / DEPARTAMENTO (Valor numérico)
+    - aporteMunicipio: APORTE DEL MUNICIPIO (Valor numérico)
+    - aporteFondo: APORTE DEL FONDO / FNGRD / UNGRD (Valor numérico)
+    - aporteFngrdObraInterventoria: APORTE DEL FNGRD / UNGRD (Valor numérico)
+    - valorTotalProyecto: VALOR TOTAL PROYECTO (Valor numérico)
+    - personasBeneficiadas: PERSONAS BENEFICIADAS (Número)
+    - empleosGenerados: EMPLEOS GENERADOS (Número)
+
+    REGLA DE ORO: Realiza OCR mental profundo. Reconstruye palabras fragmentadas. Si el documento es ilegible en una parte, busca la misma información en otra sección (ej. el valor suele repetirse en letras y números).
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          numeroConvenio: { type: Type.STRING },
+          partesConvenio: { type: Type.STRING },
+          objetoConvenio: { type: Type.STRING },
+          plazoInicialMesesConvenio: { type: Type.NUMBER },
+          tiempoTotalEjecucionMeses: { type: Type.NUMBER },
+          actaInicioConvenio: { type: Type.STRING },
+          fechaFinalizacionConvenio: { type: Type.STRING },
+          afectacionPresupuestal: { type: Type.STRING },
+          cdpConvenio: { type: Type.STRING },
+          fechaCdpConvenio: { type: Type.STRING },
+          rcConvenio: { type: Type.STRING },
+          fechaRcConvenio: { type: Type.STRING },
+          cdpObra: { type: Type.STRING },
+          fechaCdpObra: { type: Type.STRING },
+          rcObra: { type: Type.STRING },
+          fechaRcObra: { type: Type.STRING },
+          cdpInterventoria: { type: Type.STRING },
+          fechaCdpInterventoria: { type: Type.STRING },
+          rcInterventoria: { type: Type.STRING },
+          fechaRcInterventoria: { type: Type.STRING },
+          afectacionesPresupuestalesAdiciones: { type: Type.STRING },
+          aporteMunicipioGobernacionObraInterventoria: { type: Type.NUMBER },
+          aporteDistrito: { type: Type.NUMBER },
+          aporteGobernacion: { type: Type.NUMBER },
+          aporteMunicipio: { type: Type.NUMBER },
+          aporteFondo: { type: Type.NUMBER },
+          aporteFngrdObraInterventoria: { type: Type.NUMBER },
+          valorTotalProyecto: { type: Type.NUMBER },
+          personasBeneficiadas: { type: Type.NUMBER },
+          empleosGenerados: { type: Type.NUMBER }
+        }
+      }
+    }, [{ inlineData: { mimeType: file.type, data: base64 } }]);
+
+  return parseJSONResponse(responseText);
+};
+
+export const extractActaComiteDataFromPDF = async (file: File) => {
+  const model = getAIModel();
+  const base64 = await fileToBase64(file);
+
+  const prompt = `
+    Eres un auditor experto. Analiza el ACTA DE COMITÉ adjunta (puede ser un escaneo de baja calidad) y extrae la información con MÁXIMO RIGOR.
+    
+    Debes devolver un objeto JSON con esta estructura:
+    {
+      "numero": "string (Número del acta)",
+      "fecha": "string (YYYY-MM-DD)",
+      "temaCentral": "string (Resumen del tema principal)",
+      "decisiones": ["string (Lista de decisiones tomadas)"],
+      "compromisosAnteriores": [
+        {
+          "descripcion": "string",
+          "estadoActual": "string (Pendiente, En Proceso, Cumplido, Atrasado)",
+          "observaciones": "string"
+        }
+      ],
+      "compromisosNuevos": [
+        {
+          "descripcion": "string",
+          "responsable": "string",
+          "fechaLimite": "string (YYYY-MM-DD)",
+          "estado": "Pendiente"
+        }
+      ],
+      "estadoCronograma": {
+        "fechaInicioPrevista": "string (YYYY-MM-DD)",
+        "fechaFinPrevista": "string (YYYY-MM-DD)",
+        "avanceFisico": number (porcentaje 0-100),
+        "observaciones": "string"
+      },
+      "preocupaciones": ["string (Lista de preocupaciones o riesgos identificados)"],
+      "afectacionesGeneradas": [
+        {
+          "tipo": "Financiera" | "Social" | "Técnica" | "Legal",
+          "descripcion": "string",
+          "valorEstimado": number
+        }
+      ]
+    }
+
+    REGLA DE ORO: Las actas de comité son cruciales para la contratación derivada. Identifica cualquier mención a adiciones, prórrogas o nuevas obligaciones que afecten el proyecto. Extrae con precisión los compromisos anteriores y su estado, los nuevos compromisos adquiridos, las fechas previstas de inicio y fin, el avance físico reportado, y cualquier preocupación o riesgo mencionado.
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          numero: { type: Type.STRING },
+          fecha: { type: Type.STRING },
+          temaCentral: { type: Type.STRING },
+          decisiones: { type: Type.ARRAY, items: { type: Type.STRING } },
+          compromisosAnteriores: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                descripcion: { type: Type.STRING },
+                estadoActual: { type: Type.STRING },
+                observaciones: { type: Type.STRING }
+              },
+              required: ["descripcion", "estadoActual"]
+            }
+          },
+          compromisosNuevos: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                descripcion: { type: Type.STRING },
+                responsable: { type: Type.STRING },
+                fechaLimite: { type: Type.STRING },
+                estado: { type: Type.STRING }
+              },
+              required: ["descripcion", "responsable", "estado"]
+            }
+          },
+          estadoCronograma: {
+            type: Type.OBJECT,
+            properties: {
+              fechaInicioPrevista: { type: Type.STRING },
+              fechaFinPrevista: { type: Type.STRING },
+              avanceFisico: { type: Type.NUMBER },
+              observaciones: { type: Type.STRING }
+            }
+          },
+          preocupaciones: { type: Type.ARRAY, items: { type: Type.STRING } },
+          afectacionesGeneradas: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                tipo: { type: Type.STRING, enum: ["Financiera", "Social", "Técnica", "Legal"] },
+                descripcion: { type: Type.STRING },
+                valorEstimado: { type: Type.NUMBER }
+              },
+              required: ["tipo", "descripcion"]
+            }
+          }
+        },
+        required: ["numero", "fecha", "temaCentral", "decisiones"]
+      }
+    }, [{ inlineData: { mimeType: file.type, data: base64 } }]);
+
+  return parseJSONResponse(responseText);
+};
+
+export const extractConvenioData = async (text: string) => {
+  const model = getAIModel();
+
+  const prompt = `
+    Eres un auditor experto en contratación estatal y un especialista en análisis de texto. Analiza el siguiente texto de un CONVENIO de la UNGRD.
+    ADVERTENCIA: El texto puede provenir de un OCR imperfecto, tener errores tipográficos, palabras unidas o caracteres extraños.
+    
+    TU MISIÓN: Extraer la información con MÁXIMO RIGOR y TOLERANCIA A FALLOS DE OCR.
+    
+    ESTRATEGIAS DE EXTRACCIÓN:
+    1. Busca sinónimos: "N°", "Número", "No.", "Convenio Interadministrativo", "Contrato".
+    2. Infiere fechas de sellos de radicación, firmas, o textos introductorios si no hay un campo explícito.
+    3. Los valores monetarios pueden tener errores de OCR (ej. "S" por "$", "O" por "0"). Corrige estos errores lógicamente.
+    4. Si un campo no está explícitamente etiquetado, infiere su valor por el contexto (ej. el objeto suele estar en las primeras páginas después de "CONSIDERANDO" o "ACUERDAN").
+    5. NUNCA devuelvas un campo vacío si hay información que razonablemente podría corresponder a ese campo.
+    
+    Campos a extraer:
+    - numeroConvenio: N° CONVENIO (Busca en encabezados, sellos, o primer párrafo)
+    - partesConvenio: PARTES DEL CONVENIO (Quienes firman, ej. UNGRD y Municipio X)
+    - objetoConvenio: OBJETO DEL CONVENIO (Suele empezar con "Aunar esfuerzos...")
+    - plazoInicialMesesConvenio: PLAZO INICIAL (MESES) CONVENIO (Convierte texto a número si es necesario)
+    - tiempoTotalEjecucionMeses: TIEMPO TOTAL DE EJECUCIÓN (MESES)
+    - actaInicioConvenio: ACTA DE INICIO CONVENIO (Fecha YYYY-MM-DD)
+    - fechaFinalizacionConvenio: FECHA FINALIZACIÓN CONVENIO (YYYY-MM-DD)
+    - afectacionPresupuestal: AFECTACIÓN PRESUPUESTAL (CDP, RP, Rubro)
+    - cdpConvenio: Numero de CDP CONVENIO
+    - fechaCdpConvenio: Fecha de CDP CONVENIO (YYYY-MM-DD)
+    - rcConvenio: Número de RC/RP CONVENIO
+    - fechaRcConvenio: Fecha de RC/RP CONVENIO (YYYY-MM-DD)
+    - cdpObra: Numero de CDP OBRA
+    - fechaCdpObra: Fecha de CDP OBRA (YYYY-MM-DD)
+    - rcObra: Número de RC/RP OBRA
+    - fechaRcObra: Fecha de RC/RP OBRA (YYYY-MM-DD)
+    - cdpInterventoria: Numero de CDP INTERVENTORIA
+    - fechaCdpInterventoria: Fecha de CDP INTERVENTORIA (YYYY-MM-DD)
+    - rcInterventoria: Número de RC/RP INTERVENTORIA
+    - fechaRcInterventoria: Fecha de RC/RP INTERVENTORIA (YYYY-MM-DD)
+    - afectacionesPresupuestalesAdiciones: AFECTACIONES PRESUPUESTALES ADICIONES
+    - aporteMunicipioGobernacionObraInterventoria: APORTE DEL MUNICIPIO O GOBERNACION (Valor numérico)
+    - aporteDistrito: APORTE DEL DISTRITO / CIUDAD (Valor numérico)
+    - aporteGobernacion: APORTE DE LA GOBERNACIÓN / DEPARTAMENTO (Valor numérico)
+    - aporteMunicipio: APORTE DEL MUNICIPIO (Valor numérico)
+    - aporteFondo: APORTE DEL FONDO / FNGRD / UNGRD (Valor numérico)
+    - aporteFngrdObraInterventoria: APORTE DEL FNGRD / UNGRD (Valor numérico)
+    - valorTotalProyecto: VALOR TOTAL PROYECTO (Valor numérico)
+    - personasBeneficiadas: PERSONAS BENEFICIADAS (Número)
+    - empleosGenerados: EMPLEOS GENERADOS (Número)
+
+    Texto del convenio:
+    ${text}
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          numeroConvenio: { type: Type.STRING },
+          partesConvenio: { type: Type.STRING },
+          objetoConvenio: { type: Type.STRING },
+          plazoInicialMesesConvenio: { type: Type.NUMBER },
+          tiempoTotalEjecucionMeses: { type: Type.NUMBER },
+          actaInicioConvenio: { type: Type.STRING },
+          fechaFinalizacionConvenio: { type: Type.STRING },
+          afectacionPresupuestal: { type: Type.STRING },
+          cdpConvenio: { type: Type.STRING },
+          fechaCdpConvenio: { type: Type.STRING },
+          rcConvenio: { type: Type.STRING },
+          fechaRcConvenio: { type: Type.STRING },
+          cdpObra: { type: Type.STRING },
+          fechaCdpObra: { type: Type.STRING },
+          rcObra: { type: Type.STRING },
+          fechaRcObra: { type: Type.STRING },
+          cdpInterventoria: { type: Type.STRING },
+          fechaCdpInterventoria: { type: Type.STRING },
+          rcInterventoria: { type: Type.STRING },
+          fechaRcInterventoria: { type: Type.STRING },
+          afectacionesPresupuestalesAdiciones: { type: Type.STRING },
+          aporteMunicipioGobernacionObraInterventoria: { type: Type.NUMBER },
+          aporteDistrito: { type: Type.NUMBER },
+          aporteGobernacion: { type: Type.NUMBER },
+          aporteMunicipio: { type: Type.NUMBER },
+          aporteFondo: { type: Type.NUMBER },
+          aporteFngrdObraInterventoria: { type: Type.NUMBER },
+          valorTotalProyecto: { type: Type.NUMBER },
+          personasBeneficiadas: { type: Type.NUMBER },
+          empleosGenerados: { type: Type.NUMBER }
+        }
+      }
+    });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const extractActivityData = async (text: string) => {
+  const model = getAIModel();
+
+  const prompt = `
+    Analiza el siguiente texto (puede ser un acta de PMU, una citación a reunión, o un informe técnico) y extrae los datos de la actividad.
+    
+    Campos a extraer:
+    - title: Título o nombre de la actividad.
+    - type: Tipo de actividad (PMU, Reunión, Comité, Visita, Otra).
+    - date: Fecha de la actividad (YYYY-MM-DD).
+    - durationHours: Duración estimada en horas (número).
+    - phenomenon: Fenómeno asociado (ej: Frente Frío, Inundación).
+    - description: Resumen de lo tratado o el objetivo.
+    - participantEmails: Lista de correos electrónicos de los participantes mencionados.
+    
+    Texto:
+    ${text}
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING },
+        type: { type: Type.STRING, enum: ['PMU', 'Reunión', 'Comité', 'Visita', 'Otra'] },
+        date: { type: Type.STRING },
+        durationHours: { type: Type.NUMBER },
+        phenomenon: { type: Type.STRING },
+        description: { type: Type.STRING },
+        participantEmails: { type: Type.ARRAY, items: { type: Type.STRING } }
+      },
+      required: ['title', 'type', 'date', 'durationHours', 'description']
+    }
+  });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const extractCommissionData = async (text: string) => {
+  const model = getAIModel();
+
+  const prompt = `
+    Analiza el siguiente texto (resolución de comisión, solicitud de viáticos, plan de viaje o texto copiado de una tabla) y extrae los datos de la comisión de acuerdo al formato institucional.
+    
+    Campos a extraer con alta precisión:
+    - tipoVinculacion: 'CONTRATISTA' | 'FUNCIONARIO' | 'OTRO'
+    - responsableNombre: Nombre completo del responsable.
+    - tipoComision: Tipo de comisión (ej. INVITACION, TECNICA, etc).
+    - proyectoNombre: Nombre del proyecto asociado (ej. PNUD, SRR, etc).
+    - departamento: Departamento de la comisión.
+    - municipios: Municipios de la comisión.
+    - objeto: Objeto de la comisión o desplazamiento.
+    - fechaInicio: Fecha de inicio (YYYY-MM-DD).
+    - fechaFin: Fecha de terminación (YYYY-MM-DD).
+    - anio: Año de la comisión (number).
+    - numeroDias: Número de días (number, puede ser decimal ej 14.5).
+    - requiereViaticos: ¿Requiere pago de viáticos? (boolean).
+    - transporteTerrestre: ¿Usa transporte terrestre? (boolean).
+    - rutaAerea: Ruta aérea si aplica (ej. N.A o BOG-CTG).
+    - autorizadoVB: Estado de autorización (ej. CANCELADA, AUTORIZADA, V.°B°).
+    - planTrabajo1: Detalle del plan de trabajo 1.
+    - planTrabajo2: Detalle del plan de trabajo 2.
+    - planTrabajo3: Detalle del plan de trabajo 3.
+    - linkSoporte: Link de soporte si existe.
+    - fechaSolicitudFuncionario: Fecha en que el funcionario realizó la solicitud (YYYY-MM-DD).
+    - fechaSolicitud: Día de solicitud oficial (YYYY-MM-DD).
+    - fechaAprobacionSG: Día de aprobación por SG o emisión de tiquete (YYYY-MM-DD).
+    - diasGestionHabiles: Días que tardó la gestión en días hábiles (number).
+    
+    Texto:
+    ${text}
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        tipoVinculacion: { type: Type.STRING },
+        responsableNombre: { type: Type.STRING },
+        tipoComision: { type: Type.STRING },
+        proyectoNombre: { type: Type.STRING },
+        departamento: { type: Type.STRING },
+        municipios: { type: Type.STRING },
+        objeto: { type: Type.STRING },
+        fechaInicio: { type: Type.STRING },
+        fechaFin: { type: Type.STRING },
+        anio: { type: Type.NUMBER },
+        numeroDias: { type: Type.NUMBER },
+        requiereViaticos: { type: Type.BOOLEAN },
+        transporteTerrestre: { type: Type.BOOLEAN },
+        rutaAerea: { type: Type.STRING },
+        autorizadoVB: { type: Type.STRING },
+        planTrabajo1: { type: Type.STRING },
+        planTrabajo2: { type: Type.STRING },
+        planTrabajo3: { type: Type.STRING },
+        linkSoporte: { type: Type.STRING },
+        fechaSolicitudFuncionario: { type: Type.STRING },
+        fechaSolicitud: { type: Type.STRING },
+        fechaAprobacionSG: { type: Type.STRING },
+        diasGestionHabiles: { type: Type.NUMBER }
+      },
+      required: ['tipoVinculacion', 'responsableNombre', 'objeto', 'fechaInicio', 'fechaFin']
+    }
+  });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const extractProjectData = async (text: string) => {
+  const model = getAIModel();
+
+  const prompt = `Analiza el siguiente texto y extrae la información del proyecto siguiendo el formato oficial de la matriz institucional de la Subdirección de Reducción del Riesgo (SRR). 
+        Texto: ${text}
+        
+        Debes devolver un objeto JSON que mapee los campos a la interfaz ProjectMatrix y Project.
+        Campos clave a extraer para la matriz oficial:
+        - codigoDepartamento, codigoMunicipio, clave (si aparecen)
+        - numeroConvenio, partesConvenio, objetoConvenio
+        - plazoInicialMesesConvenio, tiempoTotalEjecucionMeses
+        - actaInicioConvenio, fechaFinalizacionConvenio
+        - afectacionPresupuestal, cdpConvenio, fechaCdpConvenio, rcConvenio, fechaRcConvenio
+        - cdpObra, fechaCdpObra, rcObra, fechaRcObra
+        - cdpInterventoria, fechaCdpInterventoria, rcInterventoria, fechaRcInterventoria
+        - valorTotalProyecto, personasBeneficiadas, empleosGenerados
+        - numeroContratoObra, objetoObra, valorContratoObra, contratistaObra, nitContratistaObra, valorPagadoObra
+        - numeroContratoInterventoria, objetoInterventoria, valorContratoInterventoria, contratistaInterventoria, nitContratistaInterventoria, valorPagadoInterventoria
+        - Y todos los demás campos de la matriz oficial (fechas, avances, estados, permisos, seguimientos, valorPagadoConvenio, etc.)
+        
+        Campos generales del proyecto:
+        - nombre, departamento, municipio, linea, vigencia, tipoObra, justificacion, objetivoGeneral, objetivosEspecificos (array), alcance, beneficiarios.
+        
+        INSTRUCCIÓN CRÍTICA Y RIGUROSA:
+        1. AVANCES: Extrae con precisión milimétrica el 'avanceFisico', 'avanceProgramado', 'avanceFinancieroObra', 'avanceFinancieroInterventoria' y 'avanceFinancieroPonderado'. Si encuentras porcentajes de avance en el texto, asígnalos correctamente.
+        2. PAGOS: Extrae con exactitud los valores pagados ('valorPagadoObra', 'valorPagadoInterventoria', 'valorPagadoConvenio'). Si se mencionan pagos de actividades, súmalos o asígnalos al campo correspondiente.
+        3. BENEFICIARIOS: Extrae rigurosamente la cantidad y descripción de los 'beneficiarios' (y 'personasBeneficiadas'). Consígnalo de forma clara y completa.
+        
+        Si detectas que el proyecto ya tiene contrato de obra y acta de inicio, sugiere el estado como 'En ejecución' o 'Ejecución Directa'.`;
+
+  const responseText = await generateContent(prompt, model, {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          nombre: { type: Type.STRING },
+          departamento: { type: Type.STRING },
+          municipio: { type: Type.STRING },
+          linea: { type: Type.STRING },
+          vigencia: { type: Type.STRING },
+          tipoObra: { type: Type.STRING },
+          fechaInicio: { type: Type.STRING },
+          fechaFin: { type: Type.STRING },
+          justificacion: { type: Type.STRING },
+          objetivoGeneral: { type: Type.STRING },
+          objetivosEspecificos: { type: Type.ARRAY, items: { type: Type.STRING } },
+          alcance: { type: Type.STRING },
+          beneficiarios: { type: Type.STRING },
+          matrix: {
+            type: Type.OBJECT,
+            properties: {
+              codigoDepartamento: { type: Type.STRING },
+              codigoMunicipio: { type: Type.STRING },
+              clave: { type: Type.STRING },
+              numeroConvenio: { type: Type.STRING },
+              partesConvenio: { type: Type.STRING },
+              objetoConvenio: { type: Type.STRING },
+              plazoInicialMesesConvenio: { type: Type.NUMBER },
+              tiempoTotalEjecucionMeses: { type: Type.NUMBER },
+              actaInicioConvenio: { type: Type.STRING },
+              fechaFinalizacionConvenio: { type: Type.STRING },
+              afectacionPresupuestal: { type: Type.STRING },
+              cdpConvenio: { type: Type.STRING },
+              fechaCdpConvenio: { type: Type.STRING },
+              rcConvenio: { type: Type.STRING },
+              fechaRcConvenio: { type: Type.STRING },
+              cdpObra: { type: Type.STRING },
+              fechaCdpObra: { type: Type.STRING },
+              rcObra: { type: Type.STRING },
+              fechaRcObra: { type: Type.STRING },
+              cdpInterventoria: { type: Type.STRING },
+              fechaCdpInterventoria: { type: Type.STRING },
+              rcInterventoria: { type: Type.STRING },
+              fechaRcInterventoria: { type: Type.STRING },
+              afectacionesPresupuestalesAdiciones: { type: Type.STRING },
+              aporteMunicipioGobernacionObraInterventoria: { type: Type.NUMBER },
+              aporteDistrito: { type: Type.NUMBER },
+              aporteGobernacion: { type: Type.NUMBER },
+              aporteMunicipio: { type: Type.NUMBER },
+              aporteFondo: { type: Type.NUMBER },
+              aporteFngrdObraInterventoria: { type: Type.NUMBER },
+              valorTotalProyecto: { type: Type.NUMBER },
+              personasBeneficiadas: { type: Type.NUMBER },
+              empleosGenerados: { type: Type.NUMBER },
+              numeroContratoObra: { type: Type.STRING },
+              objetoObra: { type: Type.STRING },
+              valorContratoObra: { type: Type.NUMBER },
+              contratistaObra: { type: Type.STRING },
+              conformacionLegalObra: { type: Type.STRING },
+              nitContratistaObra: { type: Type.STRING },
+              numeroContratoInterventoria: { type: Type.STRING },
+              objetoInterventoria: { type: Type.STRING },
+              valorContratoInterventoria: { type: Type.NUMBER },
+              contratistaInterventoria: { type: Type.STRING },
+              conformacionLegalInterventoria: { type: Type.STRING },
+              nitContratistaInterventoria: { type: Type.STRING },
+              valorObraInterventoria: { type: Type.NUMBER },
+              fechaSuscripcionInterventoria: { type: Type.STRING },
+              fechaInicioObra: { type: Type.STRING },
+              fechaFinalizacionInicial: { type: Type.STRING },
+              fechaFinalizacionActual: { type: Type.STRING },
+              mesFinalizacionActual: { type: Type.STRING },
+              anioFinalizacionActual: { type: Type.STRING },
+              fechaPerdidaCompetenciaLiquidacion: { type: Type.STRING },
+              anioPerdidaCompetencia: { type: Type.STRING },
+              mesPerdidaCompetencia: { type: Type.STRING },
+              valorContraLiquidacionObra: { type: Type.NUMBER },
+              valorContraLiquidacionInterventoria: { type: Type.NUMBER },
+              avanceProgramado: { type: Type.NUMBER },
+              avanceFisico: { type: Type.NUMBER },
+              avanceFinancieroObra: { type: Type.NUMBER },
+              avanceFinancieroInterventoria: { type: Type.NUMBER },
+              avanceFinancieroPonderado: { type: Type.NUMBER },
+              valorPagadoConvenio: { type: Type.NUMBER },
+              valorPagadoObra: { type: Type.NUMBER },
+              valorPagadoInterventoria: { type: Type.NUMBER },
+              estadoObra: { type: Type.STRING },
+              estadoInterventoria: { type: Type.STRING },
+              estadoProyecto: { type: Type.STRING },
+              apoyoTecnicoAntigüo: { type: Type.STRING },
+              apoyoFinanciero: { type: Type.STRING },
+              apoyoJuridico: { type: Type.STRING },
+              apoyoJuridico2026: { type: Type.STRING },
+              apoyoTecnico: { type: Type.STRING },
+              apoyoTecnico2026: { type: Type.STRING },
+              atrasoEjecucionObra: { type: Type.NUMBER },
+              diasRestantesFinalizacion: { type: Type.NUMBER },
+              entregaMunicipio: { type: Type.STRING },
+              fechaEntregaMunicipio: { type: Type.STRING },
+              detalleEstado: { type: Type.STRING },
+              anioVencimientoLiquidacion: { type: Type.STRING },
+              mesVencimiento: { type: Type.STRING },
+              regalias: { type: Type.STRING },
+              vencioTerminosLiquidacion: { type: Type.STRING },
+              afectaciones: { type: Type.STRING },
+              ejecucionAl100: { type: Type.STRING },
+              liquidacionJudicialObra: { type: Type.STRING },
+              liquidacionJudicialInterventoria: { type: Type.STRING },
+              inhabilidadObra: { type: Type.STRING },
+              inhabilidadInterventoria: { type: Type.STRING },
+              seguimientoEntesControl: { type: Type.STRING },
+              pendienteFidu: { type: Type.STRING },
+              detalleSeguimientoEntesControl: { type: Type.STRING },
+              alertaSarlaft: { type: Type.STRING },
+              detalleAlerta: { type: Type.STRING },
+              detalleIncumplimiento: { type: Type.STRING },
+              detalleConciliacionPrejudicial: { type: Type.STRING },
+              autoridadAmbientalCompetente: { type: Type.STRING },
+              requierePermisoOcupacionCauce: { type: Type.STRING },
+              tramitoPermisoOcupacionCauce: { type: Type.STRING },
+              numeroResolucionOcupacionCauce: { type: Type.STRING },
+              fechaSolicitudOcupacionCauce: { type: Type.STRING },
+              fechaResolucionOcupacionCauce: { type: Type.STRING },
+              alcanceResolucion: { type: Type.STRING },
+              alcanceRealObra: { type: Type.STRING },
+              brechaIdentificada: { type: Type.STRING },
+              requierePermisoAprovechamientoForestal: { type: Type.STRING },
+              tramitePermisoAprovechamientoForestal: { type: Type.STRING },
+              numeroResolucionAprovechamientoForestal: { type: Type.STRING },
+              fechaTramiteAprovechamientoForestal: { type: Type.STRING },
+              fechaPermisoAprovechamientoForestal: { type: Type.STRING },
+              especificacionPermiso: { type: Type.STRING },
+              analisisMultitemporalAdjunto: { type: Type.STRING },
+              evidenciaFotografica: { type: Type.STRING },
+              compensacionesExigidas: { type: Type.STRING },
+              inversion1Pct: { type: Type.STRING },
+              estadoCumplimiento1Pct: { type: Type.STRING },
+              observacionesGenerales: { type: Type.STRING },
+              avancesReportadosInterventoria: { type: Type.STRING },
+              avancesReportadosEnteTerritorial: { type: Type.STRING },
+              avancesReportadosAutoridadAmbiental: { type: Type.STRING },
+              seguimientoSubdirectoraSept2025: { type: Type.STRING },
+              seguimientoSubdirectoraOct2025: { type: Type.STRING },
+              seguimientoNov11_2025: { type: Type.STRING },
+              seguimientoNov20_2025: { type: Type.STRING },
+              seguimientoDic05_2025: { type: Type.STRING },
+              seguimientoDic12_2025: { type: Type.STRING },
+              seguimientoDic13_2025: { type: Type.STRING },
+              seguimientoEne08_2026: { type: Type.STRING },
+              seguimientoEne22_2026: { type: Type.STRING },
+              seguimientoFeb06_2026: { type: Type.STRING },
+              seguimientoFeb16_2026: { type: Type.STRING },
+              seguimientoFeb24_2026: { type: Type.STRING },
+              seguimientoMar02_2026: { type: Type.STRING },
+              seguimientoMar16_2026: { type: Type.STRING },
+            }
+          }
+        }
+      }
+    });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const analyzeCommissionReport = async (file: File) => {
+  const model = getAIModel();
+  
+  const reader = new FileReader();
+  const base64Data = await new Promise<string>((resolve) => {
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(file);
+  });
+  const base64Content = base64Data.split(',')[1];
+
+  const prompt = `
+    Eres un experto en gestión del riesgo de desastres en Colombia. Tu tarea es analizar un informe de comisión de la UNGRD (Unidad Nacional para la Gestión del Riesgo de Desastres).
+    Extrae la información clave siguiendo la estructura oficial de informes técnicos de la entidad.
+    
+    Debes devolver un objeto JSON con los siguientes campos:
+    - actividades: string (Resumen detallado de las actividades técnicas y de supervisión realizadas)
+    - hallazgos: string (Hallazgos técnicos, situaciones detectadas en terreno y estado de las obras/procesos)
+    - conclusiones: string (Conclusiones técnicas sobre el cumplimiento de los objetivos de la comisión)
+    - recomendaciones: string (Recomendaciones técnicas y acciones a seguir para la mitigación del riesgo o avance del proyecto)
+    - fechaGeneracion: string (Fecha de generación del informe en formato YYYY-MM-DD)
+  `;
+
+  const extraParts = [
+    { inlineData: { data: base64Content, mimeType: file.type } }
+  ];
+
+  const responseText = await generateContent(
+    prompt,
+    model,
+    {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          actividades: { type: Type.STRING },
+          hallazgos: { type: Type.STRING },
+          conclusiones: { type: Type.STRING },
+          recomendaciones: { type: Type.STRING },
+          fechaGeneracion: { type: Type.STRING }
+        },
+        required: ["actividades", "hallazgos", "conclusiones", "recomendaciones", "fechaGeneracion"]
+      }
+    },
+    extraParts
+  );
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const analyzePolicyText = async (text: string, modelName: string = "gemini-3-flash-preview", contractContext?: any) => {
+  const prompt = `Analiza el siguiente texto que contiene información de una póliza o garantía.
+  Extrae la información detallada según los campos requeridos.
+  
+  ${contractContext ? `CONTEXTO DEL CONTRATO:
+  - Número: ${contractContext.numero}
+  - Valor: ${contractContext.valorActual}
+  - Fecha Inicio: ${contractContext.fechaInicio}
+  - Fecha Fin: ${contractContext.fechaFin}
+  ` : ''}
+
+  Texto: ${text}
+  
+  Campos a extraer:
+  - tipo_amparo: El tipo de amparo (ej: Buen manejo del anticipo, Cumplimiento, Salarios, Estabilidad, Calidad).
+  - numero_poliza: El número identificador de la póliza.
+  - valor_asegurado: El valor total asegurado (número).
+  - numero_certificado_anexo: El número de certificado o anexo si aplica.
+  - entidad_aseguradora: Nombre de la compañía de seguros.
+  - tipo_garantia: Tipo de garantía (ej: Contrato de seguro, Garantía bancaria).
+  - fecha_expedicion: Fecha en que se expidió la póliza (YYYY-MM-DD).
+  - fecha_aprobacion: Fecha en que fue aprobada por la entidad (YYYY-MM-DD).
+  - fecha_inicio_vigencia: Fecha de inicio de la cobertura (YYYY-MM-DD).
+  - fecha_finalizacion_vigencia: Fecha de fin de la cobertura (YYYY-MM-DD).
+  - apoyo_supervision: Nombre de la persona de apoyo a la supervisión mencionada.
+  - riesgo_cubierto: Descripción del riesgo que cubre.
+  - estado: Estado actual mencionado (ej: VIGENTE, LIQUIDADO).
+  
+  VALIDACIÓN ADICIONAL:
+  - Compara las fechas de la póliza con las del contrato.
+  - Compara el valor asegurado con el valor del contrato.
+  - Detecta inconsistencias legales.
+  - Valida el cumplimiento de la Ley 1523 de 2012 (Sistema Nacional de Gestión del Riesgo de Desastres) en el contexto de la gestión del riesgo y aseguramiento.
+  - Devuelve un campo 'validacion_ia' con:
+    { 
+      "coherente": boolean, 
+      "observaciones": string, 
+      "inconsistencias": string[],
+      "cumplimiento_ley_1523": {
+        "cumple": boolean,
+        "analisis": string,
+        "articulos_relacionados": string[]
+      }
+    }`;
+
+  const responseText = await generateContent(
+    prompt,
+    modelName,
+    {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          tipo_amparo: { type: Type.STRING },
+          numero_poliza: { type: Type.STRING },
+          valor_asegurado: { type: Type.NUMBER },
+          numero_certificado_anexo: { type: Type.STRING },
+          entidad_aseguradora: { type: Type.STRING },
+          tipo_garantia: { type: Type.STRING },
+          fecha_expedicion: { type: Type.STRING },
+          fecha_aprobacion: { type: Type.STRING },
+          fecha_inicio_vigencia: { type: Type.STRING },
+          fecha_finalizacion_vigencia: { type: Type.STRING },
+          apoyo_supervision: { type: Type.STRING },
+          riesgo_cubierto: { type: Type.STRING },
+          estado: { type: Type.STRING },
+          validacion_ia: {
+            type: Type.OBJECT,
+            properties: {
+              coherente: { type: Type.BOOLEAN },
+              observaciones: { type: Type.STRING },
+              inconsistencias: { type: Type.ARRAY, items: { type: Type.STRING } },
+              cumplimiento_ley_1523: {
+                type: Type.OBJECT,
+                properties: {
+                  cumple: { type: Type.BOOLEAN },
+                  analisis: { type: Type.STRING },
+                  articulos_relacionados: { type: Type.ARRAY, items: { type: Type.STRING } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  );
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const analyzePolicyDocument = async (file: File, modelName: string = "gemini-3-flash-preview", contractContext?: any) => {
+  const base64Content = await fileToBase64(file);
+  
+  const prompt = `Analiza el siguiente documento de póliza o garantía de cumplimiento.
+  Extrae la información detallada según los campos requeridos para la gestión de contratos en Colombia.
+  
+  ${contractContext ? `CONTEXTO DEL CONTRATO:
+  - Número: ${contractContext.numero}
+  - Valor: ${contractContext.valorActual}
+  - Fecha Inicio: ${contractContext.fechaInicio}
+  - Fecha Fin: ${contractContext.fechaFin}
+  ` : ''}
+
+  Campos a extraer:
+  - tipo_amparo: El tipo de amparo (ej: Buen manejo del anticipo, Cumplimiento, Salarios, Estabilidad, Calidad).
+  - numero_poliza: El número identificador de la póliza.
+  - valor_asegurado: El valor total asegurado (número).
+  - numero_certificado_anexo: El número de certificado o anexo si aplica.
+  - entidad_aseguradora: Nombre de la compañía de seguros.
+  - tipo_garantia: Tipo de garantía (ej: Contrato de seguro, Garantía bancaria).
+  - fecha_expedicion: Fecha en que se expidió la póliza (YYYY-MM-DD).
+  - fecha_aprobacion: Fecha en que fue aprobada por la entidad (YYYY-MM-DD).
+  - fecha_inicio_vigencia: Fecha de inicio de la cobertura (YYYY-MM-DD).
+  - fecha_finalizacion_vigencia: Fecha de fin de la cobertura (YYYY-MM-DD).
+  - apoyo_supervision: Nombre de la persona de apoyo a la supervisión mencionada.
+  - riesgo_cubierto: Descripción del riesgo que cubre.
+  - estado: Estado actual mencionado (ej: VIGENTE, LIQUIDADO).
+  
+  VALIDACIÓN ADICIONAL:
+  - Compara las fechas de la póliza con las del contrato.
+  - Compara el valor asegurado con el valor del contrato.
+  - Detecta inconsistencias legales.
+  - Valida el cumplimiento de la Ley 1523 de 2012 (Sistema Nacional de Gestión del Riesgo de Desastres) en el contexto de la gestión del riesgo y aseguramiento.
+  - Devuelve un campo 'validacion_ia' con:
+    { 
+      "coherente": boolean, 
+      "observaciones": string, 
+      "inconsistencias": string[],
+      "cumplimiento_ley_1523": {
+        "cumple": boolean,
+        "analisis": string,
+        "articulos_relacionados": string[]
+      }
+    }`;
+
+  const extraParts = [
+    { inlineData: { data: base64Content, mimeType: file.type } }
+  ];
+
+  const responseText = await generateContent(
+    prompt,
+    modelName,
+    {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          tipo_amparo: { type: Type.STRING },
+          numero_poliza: { type: Type.STRING },
+          valor_asegurado: { type: Type.NUMBER },
+          numero_certificado_anexo: { type: Type.STRING },
+          entidad_aseguradora: { type: Type.STRING },
+          tipo_garantia: { type: Type.STRING },
+          fecha_expedicion: { type: Type.STRING },
+          fecha_aprobacion: { type: Type.STRING },
+          fecha_inicio_vigencia: { type: Type.STRING },
+          fecha_finalizacion_vigencia: { type: Type.STRING },
+          apoyo_supervision: { type: Type.STRING },
+          riesgo_cubierto: { type: Type.STRING },
+          estado: { type: Type.STRING },
+          validacion_ia: {
+            type: Type.OBJECT,
+            properties: {
+              coherente: { type: Type.BOOLEAN },
+              observaciones: { type: Type.STRING },
+              inconsistencias: { type: Type.ARRAY, items: { type: Type.STRING } },
+              cumplimiento_ley_1523: {
+                type: Type.OBJECT,
+                properties: {
+                  cumple: { type: Type.BOOLEAN },
+                  analisis: { type: Type.STRING },
+                  articulos_relacionados: { type: Type.ARRAY, items: { type: Type.STRING } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    extraParts
+  );
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const extractContractData = async (text: string) => {
+  const model = getAIModel();
+
+  const prompt = `Analiza el siguiente texto y extrae la información de un contrato de obra, interventoría o consultoría.
+        Texto: ${text}
+        
+        Debes devolver un objeto JSON que mapee los campos a la interfaz Contract.
+        Campos a extraer:
+        - numero, objetoContractual, valor, plazoMeses, contratista, nit, fechaInicio, fechaFin, estado, tipo.`;
+
+  const responseText = await generateContent(prompt, model, {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          numero: { type: Type.STRING },
+          objetoContractual: { type: Type.STRING },
+          valor: { type: Type.NUMBER },
+          plazoMeses: { type: Type.NUMBER },
+          contratista: { type: Type.STRING },
+          nit: { type: Type.STRING },
+          fechaInicio: { type: Type.STRING },
+          fechaFin: { type: Type.STRING },
+          estado: { type: Type.STRING },
+          tipo: { type: Type.STRING }
+        }
+      }
+    });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const extractProfessionalData = async (text: string) => {
+  const model = getAIModel();
+  console.log('Raw text to extract:', text);
+
+  // Intentar parseo manual primero (TSV)
+  const lines = text.split('\n').filter(line => line.trim() !== '');
+  
+  // Buscar una línea que no sea encabezado
+  const dataLine = lines.find(line => 
+    !line.toUpperCase().includes('CONTRATISTA') && 
+    !line.toUpperCase().includes('NUMERO DE CONTRATO') &&
+    line.split('\t').length >= 15 // Mínimo de campos esperados
+  );
+
+  if (dataLine) {
+    const parts = dataLine.split('\t');
+    console.log('Manual TSV parsing successful. Parts:', parts);
+    
+    const parsed: any = {
+      nombre: parts[2]?.trim() || '',
+      numeroContrato: parts[3]?.trim() || '',
+      profesion: parts[13]?.trim() || '',
+      salarioMensual: parseFloat(parts[18]?.replace(/[^0-9]/g, '') || '0'),
+      valorTotalContrato: parseFloat(parts[19]?.replace(/[^0-9]/g, '') || '0'),
+      supervisor: parts[9]?.trim() || '',
+      fechaInicio: parts[10]?.trim() || '',
+      fechaFinalizacion: parts[11]?.trim() || '',
+      ciudad: parts[12]?.trim() || '',
+      objetoContrato: parts[17]?.trim() || '',
+      formacionAcademica: [parts[13], parts[14], parts[15], parts[16]].filter(Boolean).map(s => s.trim()),
+      especialidades: [parts[6], parts[7]].filter(Boolean).map(s => s.trim()),
+      departamentosExperiencia: [parts[1]].filter(Boolean).map(s => s.trim()),
+      experienciaAnios: 0
+    };
+    console.log('Manually extracted professional data:', parsed);
+    return parsed;
+  }
+
+  // Fallback a IA si el parseo manual falla
+  console.log('Manual parsing failed, falling back to AI');
+  const prompt = `Analiza el siguiente texto, que contiene datos separados por tabulaciones (TSV), y extrae la información del profesional siguiendo estrictamente esta estructura de matriz:
+        N° | AREA | CONTRATISTA | NUMERO DE CONTRATO | PLANTA | CONTRATISTA | MODALIDAD DE TRABAJO | Grupo al que pertenece | Lider | Supervisor contrato | Fecha de Inicio de Contrato | Fecha de Finalización de Contrato | Lugar de ejecución del contrato | Pregrado | Posgrado 1 | Posgrado 2 | Posgrado 3 | Objeto Contrato | HONORARIOS MES | VALOR CONTRATO
+        
+        Texto (datos separados por tabulaciones):
+        ${text}
+        
+        Devuelve el JSON con esta estructura:
+        {
+          "nombre": "string",
+          "profesion": "string",
+          "experienciaAnios": number,
+          "salarioMensual": number,
+          "gastosRepresentacion": number,
+          "incrementoAntiguedad": number,
+          "valorTotalContrato": number,
+          "numeroContrato": "string",
+          "objetoContrato": "string",
+          "supervisor": "string",
+          "fechaInicio": "string",
+          "fechaFinalizacion": "string",
+          "ciudad": "string",
+          "especialidades": ["string"],
+          "departamentosExperiencia": ["string"],
+          "formacionAcademica": ["string"]
+        }`;
+
+  const responseText = await generateContent(prompt, model, {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          nombre: { type: Type.STRING },
+          profesion: { type: Type.STRING },
+          experienciaAnios: { type: Type.NUMBER },
+          salarioMensual: { type: Type.NUMBER },
+          gastosRepresentacion: { type: Type.NUMBER },
+          incrementoAntiguedad: { type: Type.NUMBER },
+          valorTotalContrato: { type: Type.NUMBER },
+          numeroContrato: { type: Type.STRING },
+          objetoContrato: { type: Type.STRING },
+          supervisor: { type: Type.STRING },
+          fechaInicio: { type: Type.STRING },
+          fechaFinalizacion: { type: Type.STRING },
+          ciudad: { type: Type.STRING },
+          especialidades: { type: Type.ARRAY, items: { type: Type.STRING } },
+          departamentosExperiencia: { type: Type.ARRAY, items: { type: Type.STRING } },
+          formacionAcademica: { type: Type.ARRAY, items: { type: Type.STRING } }
+        }
+      }
+    });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  const parsed = parseJSONResponse(responseText);
+  console.log('Extracted professional data via AI:', parsed);
+  return parsed;
+};
+
+export const generateShockPlan = async (project: ProjectData) => {
+  const model = getAIModel();
+
+  const prompt = `
+    Como experto en gestión de proyectos de infraestructura y reducción del riesgo de la UNGRD, genera un "Plan de Choque" real y detallado para el siguiente proyecto que presenta desviaciones o riesgos.
+    
+    Información del Proyecto:
+    Nombre: ${project.project.nombre}
+    Ubicación: ${project.project.municipio}, ${project.project.departamento}
+    Avance Físico: ${project.project.avanceFisico}%
+    Avance Programado: ${project.project.avanceProgramado}%
+    Retraso Estimado: ${Math.max(0, project.project.avanceProgramado - project.project.avanceFisico)}%
+    Presupuesto Total: ${project.presupuesto.valorTotal}
+    Estado: ${project.project.estado}
+    
+    Alertas Activas:
+    ${JSON.stringify(project.alerts.map(a => ({ tipo: a.tipo, nivel: a.nivel, descripcion: a.descripcion })))}
+    
+    Contratos:
+    ${JSON.stringify(project.contracts.map(c => ({ numero: c.numero, tipo: c.tipo, contratista: c.contractorId, valor: c.valor })))}
+
+    El Plan de Choque debe ser una estrategia agresiva para recuperar el cronograma y mitigar riesgos críticos.
+    Debe incluir:
+    1. Un resumen ejecutivo de la situación.
+    2. Objetivos inmediatos (próximos 30 días).
+    3. Acciones específicas categorizadas (Técnicas, Administrativas, Financieras, Sociales/Ambientales).
+    4. Cronograma de hitos críticos de recuperación.
+    5. Indicadores de éxito del plan.
+
+    Responde estrictamente en formato JSON.
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        resumenSituacion: { type: Type.STRING },
+        objetivosInmediatos: { type: Type.ARRAY, items: { type: Type.STRING } },
+        accionesEspecificas: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              categoria: { type: Type.STRING, description: "Técnica, Administrativa, Financiera, Social, Ambiental" },
+              accion: { type: Type.STRING },
+              responsable: { type: Type.STRING },
+              plazo: { type: Type.STRING }
+            },
+            required: ["categoria", "accion", "responsable", "plazo"]
+          }
+        },
+        hitosRecuperacion: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              hito: { type: Type.STRING },
+              fechaEstimada: { type: Type.STRING }
+            },
+            required: ["hito", "fechaEstimada"]
+          }
+        },
+        indicadoresExito: { type: Type.ARRAY, items: { type: Type.STRING } }
+      },
+      required: ["resumenSituacion", "objetivosInmediatos", "accionesEspecificas", "hitosRecuperacion", "indicadoresExito"]
+    }
+  });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const extractWeeklyReportData = async (text: string, file?: File) => {
+  const model = getAIModel();
+  let inlineData: any = undefined;
+
+  if (file) {
+    const base64 = await fileToBase64(file);
+    inlineData = { inlineData: { mimeType: file.type, data: base64 } };
+  }
+
+  const prompt = `
+    Eres un auditor experto en supervisión de obras de la UNGRD. Analiza el siguiente INFORME SEMANAL DE AVANCE DE OBRA con MÁXIMO RIGOR.
+    El texto proviene de un reporte de interventoría con un formato específico (PDF a veces sin formato).
+    
+    TEXTO DEL INFORME:
+    ${text}
+    
+    INSTRUCCIONES DE EXTRACCIÓN CRÍTICAS:
+    1. SEMANA: Busca "Semana Número: X". Extrae solo el dígito.
+    2. FECHAS DE LA SEMANA: Busca "Del: [Fecha] Al: [Fecha]". Ojo: a veces las fechas aparecen solas.
+    3. CONTRATISTA: Extrae el nombre después de "CONTRATISTA DE OBRA:". 
+    4. INTERVENTORÍA: Extrae el nombre después de "INTERVENTORIA:".
+    5. PORCENTAJES DE AVANCE FÍSICO (%): 
+       Lee el texto con la MÁXIMA ATENCIÓN. Si dice "Obra programada (%) 1,97% 27,39% Obra Física Ejecutada (%) 0,23% 0,93%", ENTONCES los valores ACUMULADOS son 27.39 para programada y 0.93 para ejecutada. DEBES usar los valores ACUMULADOS (el segundo de la lista de cada grupo).
+       Convierte la coma a punto (de 0,93 a 0.93) en formato Number.
+    6. VALORES FINANCIEROS ($):
+       Busca en las secciones "Valor Básico Programado:" y "Ejecutada".
+       Limpia todos los signos de pesos, separa miles por puntos y decimales por comas en el formato colombiano y pásalo a tipo Number (ej. 316.162.125,72 pasa a 316162125.72).
+    7. TEXTOS LARGOS: Copia de manera exacta:
+        "ACTIVIDADES REALIZADAS EN LA SEMANA" -> actividadesEjecutadas
+        "ACTIVIDADES A REALIZAR EN LA SIGUIENTE SEMANA" -> actividadesProximas
+        "ACTIVIDADES SISO, AMBIENTALES Y SOCIALES" -> sisoAmbiental
+        "OBSERVACIONES DIRECTOR DE INTERVENTORIA" -> observaciones
+
+    Estructura JSON requerida:
+    {
+      "semana": number,
+      "fechaInicio": "YYYY-MM-DD",
+      "fechaFin": "YYYY-MM-DD",
+      "contratistaObra": "string",
+      "interventoria": "string",
+      "interventorResponsable": "Director de Interventoría",
+      "supervisor": "string (Supervisor del contrato)",
+      "obraProgramadaPct": number (0-100),
+      "obraEjecutadaPct": number (0-100),
+      "valorProgramado": number (COP),
+      "valorEjecutado": number (COP),
+      "valorPagado": number (COP),
+      "valorInicial": number (COP),
+      "valorActualizado": number (COP),
+      "aporteDistrito": number (COP),
+      "aporteGobernacion": number (COP),
+      "aporteMunicipio": number (COP),
+      "aporteFondo": number (COP),
+      "tiempoTranscurrido": "string",
+      "fechaIniciacion": "YYYY-MM-DD",
+      "fechaVencimiento": "YYYY-MM-DD",
+      "plazoInicial": "string",
+      "plazoActualizado": "string",
+      "actividadesEjecutadas": "string",
+      "actividadesProximas": "string",
+      "sisoAmbiental": "string",
+      "observaciones": "string",
+      "numeroContrato": "string (Contrato de Obra)",
+      "numeroContratoInterventoria": "string"
+    }
+
+    NOTAS:
+    - Si no encuentras un valor, devuelve null. 
+    - Limpia los números eliminando símbolos de moneda y puntos decimales/miles si es necesario para que sea un Number válido.
+    - Ignora el encabezado "1 de 2".
+    `;
+
+  const responseText = await generateContent(prompt, model, {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        semana: { type: Type.NUMBER },
+        fechaInicio: { type: Type.STRING },
+        fechaFin: { type: Type.STRING },
+        contratistaObra: { type: Type.STRING },
+        interventoria: { type: Type.STRING },
+        interventorResponsable: { type: Type.STRING },
+        supervisor: { type: Type.STRING },
+        obraProgramadaPct: { type: Type.NUMBER },
+        obraEjecutadaPct: { type: Type.NUMBER },
+        valorProgramado: { type: Type.NUMBER },
+        valorEjecutado: { type: Type.NUMBER },
+        valorPagado: { type: Type.NUMBER },
+        valorInicial: { type: Type.NUMBER },
+        valorActualizado: { type: Type.NUMBER },
+        aporteDistrito: { type: Type.NUMBER },
+        aporteGobernacion: { type: Type.NUMBER },
+        aporteMunicipio: { type: Type.NUMBER },
+        aporteFondo: { type: Type.NUMBER },
+        tiempoTranscurrido: { type: Type.STRING },
+        fechaIniciacion: { type: Type.STRING },
+        fechaVencimiento: { type: Type.STRING },
+        plazoInicial: { type: Type.STRING },
+        plazoActualizado: { type: Type.STRING },
+        actividadesEjecutadas: { type: Type.STRING },
+        actividadesProximas: { type: Type.STRING },
+        sisoAmbiental: { type: Type.STRING },
+        observaciones: { type: Type.STRING },
+        numeroContrato: { type: Type.STRING },
+        numeroContratoInterventoria: { type: Type.STRING }
+      }
+    }
+  }, inlineData ? [inlineData] : undefined);
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
+
+export const getAIResponse = async (prompt: string, projects: ProjectData[]) => {
+  const model = getAIModel();
+  
+  // Calculate performance for all contractors
+  const allContractors = Array.from(new Set(projects.flatMap(p => p.contracts.map(c => c.contractorId))));
+  const contractorPerformance = allContractors.map(contractorId => ({
+    contractorId,
+    metrics: calculateContractorPerformance(
+      contractorId,
+      projects.flatMap(p => p.contracts),
+      projects.flatMap(p => p.otrosies),
+      projects.flatMap(p => p.alerts),
+      [], // Need to pass evaluations, but I don't have them in ProjectData directly.
+      projects.map(p => p.project)
+    )
+  }));
+
+  const systemInstruction = `
+    Eres el Asistente de Inteligencia SRR (Seguimiento, Reporte y Riesgos) de la Unidad Nacional para la Gestión del Riesgo de Desastres (UNGRD).
+    Tu objetivo es ayudar a los coordinadores a analizar el portafolio de proyectos, contratistas y documentos.
+    
+    Capacidades:
+    1. Consultar contratistas: historial de contratos, desempeño y alertas.
+    2. Analizar desempeño: identificar contratistas con más retrasos.
+    3. Consultar documentos: buscar contratos de obra, interventoría, etc.
+    4. Generar gráficos: puedes sugerir visualizaciones de datos.
+    5. Detectar inconsistencias: entre documentos, avances y contratos.
+    6. Sugerir acciones correctivas en tiempo real.
+    7. Analizar desempeño histórico de contratistas para sugerir contratistas en nuevos proyectos.
+    8. Deep Learning de Documentos: Analizar informes, contratos y proyectos para detectar patrones, casos exitosos en estructuración, costos, ahorros, ejecuciones e innovaciones.
+    
+    ¡IMPORTANTE SOBRE BENEFICIARIOS!: La información sobre el número y descripción de beneficiarios SÍ está disponible en la propiedad "beneficiarios" de cada proyecto. Debes usar esta información directa y explícitamente cuando se te pregunte por impacto social, población protegida o cantidad de beneficiarios. NO digas que la información no está consolidada.
+
+    Información del Portafolio:
+    ${JSON.stringify(projects.map(p => ({
+      id: p.project.id,
+      nombre: p.project.nombre,
+      departamento: p.project.departamento,
+      municipio: p.project.municipio,
+      estado: p.project.estado,
+      avanceFisico: p.project.avanceFisico,
+      avanceProgramado: p.project.avanceProgramado,
+      presupuesto: p.presupuesto.valorTotal,
+      beneficiarios: p.project.beneficiarios,
+      contratos: p.contracts.map(c => ({
+        id: c.id,
+        numero: c.numero,
+        tipo: c.tipo,
+        contractorId: c.contractorId,
+        valor: c.valor,
+        fechaFin: c.fechaFin,
+        analisis: c.analysis // Incluir análisis de deep learning si existe
+      })),
+      ops: p.ops?.map(o => ({
+        nombre: o.nombre,
+        rol: o.rol,
+        honorariosMensuales: o.honorariosMensuales,
+        estado: o.estado
+      })),
+      comisiones: p.comisiones?.map(c => ({
+        fechaInicio: c.fechaInicio,
+        fechaFin: c.fechaFin,
+        municipios: c.municipios,
+        objeto: c.objeto,
+        costoTotal: c.costoTotal,
+        estado: c.estado
+      })),
+      alertas: p.alerts.map(a => ({ tipo: a.tipo, nivel: a.nivel, descripcion: a.descripcion })),
+      documentos: p.documents?.map(d => ({ 
+        titulo: d.titulo, 
+        tipo: d.tipo, 
+        fecha: d.fechaCreacion,
+        estado: d.estado,
+        analisis: d.analysis, // Incluir análisis de deep learning
+        versiones: d.versiones.map(v => ({
+          version: v.version,
+          fecha: v.fecha,
+          accion: v.accion,
+          estado: v.estado
+        }))
+      }))
+    })))}
+
+    Desempeño de Contratistas:
+    ${JSON.stringify(contractorPerformance)}
+    
+    Capacidades adicionales:
+    9. Analizar datos de OPS: costo total, carga de trabajo y desempeño por profesional.
+    10. Analizar datos de comisiones: número de visitas, costo operativo y resultados de campo.
+    11. Responder consultas sobre desempeño de profesionales OPS, costos de seguimiento y proyectos que requieren visitas de campo.
+    12. Sugerir contratistas para nuevos proyectos basados en desempeño histórico.
+    13. Detección de Patrones: Identificar correlaciones entre tipos de proyectos, contratistas y resultados (ej: "los proyectos de puentes en Chocó suelen tener retrasos del 20% por clima").
+
+    Si el usuario pide un gráfico o si consideras que la información se visualiza mejor gráficamente, DEBES incluir en tu respuesta un objeto JSON en la propiedad "chart" que contenga "type" (bar, pie, line), "title" y "data" (un array estricto de objetos con "name" (string) y "value" (number)).
+    Si el usuario pide un documento, menciona el nombre del documento y su tipo.
+    Si detectas inconsistencias (ej: avance físico alto pero sin informe de interventoría), menciónalo explícitamente.
+    
+    En tus respuestas, prioriza hallazgos de "Deep Learning" como:
+    - Patrones de éxito en la estructuración de proyectos similares.
+    - Oportunidades de ahorro detectadas en contratos comparables.
+    - Innovaciones aplicadas en ejecuciones previas que podrían replicarse.
+    - Riesgos recurrentes por zona geográfica o tipo de obra.
+  `;
+
+  const responseText = await generateContent(prompt, model, {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          text: { type: Type.STRING, description: "Respuesta textual del asistente" },
+          chart: {
+            type: Type.OBJECT,
+            properties: {
+              type: { type: Type.STRING, enum: ["bar", "pie", "line"] },
+              title: { type: Type.STRING },
+              data: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    value: { type: Type.NUMBER }
+                  }
+                }
+              }
+            }
+          },
+          recommendations: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          },
+          inconsistencies: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        },
+        required: ["text"]
+      }
+    });
+
+  if (!responseText) {
+    throw new Error("El modelo no devolvió ningún contenido.");
+  }
+  
+  return parseJSONResponse(responseText);
+};
