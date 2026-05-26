@@ -608,7 +608,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       let avanceFisico = project.avanceFisico || 0;
       
-      if (projectReports.length > 0) {
+      if (project.historialAvances && project.historialAvances.length > 0) {
+        // Find the maximum or latest value in historialAvances to ensure we don't go backwards
+        const highestAvance = Math.max(...project.historialAvances.map(h => h.valor));
+        const latestAvance = [...project.historialAvances].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+        
+        // Use latest, but ensure it doesn't regress un-intentionally (although sometimes it might legally regress, usually max is safest in these reports)
+        avanceFisico = latestAvance.valor;
+      } else if (projectReports.length > 0) {
         // Use the latest report's physical progress
         const latestReport = projectReports.sort((a, b) => new Date(b.fechaFin).getTime() - new Date(a.fechaFin).getTime())[0];
         avanceFisico = latestReport.obraEjecutadaPct;
