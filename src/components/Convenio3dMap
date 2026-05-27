@@ -1,0 +1,219 @@
+import React, { useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Html, Sphere, Stars, useGLTF, Line, Base, Geometry } from '@react-three/drei';
+import * as THREE from 'three';
+import { Project, Contract } from '../types';
+import { Activity, MapPin } from 'lucide-react';
+
+interface Convenio3DMapProps {
+  projects: Project[];
+  contracts: Contract[];
+}
+
+// Normalized dept coordinates (Longitude, Latitude) mapped to pseudo-3D
+const departmentCoordinates: Record<string, [number, number]> = {
+  "amazonas": [-71.5, -1.5],
+  "antioquia": [-75.5, 7.0],
+  "arauca": [-71.0, 7.0],
+  "atlantico": [-74.9, 10.7],
+  "bolivar": [-74.5, 9.0],
+  "boyaca": [-73.0, 5.5],
+  "caldas": [-75.4, 5.3],
+  "caqueta": [-73.5, 1.0],
+  "casanare": [-71.5, 5.5],
+  "cauca": [-76.8, 2.5],
+  "cesar": [-73.5, 9.5],
+  "choco": [-76.8, 5.5],
+  "cordoba": [-75.8, 8.5],
+  "cundinamarca": [-74.0, 5.0],
+  "guainia": [-69.0, 2.5],
+  "guaviare": [-72.0, 2.0],
+  "huila": [-75.5, 2.5],
+  "la guajira": [-72.5, 11.5],
+  "magdalena": [-74.0, 10.0],
+  "meta": [-73.0, 3.5],
+  "narino": [-78.0, 1.5],
+  "norte de santander": [-73.0, 8.0],
+  "putumayo": [-76.0, 0.5],
+  "quindio": [-75.7, 4.5],
+  "risaralda": [-76.0, 5.0],
+  "san andres": [-81.7, 12.5],
+  "santander": [-73.5, 6.5],
+  "sucre": [-75.0, 9.0],
+  "tolima": [-75.2, 4.0],
+  "valle": [-76.5, 3.5],
+  "vaupes": [-70.5, 0.5],
+  "vichada": [-69.5, 4.5],
+  "bogota": [-74.08, 4.60]
+};
+
+// Map lon/lat to 3D space
+const mapCoordToPosition = (lon: number, lat: number): [number, number, number] => {
+  // Center roughly on Colombia (Lon: -74, Lat: 4)
+  const x = (lon + 74) * 2;
+  const z = -(lat - 4) * 2;
+  return [x, 0, z];
+};
+
+const Marker = ({ position, color, height, label, percentage }: any) => {
+  const mesh = useRef<THREE.Mesh>(null);
+  const [hovered, setHover] = useState(false);
+
+  useFrame(({ clock }) => {
+    if (mesh.current) {
+      mesh.current.scale.y = hovered ? THREE.MathUtils.lerp(mesh.current.scale.y, 1.5, 0.1) : THREE.MathUtils.lerp(mesh.current.scale.y, 1, 0.1);
+      mesh.current.rotation.y = clock.getElapsedTime() * 0.5;
+    }
+  });
+
+  return (
+    <group position={position}>
+      <mesh 
+        ref={mesh}
+        position={[0, height / 2, 0]} 
+        onPointerOver={(e) => { e.stopPropagation(); setHover(true); }}
+        onPointerOut={(e) => { e.stopPropagation(); setHover(false); }}
+      >
+        <cylinderGeometry args={[0.2, 0.2, height, 16]} />
+        <meshPhysicalMaterial 
+          color={color} 
+          emissive={color}
+          emissiveIntensity={hovered ? 0.8 : 0.2}
+          transparent
+          opacity={0.8}
+          transmission={0.5}
+          roughness={0.2}
+          metalness={0.8}
+        />
+      </mesh>
+      
+      <Html position={[0, height + 0.5, 0]} center className="pointer-events-none transition-all duration-300">
+        <div className={`px-2 py-1 bg-black/80 backdrop-blur-md rounded-lg border border-slate-700 whitespace-nowrap transform transition-all ${hovered ? 'scale-100 opacity-100' : 'scale-90 opacity-0'}`}>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{backgroundColor: color}}></div>
+            <p className="text-white text-[10px] font-bold uppercase tracking-widest">{label}</p>
+          </div>
+          <p className="text-white font-mono text-sm font-bold mt-1 text-center" style={{color}}>{percentage.toFixed(1)}%</p>
+        </div>
+      </Html>
+
+      {/* Ripple ring effect */}
+      <mesh rotation={[-Math.PI/2, 0, 0]} position={[0,0.01,0]}>
+        <ringGeometry args={[0.3, 0.35, 32]} />
+        <meshBasicMaterial color={color} transparent opacity={0.5} />
+      </mesh>
+    </group>
+  );
+};
+
+export const Convenio3DMap: React.FC<Convenio3DMapProps> = ({ projects, contracts }) => {
+  const points = useMemo(() => {
+    const dataByDepts = new Map<string, { weight: number, valueSum: number, count: number }>();
+    
+    projects.forEach(p => {
+      const deptKey = p.departamento?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'bogota';
+      const cList = contracts.filter(c => c.projectId === p.id && (c.afectaAvanceFisico === true || (c.afectaAvanceFisico === undefined && c.tipo === 'Obra')));
+      const val = cList.reduce((acc, curr) => acc + curr.valor, 0);
+      const weight = val > 0 ? val : 1;
+      
+      const existing = dataByDepts.get(deptKey) || { weight: 0, valueSum: 0, count: 0 };
+      existing.weight += weight;
+      existing.valueSum += (p.avanceFisico || 0) * weight;
+      existing.count += 1;
+      dataByDepts.set(deptKey, existing);
+    });
+
+    const results = [];
+    for (const [dept, data] of dataByDepts.entries()) {
+      let coords = departmentCoordinates[dept];
+      if (!coords) {
+         // rough fallback
+         coords = [-(Math.random() * 8 + 68), (Math.random() * 10 - 2)];
+      }
+
+      const percentage = data.weight > 0 ? data.valueSum / data.weight : 0;
+      
+      // Thermal Color Mapping based on Physical Progress (0 -> Blue, 50 -> Yellow, 100 -> Red/Fire)
+      const color = new THREE.Color();
+      // Use HSL for smooth gradient: H: 240 (Blue) -> 0 (Red)
+      const h = (1 - (percentage / 100)) * 0.6; 
+      color.setHSL(h, 1.0, 0.5);
+
+      const height = (percentage / 100) * 3 + 0.5; // Scaled height
+
+      results.push({
+        id: dept,
+        label: dept.toUpperCase(),
+        position: mapCoordToPosition(coords[0], coords[1]),
+        percentage,
+        color: `#${color.getHexString()}`,
+        height
+      });
+    }
+
+    return results;
+  }, [projects, contracts]);
+
+  return (
+    <div className="w-full h-[600px] bg-[#0a0a0a] rounded-3xl overflow-hidden relative shadow-2xl border border-slate-800">
+      <div className="absolute top-4 left-4 z-10 pointer-events-none">
+        <h3 className="text-white font-black text-sm uppercase tracking-widest flex items-center gap-2">
+          <MapPin className="text-rose-500" size={16} />
+          Termografía Geofísica 3D
+        </h3>
+        <p className="text-slate-400 text-[10px]">Tasa Ponderada de Avance Físico por Municipio/Departamento</p>
+      </div>
+
+      <Canvas camera={{ position: [0, 8, 10], fov: 45 }}>
+        <color attach="background" args={['#0a0a0a']} />
+        <ambientLight intensity={0.5} />
+        <pointLight position={[10, 10, 10]} intensity={1.5} color="#d4af88" />
+        <spotLight position={[-10, 15, 0]} angle={0.3} penumbra={1} intensity={2} color="#4f46e5" />
+        
+        <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+        
+        {/* Base Grid/Platform representing Colombia bounds */}
+        <mesh rotation={[-Math.PI/2, 0, 0]} position={[0,-0.1,0]}>
+          <planeGeometry args={[20, 25, 10, 10]} />
+          <meshBasicMaterial color="#1e293b" wireframe transparent opacity={0.15} />
+        </mesh>
+
+        <group position={[0,0,0]}>
+          {points.map(pt => (
+            <Marker key={pt.id} {...pt} />
+          ))}
+
+          {/* Connect points with faint lines for neural look */}
+          {points.map((p1, i) => 
+            points.slice(i+1).map((p2, j) => {
+              const distance = new THREE.Vector3(...p1.position).distanceTo(new THREE.Vector3(...p2.position));
+              if (distance < 5) { // Only connect nearby points
+                return (
+                  <Line 
+                    key={`line-${i}-${j}`}
+                    points={[p1.position, p2.position]}
+                    color="#4f46e5"
+                    transparent
+                    opacity={0.15}
+                    lineWidth={1}
+                  />
+                )
+              }
+              return null;
+            })
+          )}
+        </group>
+
+        <OrbitControls 
+          enablePan={false} 
+          minPolarAngle={Math.PI/4} 
+          maxPolarAngle={Math.PI/2.1} 
+          minDistance={5}
+          maxDistance={20}
+          autoRotate
+          autoRotateSpeed={0.5}
+        />
+      </Canvas>
+    </div>
+  );
+};
