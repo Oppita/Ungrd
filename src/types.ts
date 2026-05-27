@@ -841,6 +841,7 @@ export interface Contract {
   aporteMunicipio?: number;
   aporteFondo?: number;
   responsibleId?: string; // New field
+  afectaAvanceFisico?: boolean; // Nuevo: Permite elegir si este contrato suma al avance ponderado del convenio/fase
   valorPagado?: number;
   avanceFisico?: number;
   avanceProgramado?: number;
@@ -882,6 +883,7 @@ export interface Pago {
   observaciones: string;
   soporteUrl?: string;
   soporteNombre?: string;
+  itemCategory?: string; // Nuevo: Categoría específica de inversión (ej. Compensaciones de actores de playa)
 
   // Nuevos campos masivos (CSV)
   cdp?: string;
@@ -1315,6 +1317,7 @@ export interface FinancialDocument {
   otrosieId?: string;
   projectId?: string;
   eventoId?: string;
+  itemCategory?: string; // Nuevo: Categoría específica de inversión (ej. Compensaciones de actores de playa)
   
   // Basic fields
   tipo: 'CDP' | 'RC' | 'Otros';
