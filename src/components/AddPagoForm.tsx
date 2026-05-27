@@ -812,21 +812,6 @@ export const AddPagoForm: React.FC<AddPagoFormProps> = ({
                   placeholder="Observación del pago..."
                 />
               </div>
-              
-              <div className="space-y-2 pt-2">
-                <label className="text-xs font-black text-fuchsia-600 uppercase tracking-wider flex items-center gap-2">
-                  Categoría Específica de Inversión
-                </label>
-                <input
-                  type="text"
-                  value={formData.itemCategory || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, itemCategory: e.target.value })
-                  }
-                  placeholder="Ej: Compensaciones de actores de playa"
-                  className="w-full bg-fuchsia-50 border border-fuchsia-200 text-fuchsia-800 font-bold rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none transition-all placeholder:font-normal placeholder:text-fuchsia-300"
-                />
-              </div>
 
               <div className="flex justify-end gap-3 pt-4 sticky bottom-0 bg-white border-t border-slate-100 p-4 -mx-8 -mb-8">
                 <button
