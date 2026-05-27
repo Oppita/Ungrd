@@ -86,9 +86,7 @@ export const uploadDocumentToStorage = async (file: File, folderPath: string): P
         console.warn(`Bucket '${bucketName}' not found. Attempting to create it dynamically...`);
         // Attempt to create the bucket dynamically as public
         const { error: createError } = await supabase.storage.createBucket(bucketName, { public: true });
-        
-        const createErrorMsg = String(createError?.message || '');
-        if (!createError || createErrorMsg.includes('already exists') || createErrorMsg.includes('duplicate key value')) {
+        if (!createError || String(createError.message).includes('already exists')) {
           // Retry upload
           const retry = await supabase.storage.from(bucketName).upload(filePath, file, { cacheControl: '3600', upsert: false });
           error = retry.error;
