@@ -2206,6 +2206,23 @@ export const FinancialExecutionModule: React.FC<
                           }
                         />
                       </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                          Categoría Específica de Inversión
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Compensaciones de actores de playa"
+                          className="w-full p-2 bg-fuchsia-50 border border-fuchsia-200 text-fuchsia-800 font-bold rounded-lg text-sm placeholder:font-normal placeholder:text-fuchsia-300"
+                          value={previewDoc.itemCategory ?? ""}
+                          onChange={(e) =>
+                            setPreviewDoc({
+                              ...previewDoc,
+                              itemCategory: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-4">
