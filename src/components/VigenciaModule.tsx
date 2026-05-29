@@ -1378,7 +1378,7 @@ export const VigenciaModule: React.FC = () => {
                   </div>
                 )}
                 {managingConvenioDocs === c.id && <ConvenioDocumentManager convenio={c} />}
-                {viewingConvenioVisualizer === c.id && <ConvenioVisualizer convenio={c} projects={state.proyectos.filter(p => p.convenioId === c.id)} contracts={state.contratos} financialDocuments={state.financialDocuments} pagos={state.pagos} />}
+                {viewingConvenioVisualizer === c.id && <ConvenioVisualizer convenio={c} projects={state.proyectos.filter(p => p.convenioId === c.id)} />}
               </div>
             ))}
           </div>
